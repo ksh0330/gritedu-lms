@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 시간표 관리</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/admin-timetable.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body class="admin-timetable-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="dash-back">
+      <a href="/members/admin/dashboard.html" class="btn sm">관리자 CMS로 돌아가기</a>
+    </div>
+
+    <div class="admin-timetable-head">
+      <div>
+        <h1 class="page-title">시간표 관리</h1>
+        <p class="muted admin-timetable-desc">공개 시간표의 그룹과 그룹별 이미지를 관리합니다.</p>
+      </div>
+      <div class="admin-timetable-head__actions">
+        <button type="button" class="btn sm" id="btnRefresh">새로고침</button>
+      </div>
+    </div>
+
+    <details class="admin-catalog-panel grit-section" id="scheduleGroupsPanel" open>
+      <summary class="admin-catalog-panel__summary">시간표 기준값 관리</summary>
+      <p class="muted admin-catalog-panel__lead">
+        정규·윈터·썸머 등 공개 시간표 구분을 관리합니다. 그룹을 숨기면 공개 페이지에서 선택할 수 없습니다.
+      </p>
+      <div class="admin-timetable-catalog-grid">
+        <section class="admin-timetable-catalog-card" aria-labelledby="scheduleGroupsTitle">
+          <h3 id="scheduleGroupsTitle">시간표 그룹</h3>
+          <p class="muted">시간표 종류의 이름·순서·노출을 관리합니다.</p>
+          <div id="scheduleGroupsEditor" aria-live="polite"></div>
+        </section>
+        <section class="admin-timetable-catalog-card admin-schedule-divisions" aria-labelledby="scheduleDivisionsTitle">
+          <h3 id="scheduleDivisionsTitle">학교급</h3>
+          <p class="muted">공개 필터의 이름·순서·노출을 관리합니다.</p>
+          <div id="scheduleDivisionsEditor" aria-live="polite"></div>
+        </section>
+      </div>
+      <div class="admin-catalog-panel__actions">
+        <button type="button" class="btn primary sm" id="scheduleGroupsSaveBtn">기준값 저장</button>
+      </div>
+    </details>
+
+    <section class="grit-section admin-schedule-image-inline" aria-labelledby="scheduleImageSectionTitle">
+      <div class="admin-schedule-image-inline__head">
+        <div>
+          <h2 id="scheduleImageSectionTitle">그룹별 이미지 관리</h2>
+          <p class="muted">그룹을 선택해 이미지 정보를 관리하세요. 이름·URL 수정은 즉시 저장됩니다.</p>
+        </div>
+        <button type="button" class="btn primary" id="scheduleImageSaveBtn">이미지 저장</button>
+      </div>
+      <div id="adminScheduleGroupTabs" class="admin-schedule-group-tabs" role="tablist" aria-label="시간표 그룹"></div>
+      <div class="admin-schedule-image-inline__body">
+        <div id="scheduleImageModalAlert" class="admin-schedule-image-modal__alert" role="alert" hidden></div>
+        <p class="muted admin-schedule-image-modal__lead">R2에 업로드한 시간표 이미지 URL을 그룹별로 등록합니다.</p>
+        <p class="muted admin-schedule-image-modal__hint">허용 경로: <code>https://assets.gritedu.kr/public/schedule/</code></p>
+        <select id="scheduleImageGroupId" hidden aria-hidden="true"></select>
+        <p class="muted admin-schedule-image-modal__group">관리 중인 그룹: <strong id="scheduleImageGroupLabel">정규</strong></p>
+        <p class="sr-only" id="scheduleImageStorageHint"></p>
+        <div class="admin-schedule-image-form">
+          <div class="admin-schedule-image-form__row">
+            <label class="admin-schedule-image-form__label" for="scheduleImageDivisionInput">구분</label>
+            <select id="scheduleImageDivisionInput" class="admin-catalog-field__input">
+              <option value="high">고등부</option>
+              <option value="middle">중등부</option>
+            </select>
+          </div>
+          <div class="admin-schedule-image-form__row">
+            <label class="admin-schedule-image-form__label" for="scheduleImageNameInput">이미지 이름</label>
+            <input type="text" id="scheduleImageNameInput" class="admin-catalog-field__input" placeholder="예: 2026 정규 시간표" autocomplete="off">
+          </div>
+          <div class="admin-schedule-image-form__row">
+            <label class="admin-schedule-image-form__label" for="scheduleImageUrlInput">이미지 URL</label>
+            <input type="url" id="scheduleImageUrlInput" class="admin-catalog-field__input" placeholder="https://assets.gritedu.kr/public/schedule/..." autocomplete="off">
+          </div>
+          <button type="button" class="btn sm" id="scheduleImageAddBtn">이미지 추가</button>
+        </div>
+        <div id="scheduleImageList" class="admin-schedule-image-list" aria-live="polite"></div>
+      </div>
+    </section>
+    <div id="statusMsg" class="admin-timetable-toast" aria-live="polite"></div>
+  </main>
+
+  <div data-include="footer"></div>
+  <div id="scheduleImageEditModal" class="modal admin-schedule-image-modal" hidden>
+    <div class="modal-content admin-schedule-image-modal__content">
+      <div class="modal-header"><h2>시간표 이미지 수정</h2><button type="button" class="modal-close" data-image-edit-close aria-label="닫기">&times;</button></div>
+      <form id="scheduleImageEditForm" class="admin-schedule-image-form">
+        <input type="hidden" id="scheduleImageEditOriginalUrl">
+        <div class="admin-schedule-image-form__row"><label class="admin-schedule-image-form__label" for="scheduleImageEditName">이미지 이름</label><input id="scheduleImageEditName" class="admin-catalog-field__input" required></div>
+        <div class="admin-schedule-image-form__row"><label class="admin-schedule-image-form__label" for="scheduleImageEditUrl">이미지 URL</label><input id="scheduleImageEditUrl" class="admin-catalog-field__input" type="url" required></div>
+        <div class="admin-schedule-image-modal__actions"><button type="button" class="btn" data-image-edit-close>취소</button><button type="submit" class="btn primary">수정 저장</button></div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

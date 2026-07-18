@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Disallow: /members/
+Disallow: /admin/
+
+Sitemap: https://gritedu.kr/sitemap.xml

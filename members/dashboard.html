@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 내 강의실</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css" />
+  <style>
+    /* 로그인 체크 전까지 페이지 숨김 */
+    body {
+      visibility: hidden;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align:center;padding:50px;">
+    <p>LMS로 이동하는 중...</p>
+  </div>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  
+  <!-- LMS 이동 스크립트 -->
+  <script type="module" src="/assets/js/pages/dashboard.js"></script>
+</body>
+</html>

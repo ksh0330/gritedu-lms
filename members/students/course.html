@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <title>그릿에듀 | 강의 학습</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/student-course.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container" id="coursePage">
+    <div class="dash-back">
+      <a href="/members/students/dashboard.html" class="btn sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        내 강의실로 돌아가기
+      </a>
+    </div>
+    
+    <!-- 강의 헤더 -->
+    <section class="course-header" id="courseHeader">
+      <div class="course-header-content">
+        <div class="course-label" id="courseSubject" style="word-break:keep-all;overflow-wrap:break-word;white-space:nowrap;">과목</div>
+        <h1 class="course-title" id="courseTitle" style="word-break:keep-all;overflow-wrap:break-word;">강좌명</h1>
+        <div class="course-meta" id="courseMeta" style="width:100%;box-sizing:border-box;">
+      <span id="courseInstructor" class="course-instructor" style="word-break:keep-all;overflow-wrap:break-word;"></span>
+        </div>
+        <div id="courseEnrollmentActions" class="course-enrollment-actions" hidden style="margin-top:12px;">
+          <button type="button" id="unenrollCourseBtn" class="btn sm danger">수강취소</button>
+        </div>
+        <div class="progress-section" style="margin-top:24px;padding:24px;background:linear-gradient(135deg, var(--hover) 0%, var(--card) 100%);border-radius:16px;border:1px solid var(--border);width:100%;box-sizing:border-box;">
+          <div class="progress-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand);flex-shrink:0;">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span style="font-weight:700;color:var(--text);font-size:clamp(14px, 2vw, 16px);word-break:keep-all;">학습 진도율</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:4px;flex-shrink:0;">
+              <span id="progressText" style="font-weight:900;color:var(--brand);font-size:clamp(24px, 4vw, 28px);line-height:1;">0</span>
+              <span style="font-weight:700;color:var(--brand);font-size:clamp(16px, 2.5vw, 18px);">%</span>
+            </div>
+          </div>
+          <div class="progress-bar" style="width:100%;height:20px;background:var(--hover);border-radius:10px;overflow:hidden;position:relative;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);box-sizing:border-box;">
+            <div id="progressBar" style="height:100%;background:linear-gradient(90deg, var(--brand) 0%, var(--accent) 100%);width:0%;transition:width 0.6s cubic-bezier(0.4, 0, 0.2, 1);position:relative;border-radius:10px;">
+              <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);animation:progress-shine 2s infinite;"></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;font-size:clamp(12px, 1.8vw, 14px);color:var(--muted);font-weight:600;flex-wrap:wrap;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>시청 완료: <span id="watchedCount" style="color:var(--brand);font-weight:700;">0</span> / <span id="totalVideos" style="font-weight:700;">0</span></span>
+            </div>
+            <div id="progressMessage" style="font-size:clamp(11px, 1.6vw, 13px);color:var(--muted);font-weight:600;word-break:keep-all;overflow-wrap:break-word;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 주차별 학습 목록 -->
+    <section class="course-content" id="courseContent">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <h2 style="margin:0;font-size:clamp(1.25rem, 3vw, 1.5rem);font-weight:800;word-break:keep-all;overflow-wrap:break-word;">학습 목록</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;">
+          <div style="position:relative;flex:1;min-width:0;width:100%;">
+            <label for="searchInput" class="sr-only">검색</label>
+            <input type="text" id="searchInput" placeholder="주차 또는 영상명을 검색하세요" aria-label="주차 또는 영상명 검색" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);width:100%;font-size:16px;box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
+      <div id="weeksList" class="weeks-list" aria-live="polite" aria-busy="true">
+        <!-- 로딩 스켈레톤 -->
+        <div class="loading-skeleton">
+          <div class="skeleton-week-card">
+            <div class="skeleton-week-header">
+              <div class="skeleton-circle"></div>
+              <div class="skeleton-line" style="width:200px;"></div>
+            </div>
+          </div>
+          <div class="skeleton-week-card">
+            <div class="skeleton-week-header">
+              <div class="skeleton-circle"></div>
+              <div class="skeleton-line" style="width:180px;"></div>
+            </div>
+          </div>
+          <div class="skeleton-week-card">
+            <div class="skeleton-week-header">
+              <div class="skeleton-circle"></div>
+              <div class="skeleton-line" style="width:220px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 영상 재생 모달 -->
+  <div id="videoModal" class="video-modal" style="display:none;">
+    <div class="video-modal-content">
+      <div class="video-modal-header">
+        <h3 id="videoModalTitle">영상 제목</h3>
+        <button class="video-modal-close" onclick="closeVideoModal()" aria-label="닫기">&times;</button>
+      </div>
+      <div class="video-modal-body">
+        <div id="videoPlayer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 완료 축하 모달 -->
+  <div id="completionModal" class="completion-modal" style="display:none;">
+    <div class="completion-modal-content">
+      <div class="completion-badge-container">
+        <div class="completion-badge">
+          <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#ffd700;">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>
+          </svg>
+        </div>
+        <div class="completion-icon">
+          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand);">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.2"></circle>
+          </svg>
+        </div>
+      </div>
+      <h2>축하합니다! 🎉</h2>
+      <p style="margin-bottom:8px;font-size:18px;font-weight:700;color:var(--brand);">강의를 모두 완료하셨습니다!</p>
+      <p style="margin-top:0;font-size:14px;color:var(--muted);">성취 배지를 획득하셨습니다.</p>
+      <div class="completion-actions">
+        <button class="btn primary" onclick="closeCompletionModal()">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수강후기 작성 모달 (단순화: course-reviews.js에서 동적 생성) -->
+  <!-- 이 모달은 course-reviews.js에서 동적으로 생성되므로 여기서는 제거 -->
+
+
+  <div id="unenrollModal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="unenrollModalTitle" hidden>
+    <div class="modal-content auth-card student-unenroll-modal" style="max-width:520px;">
+      <button type="button" id="closeUnenrollModal" class="modal-close" aria-label="닫기">×</button>
+      <h1 id="unenrollModalTitle">수강 취소</h1>
+      <p class="desc">강좌: <strong id="unenrollCourseTitle">-</strong></p>
+      <ul class="student-unenroll-warning">
+        <li>수강을 취소하면 내 강의실에서 해당 강좌가 사라집니다.</li>
+        <li>학습 진도, 시청 기록 등 수강 기록이 모두 삭제됩니다.</li>
+        <li>다시 학습하려면 강좌 상세 페이지에서 다시 수강신청해야 합니다.</li>
+      </ul>
+      <label for="unenrollPhraseInput">확인 문구 입력</label>
+      <p class="desc" style="margin:0 0 8px;">아래 문구를 정확히 입력해 주세요: <code>수강취소하겠습니다</code></p>
+      <input type="text" id="unenrollPhraseInput" autocomplete="off" spellcheck="false" placeholder="수강취소하겠습니다">
+      <div class="student-unenroll-modal__actions">
+        <button type="button" id="cancelUnenrollBtn" class="btn sm">닫기</button>
+        <button type="button" id="confirmUnenrollBtn" class="btn sm danger" disabled>수강 취소</button>
+      </div>
+      <p id="unenrollStatus" class="desc" style="margin-top:12px;min-height:20px;"></p>
+    </div>
+  </div>
+
+  <div data-include="footer"></div>
+</body>
+</html>

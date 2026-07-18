@@ -1,0 +1,786 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{db}/documents {
+    
+    function signedIn() { 
+      return request.auth != null; 
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(db)/documents/admins/$(request.auth.uid));
+    }
+
+    function isInstructor() {
+      return signedIn() && (
+        exists(/databases/$(db)/documents/instructorAccounts/$(request.auth.uid)) ||
+        exists(/databases/$(db)/documents/instructors/$(request.auth.uid))
+      );
+    }
+
+    function isStudent() {
+      return signedIn() &&
+             exists(/databases/$(db)/documents/students/$(request.auth.uid));
+    }
+
+    function isMember() {
+      return signedIn() &&
+             exists(/databases/$(db)/documents/members/$(request.auth.uid));
+    }
+
+    function isGeneralMember() {
+      return isMember() &&
+             get(/databases/$(db)/documents/members/$(request.auth.uid)).data.memberPurpose == 'general';
+    }
+
+    function isParentMember() {
+      return isMember() &&
+             get(/databases/$(db)/documents/members/$(request.auth.uid)).data.memberPurpose == 'parent';
+    }
+
+    function isLinkedParentOfStudent(studentUid) {
+      return isParentMember() &&
+             studentUid is string &&
+             studentUid != "" &&
+             exists(/databases/$(db)/documents/studentParentLinks/$(studentUid + '_' + request.auth.uid)) &&
+             get(/databases/$(db)/documents/studentParentLinks/$(studentUid + '_' + request.auth.uid)).data.status == 'active' &&
+             get(/databases/$(db)/documents/studentParentLinks/$(studentUid + '_' + request.auth.uid)).data.memberUid == request.auth.uid &&
+             get(/databases/$(db)/documents/studentParentLinks/$(studentUid + '_' + request.auth.uid)).data.studentUid == studentUid;
+    }
+
+    function onlyAllowedFieldsChanged(allowed) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return changedKeys.hasOnly(allowed);
+    }
+
+    function isSignupEnabled() {
+      return !exists(/databases/$(db)/documents/settings/signup) ||
+             !('enabled' in get(/databases/$(db)/documents/settings/signup).data) ||
+             get(/databases/$(db)/documents/settings/signup).data.enabled != false;
+    }
+
+    function isStudentSignupEnabled() {
+      return isSignupEnabled() &&
+             (
+               !exists(/databases/$(db)/documents/settings/signup) ||
+               !('studentEnabled' in get(/databases/$(db)/documents/settings/signup).data) ||
+               get(/databases/$(db)/documents/settings/signup).data.studentEnabled != false
+             );
+    }
+
+    function isMemberSignupEnabled() {
+      return isSignupEnabled() &&
+             (
+               !exists(/databases/$(db)/documents/settings/signup) ||
+               !('memberEnabled' in get(/databases/$(db)/documents/settings/signup).data) ||
+               get(/databases/$(db)/documents/settings/signup).data.memberEnabled != false
+             );
+    }
+
+    function isValidMemberPurpose(value) {
+      return value is string &&
+             value in ['parent', 'general'];
+    }
+
+    function isValidMemberSignupSource(value) {
+      return value is string &&
+             value in ['search', 'friend', 'sns', 'ad', 'other'];
+    }
+
+    function legalPolicyVersion() {
+      return '2026-07-18';
+    }
+
+    function isValidConsentSource(value) {
+      return value is string &&
+             value in ['signup', 'settings', 'admin'];
+    }
+
+    function isValidMarketingConsent(data) {
+      return data is map &&
+             data.keys().hasOnly([
+               'sms',
+               'email',
+               'agreedAt',
+               'updatedAt',
+               'withdrawnAt',
+               'source',
+               'policyVersion'
+             ]) &&
+             data.keys().hasAll([
+               'sms',
+               'email',
+               'agreedAt',
+               'updatedAt',
+               'withdrawnAt',
+               'source',
+               'policyVersion'
+             ]) &&
+             data.sms is bool &&
+             data.email is bool &&
+             (
+               data.sms == true || data.email == true
+                 ? data.agreedAt is timestamp
+                 : (data.agreedAt == null || data.agreedAt is timestamp)
+             ) &&
+             data.updatedAt is timestamp &&
+             (data.withdrawnAt == null || data.withdrawnAt is timestamp) &&
+             isValidConsentSource(data.source) &&
+             data.policyVersion == legalPolicyVersion();
+    }
+
+    function hasValidMarketingConsentChangeCounter(data) {
+      return (
+               !('marketingConsentChangeDate' in data) &&
+               !('marketingConsentChangeCount' in data)
+             ) ||
+             (
+               ('marketingConsentChangeDate' in data) &&
+               ('marketingConsentChangeCount' in data) &&
+               data.marketingConsentChangeDate is string &&
+               data.marketingConsentChangeDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+               data.marketingConsentChangeCount is number &&
+               data.marketingConsentChangeCount >= 1 &&
+               data.marketingConsentChangeCount <= 3
+             );
+    }
+
+    function hasValidOwnerMarketingConsentUpdate(data) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return !changedKeys.hasAny(['marketingConsent']) ||
+             (
+               isValidMarketingConsent(data.marketingConsent) &&
+               data.marketingConsent.source == 'settings' &&
+               ('marketingConsentChangeDate' in data) &&
+               ('marketingConsentChangeCount' in data) &&
+               hasValidMarketingConsentChangeCounter(data)
+             );
+    }
+
+    function hasValidRequiredConsent(data) {
+      return data.termsAgreed == true &&
+             data.privacyAgreed == true &&
+             data.termsAgreedAt is timestamp &&
+             data.privacyAgreedAt is timestamp &&
+             isValidConsentSource(data.consentSource) &&
+             data.policyVersion == legalPolicyVersion();
+    }
+
+    function isValidStudentSignupSource(value) {
+      return value is string &&
+             value in ['search', 'friend', 'sns', 'ad', 'other'];
+    }
+
+    function hasValidStudentSignupSource(data) {
+      return !('signupSource' in data) || isValidStudentSignupSource(data.signupSource);
+    }
+
+    function isValidStudentSignupData(uid, data) {
+      return data.keys().hasOnly([
+               'name',
+               'email',
+               'school',
+               'grade',
+               'phone',
+               'note',
+               'signupSource',
+               'termsAgreed',
+               'privacyAgreed',
+               'termsAgreedAt',
+               'privacyAgreedAt',
+               'consentSource',
+               'policyVersion',
+               'marketingConsent',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             data.keys().hasAll([
+               'name',
+               'email',
+               'school',
+               'grade',
+               'phone',
+               'note',
+               'termsAgreed',
+               'privacyAgreed',
+               'termsAgreedAt',
+               'privacyAgreedAt',
+               'consentSource',
+               'policyVersion',
+               'marketingConsent',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             data.name is string &&
+             data.email is string &&
+             data.school is string &&
+             data.grade is string &&
+             data.grade in ['1', '2', '3', '4', '5', '6', '7'] &&
+             data.phone is string &&
+             data.note is string &&
+             hasValidStudentSignupSource(data) &&
+             data.consentSource == 'signup' &&
+             hasValidRequiredConsent(data) &&
+             isValidMarketingConsent(data.marketingConsent) &&
+             data.marketingConsent.source == 'signup' &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function hasValidMemberSignupSource(data) {
+      return data.memberPurpose == 'parent'
+        ? (!('signupSource' in data) && !('signupSourceOther' in data))
+        : (
+            ('signupSource' in data) &&
+            isValidMemberSignupSource(data.signupSource) &&
+            (
+              data.signupSource == 'other'
+                ? (('signupSourceOther' in data) && data.signupSourceOther is string && data.signupSourceOther != '')
+                : !('signupSourceOther' in data)
+            )
+          );
+    }
+
+    function isValidMemberProfileData(data) {
+      return data.keys().hasOnly([
+               'uid',
+               'role',
+               'name',
+               'email',
+               'emailLower',
+               'phone',
+               'memberPurpose',
+               'signupSource',
+               'signupSourceOther',
+               'status',
+               'hasLinkedChildren',
+               'linkedChildrenCount',
+               'termsAgreed',
+               'privacyAgreed',
+               'termsAgreedAt',
+               'privacyAgreedAt',
+               'consentSource',
+               'policyVersion',
+               'marketingConsent',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             data.keys().hasAll([
+               'uid',
+               'role',
+               'name',
+               'email',
+               'emailLower',
+               'phone',
+               'memberPurpose',
+               'status',
+               'hasLinkedChildren',
+               'linkedChildrenCount',
+               'termsAgreed',
+               'privacyAgreed',
+               'consentSource',
+               'policyVersion',
+               'marketingConsent',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             data.name is string &&
+             data.email is string &&
+             data.emailLower is string &&
+             data.phone is string &&
+             data.uid == request.auth.uid &&
+             data.role == 'member' &&
+             isValidMemberPurpose(data.memberPurpose) &&
+             hasValidMemberSignupSource(data) &&
+             data.status == 'active' &&
+             data.hasLinkedChildren is bool &&
+             data.linkedChildrenCount is number &&
+             hasValidRequiredConsent(data) &&
+             isValidMarketingConsent(data.marketingConsent);
+    }
+
+    function isValidMemberOwnerUpdateData(data) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return (!changedKeys.hasAny(['name']) || data.name is string) &&
+             (!changedKeys.hasAny(['phone']) || data.phone is string) &&
+             (!changedKeys.hasAny(['updatedAt']) || data.updatedAt is timestamp) &&
+             (!changedKeys.hasAny(['marketingConsent']) || isValidMarketingConsent(data.marketingConsent)) &&
+             hasValidMarketingConsentChangeCounter(data);
+    }
+
+    function currentInstructorProfileId() {
+      return exists(/databases/$(db)/documents/instructorAccounts/$(request.auth.uid)) &&
+             get(/databases/$(db)/documents/instructorAccounts/$(request.auth.uid)).data.instructorId is string
+             ? get(/databases/$(db)/documents/instructorAccounts/$(request.auth.uid)).data.instructorId
+             : "";
+    }
+
+    function isLinkedInstructorProfile(profileId) {
+      return signedIn() &&
+             profileId is string &&
+             profileId != "" &&
+             exists(/databases/$(db)/documents/instructors/$(profileId)) &&
+             get(/databases/$(db)/documents/instructors/$(profileId)).data.uid == request.auth.uid;
+    }
+
+    function isCurrentInstructorAssignmentKey(value) {
+      let instructorId = currentInstructorProfileId();
+      return signedIn() &&
+             value is string &&
+             value != "" &&
+             (
+               value == request.auth.uid ||
+               (instructorId != "" && value == instructorId) ||
+               isLinkedInstructorProfile(value)
+             );
+    }
+
+    function isAssignedCourseInstructor(courseData) {
+      let instructorId = currentInstructorProfileId();
+      return (
+        ("instructorUid" in courseData) &&
+        isCurrentInstructorAssignmentKey(courseData.instructorUid)
+      ) || (
+        ("instructorUids" in courseData) &&
+        courseData.instructorUids is list &&
+        (
+          request.auth.uid in courseData.instructorUids ||
+          (instructorId != "" && instructorId in courseData.instructorUids)
+        )
+      ) || (
+        ("instructorId" in courseData) &&
+        isCurrentInstructorAssignmentKey(courseData.instructorId)
+      );
+    }
+
+    function isAssignedCourseInstructorById(courseId) {
+      return courseId is string &&
+             courseId != "" &&
+             exists(/databases/$(db)/documents/courses/$(courseId)) &&
+             isAssignedCourseInstructor(get(/databases/$(db)/documents/courses/$(courseId)).data);
+    }
+
+    function isAssignedOfflineClassInstructor(classData) {
+      let profileId = currentInstructorProfileId();
+      return (
+        ("instructorUid" in classData) &&
+        isCurrentInstructorAssignmentKey(classData.instructorUid)
+      ) || (
+        ("instructorId" in classData) &&
+        isCurrentInstructorAssignmentKey(classData.instructorId)
+      ) || (
+        ("instructorUids" in classData) &&
+        classData.instructorUids is list &&
+        (
+          request.auth.uid in classData.instructorUids ||
+          (profileId != "" && profileId in classData.instructorUids)
+        )
+      );
+    }
+
+    function isAssignedOfflineClassInstructorByClassId(classId) {
+      return classId is string &&
+             classId != "" &&
+             exists(/databases/$(db)/documents/offlineClasses/$(classId)) &&
+             isAssignedOfflineClassInstructor(get(/databases/$(db)/documents/offlineClasses/$(classId)).data);
+    }
+
+    function offlineClassMemberDocId(classId) {
+      return classId + '_' + request.auth.uid;
+    }
+
+    function isActiveOfflineClassMember(classId) {
+      return isStudent() &&
+             classId is string &&
+             classId != "" &&
+             exists(/databases/$(db)/documents/offlineClassMembers/$(offlineClassMemberDocId(classId))) &&
+             get(/databases/$(db)/documents/offlineClassMembers/$(offlineClassMemberDocId(classId))).data.status == 'active' &&
+             get(/databases/$(db)/documents/offlineClassMembers/$(offlineClassMemberDocId(classId))).data.studentUid == request.auth.uid &&
+             get(/databases/$(db)/documents/offlineClassMembers/$(offlineClassMemberDocId(classId))).data.classId == classId;
+    }
+
+    function isValidEnrollmentStudentSnapshot(snapshot) {
+      return snapshot is map &&
+             snapshot.keys().hasOnly(['name', 'email', 'phone', 'school', 'grade']) &&
+             (!('name' in snapshot) || snapshot.name is string) &&
+             (!('email' in snapshot) || snapshot.email is string) &&
+             (!('phone' in snapshot) || snapshot.phone is string) &&
+             (!('school' in snapshot) || snapshot.school is string) &&
+             (!('grade' in snapshot) || snapshot.grade is string);
+    }
+
+    function isValidEnrollmentLearnerType(value) {
+      return value in ['student', 'member'];
+    }
+
+    function isCurrentEnrollmentLearnerType(value) {
+      return (value == 'student' && isStudent()) ||
+             (value == 'member' && isGeneralMember());
+    }
+
+    function isValidEnrollmentLearnerSnapshot(snapshot, learnerType) {
+      return snapshot is map &&
+             snapshot.keys().hasOnly(['name', 'email', 'phone', 'type', 'school', 'grade']) &&
+             snapshot.keys().hasAll(['name', 'email', 'phone', 'type', 'school', 'grade']) &&
+             snapshot.name is string &&
+             snapshot.email is string &&
+             snapshot.phone is string &&
+             snapshot.type == learnerType &&
+             (
+               learnerType == 'student'
+                 ? (snapshot.school is string && snapshot.grade is string)
+                 : (snapshot.school == null && snapshot.grade == null)
+             );
+    }
+
+    function hasOnlyOwnerEnrollmentWriteFields(data) {
+      return data.keys().hasOnly([
+        'userId',
+        'courseId',
+        'status',
+        'progress',
+        'studentSnapshot',
+        'learnerType',
+        'learnerSnapshot',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    function hasValidOptionalEnrollmentSnapshot(data) {
+      return !('studentSnapshot' in data) ||
+             data.studentSnapshot == null ||
+             isValidEnrollmentStudentSnapshot(data.studentSnapshot);
+    }
+
+    function hasValidRequiredEnrollmentLearner(data) {
+      return ('learnerType' in data) &&
+             ('learnerSnapshot' in data) &&
+             isValidEnrollmentLearnerType(data.learnerType) &&
+             isCurrentEnrollmentLearnerType(data.learnerType) &&
+             isValidEnrollmentLearnerSnapshot(data.learnerSnapshot, data.learnerType) &&
+             (
+               data.learnerType == 'student'
+                 ? (('studentSnapshot' in data) && isValidEnrollmentStudentSnapshot(data.studentSnapshot))
+                 : (!('studentSnapshot' in data) || data.studentSnapshot == null)
+             );
+    }
+
+    function hasValidOptionalEnrollmentStatus(data) {
+      return !('status' in data) ||
+             data.status == 'active';
+    }
+
+    function hasValidOptionalEnrollmentProgress(data) {
+      return !('progress' in data) ||
+             (data.progress >= 0 && data.progress <= 100);
+    }
+
+    function isValidOwnerEnrollmentWrite(enrollmentId) {
+      return signedIn() &&
+             (isStudent() || isMember()) &&
+             enrollmentId == request.auth.uid + '_' + request.resource.data.courseId &&
+             hasOnlyOwnerEnrollmentWriteFields(request.resource.data) &&
+             request.resource.data.userId == request.auth.uid &&
+             request.resource.data.courseId is string &&
+             request.resource.data.courseId != '' &&
+             hasValidOptionalEnrollmentStatus(request.resource.data) &&
+             hasValidOptionalEnrollmentProgress(request.resource.data) &&
+             hasValidOptionalEnrollmentSnapshot(request.resource.data) &&
+             hasValidRequiredEnrollmentLearner(request.resource.data);
+    }
+
+    function isLearnerEnrollmentOwner() {
+      return signedIn() &&
+             (isStudent() || isMember()) &&
+             resource.data.userId == request.auth.uid &&
+             resource.data.courseId != null;
+    }
+
+    function isLearnerEnrollmentWriteOwner() {
+      return signedIn() &&
+             (isStudent() || isGeneralMember()) &&
+             resource.data.userId == request.auth.uid &&
+             resource.data.courseId != null;
+    }
+
+    match /users/{roleDocId} {
+      allow read, write: if false;
+    }
+
+    match /admins/{uid} {
+      allow read:    if signedIn() && (uid == request.auth.uid || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /instructors/{uid} { 
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /instructorAccounts/{uid} {
+      allow read: if signedIn() && (isAdmin() || uid == request.auth.uid);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /students/{uid} {
+      allow read: if signedIn() && (uid == request.auth.uid || isAdmin());
+      allow create: if isAdmin() ||
+                      (uid == request.auth.uid &&
+                       isStudentSignupEnabled() &&
+                       isValidStudentSignupData(uid, request.resource.data));
+      allow update: if isAdmin() ||
+                      (uid == request.auth.uid && 
+                       onlyAllowedFieldsChanged(['name', 'phone', 'school', 'grade', 'updatedAt', 'gradeManualOverride', 'email', 'marketingConsent', 'marketingConsentChangeDate', 'marketingConsentChangeCount']) &&
+                       hasValidOwnerMarketingConsentUpdate(request.resource.data) &&
+                       hasValidMarketingConsentChangeCounter(request.resource.data));
+      
+      allow delete: if isAdmin();
+    }
+
+    match /members/{uid} {
+      allow read: if signedIn() && (uid == request.auth.uid || isAdmin());
+      allow create: if isAdmin() ||
+                      (uid == request.auth.uid &&
+                       isMemberSignupEnabled() &&
+                       isValidMemberProfileData(request.resource.data) &&
+                       request.resource.data.hasLinkedChildren == false &&
+                       request.resource.data.linkedChildrenCount == 0);
+      allow update: if isAdmin() ||
+                      (uid == request.auth.uid &&
+                       onlyAllowedFieldsChanged(['name', 'phone', 'updatedAt', 'marketingConsent', 'marketingConsentChangeDate', 'marketingConsentChangeCount']) &&
+                       isValidMemberOwnerUpdateData(request.resource.data) &&
+                       hasValidOwnerMarketingConsentUpdate(request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /studentParentLinks/{linkId} {
+      allow read: if isAdmin() ||
+        (signedIn() && resource.data.memberUid == request.auth.uid) ||
+        (isStudent() && resource.data.studentUid == request.auth.uid);
+      allow create, update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /memberChildLinkAttempts/{attemptId} {
+      allow read: if isAdmin() ||
+        (isMember() && resource.data.memberUid == request.auth.uid);
+      allow create, update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /parents/{uid} {
+      allow read:    if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/signup {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/coursesMenu {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /** 강사진 노출/정렬/과목 기준값 — 공개 페이지에서 읽음 */
+    match /settings/instructorsMenu {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /** 온라인 강좌 목록 필터 기준값 — 공개 페이지에서 읽음 */
+    match /settings/courseCatalog {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /** 공개 시간표 필터 옵션 */
+    match /settings/timetableCatalog {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /** 오프라인 반 입력 기준값 — 오프라인 반 CMS 전용 */
+    match /settings/offlineClassCatalog {
+      allow read, write: if isAdmin();
+    }
+
+    /** 홈페이지 팝업 표시 설정 — 공개 표시용 문서만 읽기 허용 */
+    match /settings/popups {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /** 카카오톡 채널 플로팅 링크 설정 — 공개 페이지에서 읽음 */
+    match /settings/kakaoChannel {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /publicTimetableEntries/{classId} {
+      // 폐기된 공개 시간표 CRUD 컬렉션. 잔여 관리자 정리 코드만 접근 가능.
+      allow read, delete: if isAdmin();
+      allow create, update: if false;
+    }
+
+    /** 푸터 사업자 및 SNS 공개 정보 */
+    match /settings/footer {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /** 학원정보조회·교습비·환불규정 공개 이미지 목록 */
+    match /settings/tuitionImages {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{doc} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /pages/{slug} { 
+      allow read: if true; 
+      allow write: if isAdmin(); 
+    }
+
+    match /arrangements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /exam_contents/{contentId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /enrollments/{enrollmentId} {
+      // TODO: After class removal rollout, manually verify legacy enrollment docs no longer depend on classId.
+      allow read: if signedIn() && (
+        isAdmin() ||
+        isAssignedCourseInstructorById(resource.data.courseId) ||
+        (resource.data.userId == request.auth.uid) ||
+        isLinkedParentOfStudent(resource.data.userId)
+      );
+
+      allow create: if isAdmin() ||
+        isValidOwnerEnrollmentWrite(enrollmentId);
+      
+      allow delete: if isAdmin() ||
+        isLearnerEnrollmentOwner();
+
+      allow update: if signedIn() && (
+        isAdmin() ||
+        isAssignedCourseInstructorById(resource.data.courseId) ||
+        isValidOwnerEnrollmentWrite(enrollmentId) ||
+        (isLearnerEnrollmentWriteOwner()
+         && (
+           (!('progress' in request.resource.data) || 
+            (request.resource.data.progress >= 0 && request.resource.data.progress <= 100))
+           &&
+           onlyAllowedFieldsChanged(['progress','lastWatchedAt','checklist','currentSession','updatedAt','watchedVideos'])
+         ))
+      );
+    }
+
+    match /offlineClasses/{classId} {
+      allow read: if isAdmin() ||
+        (signedIn() && isAssignedOfflineClassInstructor(resource.data)) ||
+        (isStudent() && isActiveOfflineClassMember(classId));
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /offlineClassMembers/{memberId} {
+      allow read: if isAdmin() ||
+        (signedIn() &&
+         resource.data.classId is string &&
+         isAssignedOfflineClassInstructorByClassId(resource.data.classId)) ||
+        (isStudent() && resource.data.studentUid == request.auth.uid) ||
+        isLinkedParentOfStudent(resource.data.studentUid);
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /offlineClassSessions/{sessionId} {
+      // Students: active class membership + published sessions.
+      // joinedAt / manual grant / revoke are enforced client-side (student-offline-class.js);
+      // Firestore cannot compare sessionDate to membership.joinedAt in rules.
+      allow read: if isAdmin() ||
+        (signedIn() &&
+         resource.data.classId is string &&
+         isAssignedOfflineClassInstructorByClassId(resource.data.classId)) ||
+        (isStudent() &&
+         resource.data.classId is string &&
+         isActiveOfflineClassMember(resource.data.classId) &&
+         resource.data.status == 'published');
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /offlineSessionAccess/{accessId} {
+      allow read: if isAdmin() ||
+        (signedIn() &&
+         resource.data.classId is string &&
+         isAssignedOfflineClassInstructorByClassId(resource.data.classId)) ||
+        (isStudent() && resource.data.studentUid == request.auth.uid);
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /changeHistory/{historyId} {
+      allow read, write: if false;
+    }
+
+    match /operationTasks/{taskId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin() &&
+        (
+          (
+            resource.data.status == 'done' &&
+            resource.data.completedAt is timestamp &&
+            resource.data.completedAt < request.time - duration.value(7, 'd')
+          ) ||
+          (
+            resource.data.status in ['dismissed', 'ignored'] &&
+            (
+              (
+                resource.data.dismissedAt is timestamp &&
+                resource.data.dismissedAt < request.time - duration.value(30, 'd')
+              ) ||
+              (
+                resource.data.updatedAt is timestamp &&
+                resource.data.updatedAt < request.time - duration.value(30, 'd')
+              )
+            )
+          )
+        );
+    }
+
+    match /emailVerifications/{verificationId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if false;
+    }
+
+    match /signupAttempts/{attemptId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if false;
+    }
+
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+  }
+}

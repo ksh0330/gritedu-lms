@@ -1,0 +1,279 @@
+/* Contact page layout */
+
+.contact-wrap {
+  margin:0 auto;
+  max-width:var(--container);
+  padding:40px 16px
+}
+.contact-grid {
+  display:grid;
+  gap:40px;
+  grid-template-columns:1fr 1fr;
+  margin-top:40px
+}
+@media (max-width:768px) {
+  .contact-grid {
+    gap:32px;
+    grid-template-columns:1fr;
+    margin-top:32px
+  }
+}
+.contact-card {
+  background:var(--card);
+  border-radius:20px;
+  box-shadow:0 4px 20px rgba(0,0,0,.06);
+  padding:40px
+}
+@media (max-width:768px) {
+  .contact-card {
+    padding:32px 24px
+  }
+}
+.contact-meta {
+  display:flex;
+  flex-direction:column;
+  gap:32px
+}
+.contact-phone-section {
+  border-bottom:2px solid var(--border);
+  padding-bottom:32px;
+  text-align:center
+}
+.grit-contact-phone {
+  align-items:center;
+  color:var(--brand);
+  display:inline-flex;
+  font-size:36px;
+  font-weight:900;
+  gap:12px;
+  letter-spacing:-.5px;
+  text-decoration:none;
+  transition:all .2s ease
+}
+.grit-contact-phone svg {
+  flex-shrink:0
+}
+.grit-contact-phone:hover {
+  color:var(--accent);
+  transform:scale(1.05)
+}
+.grit-contact-booking-btn {
+  align-items:center;
+  background:var(--brand);
+  border-radius:10px;
+  color:#fff;
+  display:inline-flex;
+  font-size:15px;
+  font-weight:700;
+  gap:8px;
+  margin-top:16px;
+  padding:12px 24px;
+  text-decoration:none;
+  transition:background .2s ease,box-shadow .2s ease,transform .2s ease
+}
+.grit-contact-booking-btn svg {
+  color:currentColor;
+  flex-shrink:0
+}
+.grit-contact-booking-btn:hover,
+.grit-contact-booking-btn:focus,
+.grit-contact-booking-btn:focus-visible {
+  background:var(--accent);
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+  color:#fff;
+  transform:translateY(-1px)
+}
+html[data-theme=dark] .grit-page-container.contact .grit-contact-booking-btn,
+html[data-theme=dark] .grit-page-container.contact .grit-contact-booking-btn:hover,
+html[data-theme=dark] .grit-page-container.contact .grit-contact-booking-btn:focus,
+html[data-theme=dark] .grit-page-container.contact .grit-contact-booking-btn:focus-visible {
+  color:#fff
+}
+@media (prefers-color-scheme:dark) {
+  html:not([data-theme=light]) .grit-page-container.contact .grit-contact-booking-btn,
+  html:not([data-theme=light]) .grit-page-container.contact .grit-contact-booking-btn:hover,
+  html:not([data-theme=light]) .grit-page-container.contact .grit-contact-booking-btn:focus,
+  html:not([data-theme=light]) .grit-page-container.contact .grit-contact-booking-btn:focus-visible {
+    color:#fff
+  }
+}
+@media (max-width:768px) {
+  .grit-contact-phone {
+    font-size:28px
+  }
+}
+.contact-info-item {
+  display:flex;
+  flex-direction:column;
+  gap:8px
+}
+.contact-label {
+  color:var(--muted);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.5px;
+  text-transform:uppercase
+}
+.contact-value {
+  color:var(--text);
+  font-size:16px;
+  font-weight:500;
+  line-height:1.6
+}
+.contact-map-area {
+  display:flex;
+  flex-direction:column;
+  gap:20px
+}
+.grit-map {
+  margin:0
+}
+.embed-map,.grit-map {
+  border-radius:16px;
+  overflow:hidden
+}
+.embed-map {
+  border:1px solid var(--border);
+  height:clamp(300px,50vw,500px);
+  width:100%
+}
+.embed-map iframe {
+  border:0;
+  height:100%;
+  width:100%
+}
+.map-links {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+  margin-top:20px
+}
+.map-link-btn {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  display:inline-block;
+  font-size:13px;
+  font-weight:600;
+  padding:10px 20px;
+  text-decoration:none;
+  transition:all .2s ease
+}
+.map-link-btn:hover {
+  background:var(--hover);
+  border-color:var(--brand);
+  color:var(--brand);
+  transform:translateY(-1px)
+}
+.grit-contact-links {
+  display:flex;
+  gap:12px;
+  justify-content:center;
+  margin:20px 0
+}
+.grit-contact-links img {
+  transition:filter .2s ease
+}
+#contact-directions-container {
+  margin-top:24px
+}
+.contact-directions {
+  background:var(--bg-secondary);
+  border-left:4px solid var(--brand);
+  border-radius:12px;
+  padding:20px
+}
+.contact-directions .directions-school {
+  color:var(--brand);
+  font-size:16px;
+  font-weight:700;
+  line-height:1.6;
+  margin:0 0 20px
+}
+.contact-directions .directions-section {
+  margin-bottom:20px
+}
+.contact-directions .directions-section:last-child {
+  margin-bottom:0
+}
+.contact-directions .directions-title {
+  align-items:center;
+  color:var(--text);
+  display:flex;
+  font-size:15px;
+  font-weight:700;
+  gap:6px;
+  line-height:1.5;
+  margin:0 0 12px
+}
+.contact-directions .directions-title svg {
+  flex-shrink:0
+}
+.contact-directions .directions-list {
+  list-style:none;
+  margin:0;
+  padding-left:20px
+}
+.contact-directions .directions-list li {
+  color:var(--text);
+  font-size:14px;
+  line-height:1.8;
+  margin-bottom:12px
+}
+.contact-directions .directions-list li:last-child {
+  margin-bottom:0
+}
+.contact-directions .directions-detail {
+  color:var(--muted);
+  display:block;
+  font-size:13px;
+  line-height:1.6;
+  margin-top:4px
+}
+.contact-directions .directions-bus,.contact-directions .directions-parking {
+  color:var(--text);
+  font-size:14px;
+  line-height:1.8;
+  margin:0
+}
+@media (max-width:768px) {
+  .contact-directions {
+    padding:16px
+  }
+  .contact-directions .directions-school {
+    font-size:15px
+  }
+  .contact-directions .directions-title {
+    font-size:14px
+  }
+  .contact-directions .directions-bus,.contact-directions .directions-list li,.contact-directions .directions-parking {
+    font-size:13px
+  }
+}
+
+/* Contact map/location UI migrated from assets/css/main.css */
+
+.grit-page-container.contact .contact-location-filter {
+  margin:8px 0 24px
+}
+.contact-grid>.contact-card,
+.contact-grid>.contact-map-area {
+  min-width:0
+}
+.contact-map-placeholder {
+  align-items:center;
+  color:var(--muted);
+  display:flex;
+  font-size:14px;
+  justify-content:center;
+  line-height:1.5;
+  min-height:clamp(280px,45vw,480px);
+  padding:32px 20px;
+  text-align:center
+}
+.grit-page-container.contact .contact-map-area .embed-map iframe {
+  display:block;
+  vertical-align:top
+}

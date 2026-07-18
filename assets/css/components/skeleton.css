@@ -1,0 +1,220 @@
+/* Skeleton 로딩 애니메이션 */
+@keyframes skeleton-loading {
+  0% {
+    background-position:-200px 0
+  }
+  to {
+    background-position:calc(200px + 100%) 0
+  }
+}
+@keyframes skeleton-shimmer {
+  0% {
+    transform:translateX(-100%)
+  }
+  to {
+    transform:translateX(200%)
+  }
+}
+@keyframes skeleton-fade-in {
+  0% {
+    opacity:0;
+    transform:scale(0.98)
+  }
+  to {
+    opacity:1;
+    transform:scale(1)
+  }
+}
+@keyframes skeleton-pulse {
+  0%,100% {
+    opacity:1
+  }
+  50% {
+    opacity:0.5
+  }
+}
+
+/* 기본 Skeleton */
+.skeleton {
+  animation:skeleton-loading 1.5s ease-in-out infinite;
+  background:var(--hover) !important;
+  background-size:200px 100%;
+  border-radius:8px;
+  position:relative;
+  overflow:hidden;
+  will-change:background-position;
+  transition:opacity 0.3s ease,visibility 0.3s ease
+}
+.skeleton::after {
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);
+  animation:skeleton-shimmer 1.5s ease-in-out infinite;
+  will-change:transform;
+  transform:translateX(-100%)
+}
+html[data-theme=dark] .skeleton::after {
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent)
+}
+@media (prefers-reduced-motion:reduce) {
+  .skeleton {
+    animation:none;
+    background:var(--hover) !important
+  }
+  .skeleton::after {
+    animation:none;
+    display:none
+  }
+}
+
+/* Skeleton 페이드 효과 */
+.skeleton-fade-out {
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity 0.3s ease,visibility 0.3s ease
+}
+.skeleton-fade-in {
+  opacity:1;
+  visibility:visible;
+  transition:opacity 0.3s ease,visibility 0.3s ease;
+  animation:skeleton-fade-in 0.3s ease-out
+}
+@media (prefers-reduced-motion:reduce) {
+  .skeleton-fade-in {
+    animation:none
+  }
+}
+
+/* Skeleton 펄스 효과 */
+@media (prefers-reduced-motion:reduce) {
+  .skeleton-pulse {
+    animation:none
+  }
+}
+
+/* 강사 카드 Skeleton */
+.skeleton-instructor {
+  aspect-ratio:3/4;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+  width:100%;
+  position:relative;
+  transition:opacity 0.3s ease,visibility 0.3s ease
+}
+.skeleton-instructor:before {
+  background:var(--hover);
+  content:"";
+  display:block;
+  height:100%;
+  width:100%
+}
+.skeleton-instructor::after {
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);
+  animation:skeleton-shimmer 1.5s ease-in-out infinite;
+  will-change:transform;
+  transform:translateX(-100%)
+}
+html[data-theme=dark] .skeleton-instructor::after {
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent)
+}
+@media (prefers-reduced-motion:reduce) {
+  .skeleton-instructor::after {
+    animation:none;
+    display:none
+  }
+}
+
+/* 강의 카드 Skeleton */
+.skeleton-course {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:16px;
+  transition:opacity 0.3s ease,visibility 0.3s ease
+}
+.skeleton-course-label {
+  height:20px;
+  width:60px
+}
+.skeleton-course-title {
+  height:20px;
+  width:80%
+}
+.skeleton-course-meta {
+  height:16px;
+  width:60%
+}
+
+/* 리스트 아이템 Skeleton */
+.skeleton-list-item {
+  align-items:center;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  padding:12px 0;
+  transition:opacity 0.3s ease,visibility 0.3s ease
+}
+.skeleton-list-item:before {
+  content:"";
+  display:block;
+  height:16px;
+  width:100%
+}
+
+/* 갤러리 Skeleton */
+.skeleton-gallery {
+  border-radius:10px;
+  height:180px;
+  overflow:hidden;
+  width:100%;
+  position:relative;
+  transition:opacity 0.3s ease,visibility 0.3s ease
+}
+.skeleton-gallery:before {
+  background:var(--hover);
+  content:"";
+  display:block;
+  height:100%;
+  width:100%
+}
+.skeleton-gallery::after {
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);
+  animation:skeleton-shimmer 1.5s ease-in-out infinite;
+  will-change:transform;
+  transform:translateX(-100%)
+}
+html[data-theme=dark] .skeleton-gallery::after {
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent)
+}
+@media (prefers-reduced-motion:reduce) {
+  .skeleton-gallery::after {
+    animation:none;
+    display:none
+  }
+}
+@media (max-width:640px) {
+  .skeleton-gallery {
+    height:150px
+  }
+}

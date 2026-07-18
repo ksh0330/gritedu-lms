@@ -1,0 +1,65 @@
+/* Import-only entry — mirrors scripts/prebuild.js bundle order (base → components → pages). */
+/* Legacy monolith preserved in main.legacy.css (not included in prebuild). */
+
+/* base */
+@import url("./base/variables.css");
+@import url("./base/reset.css");
+@import url("./base/typography.css");
+@import url("./base/utilities.css");
+@import url("./base/layout.css");
+
+/* components */
+@import url("./components/button.css");
+@import url("./components/card.css");
+@import url("./components/header.css");
+@import url("./components/footer.css");
+@import url("./components/skeleton.css");
+@import url("./components/dashboard-skeleton.css");
+@import url("./components/status.css");
+@import url("./components/modal.css");
+@import url("./components/dashboard-modal.css");
+@import url("./components/toast.css");
+@import url("./components/pagination.css");
+@import url("./components/filter.css");
+@import url("./components/dash-back.css");
+@import url("./components/form.css");
+@import url("./components/kakao-channel.css");
+
+/* pages — preferred order (prebuild.js preferredPageOrder) */
+@import url("./pages/courses-all.css");
+@import url("./pages/course-detail.css");
+@import url("./pages/course.css");
+@import url("./pages/instructor.css");
+@import url("./pages/public.css");
+@import url("./pages/notfound.css");
+@import url("./pages/admin.css");
+@import url("./pages/admin-courses.css");
+@import url("./pages/student.css");
+
+/* pages — remaining (localeCompare en, same as prebuild discovery) */
+@import url("./pages/admin-dashboard.css");
+@import url("./pages/admin-instructors.css");
+@import url("./pages/admin-offline-classes.css");
+@import url("./pages/admin-timetable.css");
+@import url("./pages/schedule.css");
+@import url("./pages/schedule-images.css");
+@import url("./pages/admin-site.css");
+@import url("./pages/admin-students.css");
+@import url("./pages/admin-user-add.css");
+@import url("./pages/contact.css");
+@import url("./pages/home.css");
+@import url("./pages/instructor-course-detail.css");
+@import url("./pages/instructor-dashboard.css");
+@import url("./pages/instructor-offline-class.css");
+@import url("./pages/instructor-details.css");
+@import url("./pages/instructors.css");
+@import url("./pages/login.css");
+@import url("./pages/member-dashboard.css");
+@import url("./pages/privacy.css");
+@import url("./pages/signup.css");
+@import url("./pages/story.css");
+@import url("./pages/student-course.css");
+@import url("./pages/student-dashboard.css");
+@import url("./pages/student-offline-class.css");
+@import url("./pages/terms.css");
+@import url("./pages/tuition.css");

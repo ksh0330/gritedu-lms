@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 시간표 | 그릿에듀학원</title>
+  <meta name="description" content="그릿에듀학원의 오프라인 수업 일정과 국어, 영어, 수학, 과학, 수리논술 시간표를 확인하세요.">
+  <link rel="canonical" href="https://gritedu.kr/schedule.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:title" content="그릿에듀 시간표 | 그릿에듀학원">
+  <meta property="og:description" content="그릿에듀학원의 오프라인 수업 일정과 과목별 시간표를 확인하세요.">
+  <meta property="og:url" content="https://gritedu.kr/schedule.html">
+  <meta property="og:image" content="https://gritedu.kr/assets/main.png">
+  <meta property="og:site_name" content="그릿에듀학원">
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/schedule.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body class="schedule-images-page">
+  <div data-include="header"></div>
+  <main class="grit-page-container schedule-images">
+    <header class="schedule-images-page-header">
+      <h1 class="page-title">그릿에듀 시간표</h1>
+      <p class="muted schedule-images-page-desc">
+        그릿에듀학원의 오프라인 수업 일정과 과목별 시간표를 확인하세요.<br>
+        중고등 내신과 입시를 준비하는 학생을 위해 국어, 영어, 수학, 과학, 수리논술 수업을 안내합니다.
+      </p>
+    </header>
+    <nav id="scheduleGroupNav" class="schedule-images-nav grit-section" aria-label="시간표 그룹" hidden></nav>
+    <nav id="scheduleDivisionNav" class="schedule-division-nav" aria-label="학교급 필터"></nav>
+    <section id="scheduleImagesMain" class="schedule-images-main grit-section" aria-live="polite">
+      <p id="scheduleImagesEmpty" class="muted schedule-images-empty" hidden>등록된 시간표 이미지가 없습니다.</p>
+    </section>
+  </main>
+  <div id="scheduleImageViewer" class="schedule-image-viewer" hidden role="dialog" aria-modal="true" aria-label="시간표 이미지 확대 보기">
+    <div class="schedule-image-viewer__stage"><img id="scheduleImageViewerImage" alt=""></div>
+  </div>
+  <div data-include="footer"></div>
+</body>
+</html>

@@ -1,0 +1,83 @@
+/* Global layout primitives migrated from public.css */
+
+/* 페이지 컨테이너 - 모든 페이지에서 사용 */
+.grit-page-container {
+  margin:0 auto;
+  max-width:var(--container);
+  min-height:calc(100vh - var(--header-h) - 160px);
+  min-height:calc(100svh - var(--header-h) - 160px);
+  padding:20px 16px
+}
+.container {
+  margin:0 auto;
+  max-width:1200px;
+  padding:20px
+}
+.grit-section {
+  margin:24px auto;
+  max-width:var(--container);
+  padding:0 16px
+}
+.page-title {
+  color:var(--text);
+  font-size:1.9rem;
+  font-weight:800;
+  letter-spacing:-.02em;
+  margin:0 0 16px;
+  text-align:center
+}
+.section-head {
+  align-items:center;
+  display:flex;
+  gap:12px;
+  justify-content:space-between;
+  margin:24px 0 8px
+}
+.section-head h2 {
+  border-left:4px solid var(--accent);
+  color:var(--text);
+  font-size:1.35rem;
+  font-weight:700;
+  margin:0;
+  padding-left:10px
+}
+.section-head .more {
+  color:var(--muted);
+  font-size:.85rem;
+  white-space:nowrap
+}
+.section-head .more:hover {
+  color:var(--brand);
+  text-decoration:underline
+}
+.grit-section h2,.grit-section__head h2 {
+  border-left:4px solid var(--accent);
+  color:var(--text);
+  font-size:1.35rem;
+  font-weight:700;
+  letter-spacing:-.01em;
+  margin:28px 0 12px;
+  padding-left:10px
+}
+.grit-section p {
+  color:var(--text);
+  font-size:1.05rem;
+  margin-bottom:16px
+}
+
+/* Typed page containers (instructors, contact, notfound) migrated from public.css */
+/* 모든 페이지에서 동일한 컨테이너 너비 및 여백 유지 */
+.grit-page-container.instructors,
+.grit-page-container.contact,
+.grit-page-container.notfound {
+  max-width:var(--container);
+  margin:0 auto;
+  padding:20px 16px
+}
+@media (max-width:768px) {
+  .grit-page-container.instructors,
+  .grit-page-container.contact,
+  .grit-page-container.notfound {
+    padding:20px 16px
+  }
+}

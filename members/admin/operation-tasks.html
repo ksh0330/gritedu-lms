@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 운영 기록 정리</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/admin-operation-tasks.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/pages/admin-operation-tasks.css">
+</head>
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container operation-task-page">
+    <div class="dash-back">
+      <a href="/members/admin/dashboard.html" class="btn sm">
+        관리자 CMS로 돌아가기
+      </a>
+    </div>
+
+    <section class="grit-section">
+      <div class="section-head page-header-row">
+        <div>
+          <h1 class="page-title">운영 기록 정리</h1>
+          <p class="desc">만료 기록과 오래된 수업을 정리합니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grit-section">
+      <div class="task-notice">
+        <strong>운영 방침:</strong>
+        <p style="margin:8px 0 0;">매일 03:00 자동 실행</p>
+        <p style="margin:4px 0 0;">만료된 운영 기록만 자동으로 정리합니다.</p>
+      </div>
+      <div id="operationTaskStatus" class="muted">최근 자동 정리 결과를 불러오는 중입니다...</div>
+      <div class="record-cleanup-panel">
+        <div id="recordCleanupMessage" class="record-cleanup-message" hidden></div>
+        <ul id="recordCleanupCounts" class="record-cleanup-counts" hidden></ul>
+      </div>
+    </section>
+
+    <section class="grit-section">
+      <div class="offline-session-panel">
+        <h2>오프라인 수업 정리</h2>
+        <p class="panel-desc">오래된 수업만 정리합니다. 반·수강·계정 정보는 유지됩니다.</p>
+        <div class="offline-session-warnings">
+          <strong>안내</strong>
+          <ul>
+            <li>6개월이 지난 수업을 매일 자동 정리합니다.</li>
+            <li>실제 삭제 실행을 켜면 수업과 연결된 예외 권한 기록이 삭제됩니다.</li>
+            <li>영상이 있는 수업도 정리 대상이면 목록에서 사라질 수 있습니다.</li>
+            <li>한 번에 최대 처리 개수를 제한해 Firestore 사용량 급증을 방지합니다.</li>
+            <li>반, 입반 기록, 학생/학부모/강사 계정, 수강 등록은 삭제하지 않습니다.</li>
+          </ul>
+        </div>
+        <form id="offlineSessionRetentionForm" class="offline-session-form">
+          <div class="offline-session-form-card">
+            <div class="offline-session-form-grid">
+              <div class="offline-session-field offline-session-field--full">
+                <label class="offline-session-checkbox-row" for="offlineSessionCleanupEnabled">
+                  <input type="checkbox" id="offlineSessionCleanupEnabled" checked>
+                  <span class="offline-session-checkbox-text">자동 정리 사용</span>
+                </label>
+              </div>
+              <div class="offline-session-field offline-session-field--full">
+                <label class="offline-session-checkbox-row" for="offlineSessionActualDelete">
+                  <input type="checkbox" id="offlineSessionActualDelete" checked>
+                  <span class="offline-session-checkbox-text">
+                    실제 삭제 실행
+                    <span class="offline-session-checkbox-hint">보존 기간이 지난 수업과 예외 권한 삭제</span>
+                  </span>
+                </label>
+              </div>
+              <div class="offline-session-field">
+                <label class="offline-session-field-label" for="offlineSessionRetentionDays">보존 기간</label>
+                <div class="offline-session-input-row">
+                  <input type="number" id="offlineSessionRetentionDays" min="1" max="3650" value="180" required>
+                  <span class="offline-session-input-unit">일</span>
+                </div>
+                <p class="offline-session-field-hint">수업일 기준, 기본 180일</p>
+              </div>
+              <div class="offline-session-field">
+                <span class="offline-session-field-label">정리 대상 상태</span>
+                <div class="offline-session-status-group" role="group" aria-label="정리 대상 상태">
+                  <label class="offline-session-status-pill">
+                    <input type="checkbox" name="offlineSessionStatus" value="published" checked>
+                    <span>게시</span>
+                  </label>
+                  <label class="offline-session-status-pill">
+                    <input type="checkbox" name="offlineSessionStatus" value="archived" checked>
+                    <span>보관</span>
+                  </label>
+                </div>
+              </div>
+              <div class="offline-session-field offline-session-field--full">
+                <label class="offline-session-field-label" for="offlineSessionPerRunLimit">1회 최대 정리 수업 수</label>
+                <input type="number" id="offlineSessionPerRunLimit" min="1" max="500" value="200" required>
+              </div>
+              <div class="offline-session-field offline-session-field--full">
+                <label class="offline-session-checkbox-row" for="offlineSessionSkipActiveAccess">
+                  <input type="checkbox" id="offlineSessionSkipActiveAccess" checked>
+                  <span class="offline-session-checkbox-text">수동 권한(active) 수업 제외</span>
+                </label>
+              </div>
+            </div>
+            <div class="offline-session-form-actions">
+              <button type="submit" class="btn primary sm" id="offlineSessionPolicySave">설정 저장</button>
+              <button type="button" class="btn sm" id="offlineSessionPreviewButton">대상 확인 (최대 50개)</button>
+            </div>
+          </div>
+        </form>
+        <div id="offlineSessionPolicyMessage" class="record-cleanup-message" hidden></div>
+        <ul id="offlineSessionPreviewCounts" class="record-cleanup-counts" hidden></ul>
+        <div id="offlineSessionLastRun" class="offline-session-last-run" hidden></div>
+      </div>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>

@@ -1,0 +1,113 @@
+/* Global accessibility utilities migrated from assets/css/main.css */
+
+/* 1. 키보드 네비게이션 개선 */
+*:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* 11. 애니메이션 성능 최적화 (reduced motion) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Shared layout and helper utilities migrated from public.css */
+.fade-in {
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity .6s ease-out,transform .6s ease-out
+}
+.fade-in-visible {
+  opacity:1;
+  transform:translateY(0)
+}
+@media (prefers-reduced-motion:reduce) {
+  .fade-in {
+    opacity:1;
+    transform:none;
+    transition:none
+  }
+}
+.mt-0 {
+  margin-top:0
+}
+.mt-6 {
+  margin-top:6px
+}
+.mt-8 {
+  margin-top:8px
+}
+.mt-16 {
+  margin-top:16px
+}
+.mt-24 {
+  margin-top:24px
+}
+.mb-12 {
+  margin-bottom:12px
+}
+.mb-16 {
+  margin-bottom:16px
+}
+.pt-24 {
+  padding-top:24px
+}
+.flex {
+  display:flex
+}
+.justify-between {
+  justify-content:space-between
+}
+.items-center {
+  align-items:center
+}
+.text-sm {
+  font-size:.9rem
+}
+.text-muted {
+  color:var(--muted)
+}
+.no-underline {
+  text-decoration:none
+}
+.border-t {
+  border-top:1px solid var(--border)
+}
+.border-border {
+  border-color:var(--border)
+}
+.w-full {
+  width:100%
+}
+.m-0 {
+  margin:0
+}
+.block {
+  display:block
+}
+.cursor-pointer {
+  cursor:pointer
+}
+.text-center {
+  text-align:center
+}
+/* 앵커 링크 스크롤 마진 */
+:target {
+  scroll-margin-top:calc(var(--header-h) + env(safe-area-inset-top))
+}

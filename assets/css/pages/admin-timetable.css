@@ -1,0 +1,962 @@
+/* Admin timetable — members/admin/timetable.html */
+
+.admin-timetable-page .admin-timetable-head {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.admin-timetable-page .admin-timetable-head .page-title {
+  margin: 0 0 6px;
+}
+
+.admin-timetable-page .admin-timetable-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.admin-timetable-page .admin-timetable-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-timetable-page .admin-timetable-meta {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 12px 0 16px;
+}
+
+.admin-timetable-page .admin-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-timetable-page .timetable-schedule-cell {
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.admin-timetable-page .timetable-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-timetable-page .timetable-status {
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.admin-timetable-page .timetable-status--active {
+  background: color-mix(in srgb, var(--success-color, #4caf50) 18%, transparent);
+  color: var(--success-color, #2e7d32);
+}
+
+.admin-timetable-page .timetable-status--archived {
+  background: var(--hover);
+  color: var(--muted);
+}
+
+.admin-timetable-page .admin-timetable-toast {
+  background: var(--success-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  color: var(--success-color);
+  font-weight: 600;
+  left: 50%;
+  max-width: min(90%, 420px);
+  opacity: 0;
+  padding: 12px 16px;
+  pointer-events: none;
+  position: fixed;
+  text-align: center;
+  top: 80px;
+  transform: translateX(-50%);
+  transition: opacity 0.2s ease;
+  z-index: 11000;
+}
+
+.admin-timetable-page .admin-timetable-toast.is-visible {
+  opacity: 1;
+}
+
+.admin-timetable-page .admin-timetable-toast.is-error {
+  background: var(--error-bg, #fdecea);
+  color: var(--error-color, #c62828);
+}
+
+/* Global .modal uses display:none; show with .is-open on this page */
+.admin-timetable-page .admin-timetable-modal.modal,
+.admin-timetable-page .admin-timetable-catalog-modal.modal,
+.admin-timetable-page .admin-schedule-image-modal.modal {
+  align-items: flex-start;
+  display: none;
+  inset: 0;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 20px;
+  position: fixed;
+  z-index: 10000;
+}
+
+.admin-timetable-page .admin-timetable-modal.modal.is-open,
+.admin-timetable-page .admin-timetable-catalog-modal.modal.is-open,
+.admin-timetable-page .admin-schedule-image-modal.modal.is-open {
+  display: flex;
+}
+
+.admin-timetable-page .admin-timetable-modal.modal[hidden]:not(.is-open),
+.admin-timetable-page .admin-timetable-catalog-modal.modal[hidden]:not(.is-open),
+.admin-timetable-page .admin-schedule-image-modal.modal[hidden]:not(.is-open) {
+  display: none !important;
+}
+
+.admin-timetable-page .modal-content {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  width: min(92vw, 720px);
+}
+
+.admin-timetable-page .modal-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+}
+
+.admin-timetable-page .modal-header h2 {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.admin-timetable-page .modal-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  padding: 0;
+}
+
+.admin-timetable-page .modal-close:hover {
+  color: var(--text);
+}
+
+body.admin-timetable-page.modal-open,
+html.modal-open {
+  overflow: hidden;
+}
+
+.admin-timetable-page .admin-timetable-modal__content,
+.admin-timetable-page .admin-timetable-catalog-modal__content {
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+  width: min(92vw, 720px);
+}
+
+.admin-timetable-page .schedule-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-timetable-page .schedule-item-row {
+  align-items: end;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  padding: 10px;
+}
+
+.admin-timetable-page .schedule-items-hint {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.admin-timetable-page .timetable-schools-hint,
+.admin-timetable-page .timetable-schools-empty {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.admin-timetable-page .timetable-school-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-timetable-page .timetable-school-choice-chip {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 6px;
+  line-height: 1.2;
+  padding: 8px 12px;
+  user-select: none;
+}
+
+.admin-timetable-page .timetable-school-choice-chip.is-checked {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+}
+
+.admin-timetable-page .timetable-school-choice-chip input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
+}
+
+.admin-timetable-page .timetable-school-extra-input {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.admin-timetable-page .admin-timetable-copy-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.admin-timetable-page .admin-timetable-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-timetable-page .admin-timetable-copy-row select {
+  flex: 1 1 260px;
+}
+
+.admin-timetable-page .admin-timetable-copy-hint,
+.admin-timetable-page .admin-timetable-copy-group-line,
+.admin-timetable-page .admin-timetable-copy-list__empty {
+  color: var(--muted);
+}
+
+.admin-timetable-page .admin-timetable-copy-list__empty {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.admin-timetable-page .admin-timetable-copy-hint {
+  font-size: 12px;
+  margin: 4px 0 8px;
+}
+
+.admin-timetable-page .admin-timetable-copy-group-line {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.admin-timetable-page .admin-timetable-copy-search-wrap {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.admin-timetable-page .admin-timetable-copy-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.admin-timetable-page .admin-timetable-copy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  margin-bottom: 10px;
+}
+
+.admin-timetable-page .admin-timetable-copy-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-timetable-page .admin-timetable-copy-item.is-selected {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.admin-timetable-page .admin-timetable-copy-item__title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-timetable-page .admin-timetable-copy-item__meta,
+.admin-timetable-page .admin-timetable-copy-item__group {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+
+.admin-timetable-page .admin-schedule-image-modal__group {
+  margin: 0 0 0.35rem;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__storage {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__alert {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent, #ff7a00) 12%, transparent);
+  color: var(--text, #1a1a1a);
+  font-size: 0.9rem;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__alert.is-error {
+  background: color-mix(in srgb, #dc3545 14%, transparent);
+  color: #b42318;
+}
+
+.admin-timetable-page .admin-timetable-detail-fields label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 10px 0 6px;
+}
+
+.admin-timetable-page .admin-timetable-detail-fields label:first-of-type {
+  margin-top: 8px;
+}
+
+.admin-timetable-page .admin-timetable-detail-fields textarea,
+.admin-timetable-page .admin-timetable-detail-fields input[type="url"] {
+  width: 100%;
+}
+
+.admin-timetable-page .admin-timetable-detail-hint {
+  font-size: 12px;
+  margin: 0 0 4px;
+}
+
+.admin-timetable-page .admin-timetable-catalog-hint {
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.admin-timetable-page .admin-timetable-catalog-section {
+  background: color-mix(in srgb, var(--brand) 4%, var(--card));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.admin-timetable-page .timetable-catalog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-timetable-page .timetable-catalog-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.admin-timetable-page .timetable-catalog-field__input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-timetable-page .timetable-catalog-field__input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.admin-timetable-page .timetable-catalog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-timetable-page .timetable-catalog-tags-empty {
+  font-size: 13px;
+}
+
+.admin-timetable-page .timetable-catalog-tag {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 4px;
+  line-height: 1.2;
+  padding: 6px 8px 6px 12px;
+}
+
+.admin-timetable-page .timetable-catalog-tag__remove {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 18px;
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 22px;
+}
+
+.admin-timetable-page .timetable-catalog-tag__remove:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.admin-timetable-page .timetable-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-timetable-page .timetable-choice-empty {
+  font-size: 13px;
+  margin: 0;
+}
+
+.admin-timetable-page .timetable-choice-chip {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 8px 12px;
+}
+
+.admin-timetable-page .timetable-choice-chip.is-selected {
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  border-color: var(--brand);
+}
+
+.admin-timetable-page .timetable-choice-chip:hover {
+  border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
+}
+
+@media (max-width: 768px) {
+  .admin-timetable-page .schedule-item-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.admin-timetable-page .admin-catalog-panel {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.admin-timetable-page .admin-catalog-panel__summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.admin-timetable-page .admin-catalog-panel__hint {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 10px 0 14px;
+}
+
+.admin-timetable-page .admin-catalog-panel__grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.admin-timetable-page .admin-catalog-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.admin-timetable-page .admin-catalog-field__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.admin-timetable-page .admin-catalog-field__input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.admin-timetable-page .admin-catalog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.admin-timetable-page .admin-catalog-tag {
+  align-items: center;
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 13px;
+  gap: 2px;
+  padding: 4px 6px 4px 10px;
+}
+
+.admin-timetable-page .admin-catalog-tag__edit,
+.admin-timetable-page .admin-catalog-tag__remove {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.admin-timetable-page .admin-catalog-tag__remove {
+  font-size: 18px;
+}
+
+.admin-timetable-page .admin-catalog-panel__lead,
+.admin-timetable-page .admin-catalog-panel__notes {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+
+.admin-timetable-page .admin-catalog-panel__notes {
+  margin-bottom: 12px;
+  padding-left: 18px;
+}
+
+.admin-timetable-page .admin-catalog-tag__moves {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.admin-timetable-page .admin-catalog-tag__move {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.admin-timetable-page .timetable-extra-label {
+  display: block;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.admin-timetable-page .timetable-extra-input {
+  margin-top: 4px;
+  width: 100%;
+}
+
+.admin-timetable-page .admin-catalog-panel__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__content {
+  max-width: 720px;
+  width: min(100%, 720px);
+}
+
+.admin-timetable-page .admin-schedule-image-modal__body {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__lead,
+.admin-timetable-page .admin-schedule-image-modal__hint {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 8px;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__notes {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+  padding-left: 18px;
+}
+
+.admin-timetable-page .admin-schedule-image-form {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.admin-timetable-page .admin-schedule-image-form__row {
+  margin-bottom: 10px;
+}
+
+.admin-timetable-page .admin-schedule-image-form__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.admin-timetable-page .admin-schedule-image-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-timetable-page .admin-schedule-image-list__empty {
+  margin: 0;
+}
+
+.admin-timetable-page .admin-schedule-image-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 96px 1fr;
+  padding: 12px;
+}
+
+.admin-timetable-page .admin-schedule-image-item__thumb-wrap {
+  align-items: center;
+  background: var(--hover);
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  min-height: 72px;
+  overflow: hidden;
+}
+
+.admin-timetable-page .admin-schedule-image-item__thumb {
+  display: block;
+  max-height: 72px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.admin-timetable-page .admin-schedule-image-item__thumb-fallback {
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+}
+
+.admin-timetable-page .admin-schedule-image-item__name {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.admin-timetable-page .admin-schedule-image-item__url {
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+  word-break: break-all;
+}
+
+.admin-timetable-page .admin-schedule-image-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-timetable-page .admin-schedule-image-modal__actions {
+  justify-content: flex-end;
+}
+
+.admin-timetable-page .admin-timetable-catalog-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-timetable-page .admin-timetable-catalog-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.admin-timetable-page .admin-timetable-catalog-card h3 { font-size: 16px; margin: 0 0 6px; }
+.admin-timetable-page .admin-timetable-catalog-card > p { font-size: 13px; margin: 0 0 12px; }
+.admin-timetable-page .admin-timetable-catalog-card .admin-schedule-groups-editor__lead { display: none; }
+.admin-timetable-page .admin-timetable-catalog-card .admin-schedule-group-row {
+  background: var(--surface);
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto;
+  padding: 10px 12px;
+}
+.admin-timetable-page .admin-timetable-catalog-card .admin-schedule-group-row__visibility {
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 0;
+  overflow: hidden;
+  padding: 2px;
+}
+.admin-timetable-page .admin-timetable-catalog-card .admin-schedule-group-visibility-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  min-height: 30px;
+}
+.admin-timetable-page .admin-timetable-catalog-card .admin-schedule-group-visibility-btn.on {
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  color: var(--brand);
+}
+@media (max-width: 720px) {
+  .admin-timetable-page .admin-timetable-catalog-grid { grid-template-columns: 1fr; }
+  .admin-timetable-page .admin-timetable-catalog-card .admin-schedule-group-row__meta { margin-left: 0; }
+}
+
+.admin-timetable-page .admin-schedule-image-item__division-label {
+  align-items: center;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+
+.admin-timetable-page .admin-schedule-image-item__division {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  min-height: 34px;
+  padding: 4px 28px 4px 10px;
+}
+
+.admin-timetable-page .admin-schedule-image-inline {
+  margin-top: 18px;
+  padding: 18px;
+}
+
+.admin-timetable-page .admin-schedule-image-inline__head {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.admin-timetable-page .admin-schedule-image-inline__head h2,
+.admin-timetable-page .admin-schedule-image-inline__head p {
+  margin: 0;
+}
+
+.admin-timetable-page .admin-schedule-image-inline__head p {
+  margin-top: 6px;
+}
+
+.admin-timetable-page .admin-schedule-image-inline__body {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .admin-timetable-page .admin-schedule-image-item {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-timetable-page .admin-schedule-image-inline__head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* Schedule groups — shared by timetable + offline-classes admin */
+.admin-schedule-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+.admin-schedule-group-tabs[hidden] {
+  display: none;
+}
+
+.admin-schedule-group-tabs__single {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.admin-schedule-group-tab {
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  min-height: 36px;
+  padding: 8px 16px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-schedule-group-tab:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.admin-schedule-group-tab.on {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.admin-schedule-groups-editor__lead {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.admin-schedule-groups-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-schedule-groups-editor__actions { align-items: center; display: flex; gap: 8px; }
+.admin-schedule-groups-editor__actions .admin-catalog-field__input { max-width: 240px; }
+
+.admin-schedule-group-row {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.admin-schedule-group-row__name {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.admin-schedule-group-row__visibility {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.admin-schedule-group-visibility-btn {
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  min-height: 32px;
+  padding: 6px 12px;
+}
+
+.admin-schedule-group-visibility-btn.on {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.admin-schedule-group-row__order {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.admin-schedule-group-order-btn {
+  min-width: 36px;
+  padding-inline: 8px;
+}
+
+.admin-schedule-group-row__meta {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.admin-schedule-group-row__count,
+.admin-schedule-group-row__reserved {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-schedule-group-row__delete {
+  white-space: nowrap;
+}
+
+.admin-catalog-panel__group-label {
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .admin-schedule-group-row__meta {
+    margin-left: 0;
+    width: 100%;
+  }
+}

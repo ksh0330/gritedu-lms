@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 페이지를 찾을 수 없습니다 (404)</title>
+
+  <meta name="robots" content="noindex,follow" />
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<!-- 테마 즉시 적용 및 조건부 이미지 프리로드 -->
+  <script>
+    (function() {
+      const THEME_KEY = 'grit-theme';
+      function getCurrentTheme() {
+        try {
+          return localStorage.getItem(THEME_KEY) || 
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch {
+          return 'light';
+        }
+      }
+      const theme = getCurrentTheme();
+      document.documentElement.setAttribute('data-theme', theme);
+      
+      // 현재 테마에 따라 필요한 이미지만 preload
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = theme === 'dark' ? '/assets/lightmode.png' : '/assets/darkmode.png';
+      document.head.appendChild(link);
+    })();
+  </script>
+  
+  <!-- 헤더/푸터는 common.js에서만 로드 (인라인 fetch와 중복 시 DOM/이벤트가 꼬일 수 있음) -->
+
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container notfound">
+    <div class="notfound-content">
+      <div class="notfound-visual">
+        <div class="notfound-number">404</div>
+        <div class="notfound-icon" aria-hidden="true">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="60" r="50" stroke="var(--brand)" stroke-width="3" stroke-dasharray="8 4" opacity="0.3"/>
+            <path d="M40 40L80 80M80 40L40 80" stroke="var(--brand)" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      
+      <h1 class="notfound-title">페이지를 찾을 수 없습니다</h1>
+      
+      <section class="notfound-section" aria-labelledby="nfTitle">
+        <h2 id="nfTitle" class="visually-hidden">404 안내</h2>
+        <p class="notfound-description">
+          요청하신 주소가 변경되었거나 삭제되었어요.<br>
+          아래 버튼을 눌러 이동해 보세요.
+        </p>
+
+        <div class="notfound-actions">
+          <a class="btn btn-primary notfound-btn" href="/">홈으로</a>
+          <a class="btn notfound-btn" href="/instructors.html">강사진 보기</a>
+          <a class="btn notfound-btn" href="/courses.html">모든 강좌</a>
+          <a class="btn notfound-btn" href="/contact.html">상담 문의</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>

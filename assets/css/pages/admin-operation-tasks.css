@@ -1,0 +1,323 @@
+.operation-task-page .task-notice {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 16px;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.operation-task-page .record-cleanup-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.operation-task-page .record-cleanup-message {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.operation-task-page .record-cleanup-message.is-error {
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+}
+
+.operation-task-page .record-cleanup-message.is-success {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+}
+
+.operation-task-page .record-cleanup-cooldown {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 12px 0 0;
+  background: rgba(234, 179, 8, 0.12);
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.operation-task-page .record-cleanup-counts {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operation-task-page .record-cleanup-counts li {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.operation-task-page .record-cleanup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.operation-task-page .offline-session-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.operation-task-page .offline-session-panel h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.operation-task-page .offline-session-panel .panel-desc {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.operation-task-page .offline-session-warnings {
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  background: rgba(234, 88, 12, 0.08);
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.operation-task-page .offline-session-warnings strong {
+  font-size: 13px;
+}
+
+.operation-task-page .offline-session-warnings ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+.operation-task-page .offline-session-warnings li + li {
+  margin-top: 2px;
+}
+
+.operation-task-page .offline-session-form-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 14px 16px;
+}
+
+.operation-task-page .offline-session-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+}
+
+.operation-task-page .offline-session-field {
+  min-width: 0;
+}
+
+.operation-task-page .offline-session-field--full {
+  grid-column: 1 / -1;
+}
+
+.operation-task-page .offline-session-field-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.operation-task-page .offline-session-field-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.operation-task-page .offline-session-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+}
+
+.operation-task-page .offline-session-input-unit {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.operation-task-page .offline-session-form input[type="number"],
+.operation-task-page .offline-session-form input[type="text"] {
+  width: 100%;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--card);
+  color: var(--text);
+}
+
+.operation-task-page .offline-session-input-row input[type="number"] {
+  max-width: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.operation-task-page .offline-session-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.operation-task-page .offline-session-checkbox-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.operation-task-page .offline-session-checkbox-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.operation-task-page .offline-session-checkbox-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.operation-task-page .offline-session-status-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.operation-task-page .offline-session-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.operation-task-page .offline-session-status-pill input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.operation-task-page .offline-session-status-pill:has(input:checked) {
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+  background: color-mix(in srgb, var(--brand) 10%, var(--card));
+}
+
+.operation-task-page .offline-session-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.operation-task-page .offline-session-last-run {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  margin-top: 12px;
+}
+
+.operation-task-page .offline-session-last-run dl {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 4px;
+}
+
+.operation-task-page .offline-session-last-run dt {
+  font-weight: 700;
+}
+
+.operation-task-page .offline-session-last-run dd {
+  margin: 0 0 4px;
+  color: var(--muted);
+}
+
+.operation-task-page .page-header-row {
+  margin: 0;
+}
+
+.operation-task-page .page-header-row .page-title {
+  margin: 0;
+  text-align: left;
+}
+
+.operation-task-page .page-header-row .desc {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .operation-task-page .page-header-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .operation-task-page .offline-session-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-task-page .offline-session-form input[type="number"],
+  .operation-task-page .offline-session-form input[type="text"],
+  .operation-task-page .offline-session-input-row {
+    max-width: none;
+  }
+}

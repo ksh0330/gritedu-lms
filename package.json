@@ -1,0 +1,44 @@
+{
+  "name": "gritedu-lms-site",
+  "private": true,
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "build": "node scripts/prebuild.js",
+    "build:strict": "node scripts/prebuild.js --strict",
+    "verify": "node scripts/verify-build.js",
+    "verify:strict": "node scripts/verify-build.js --strict",
+    "check:functions": "node scripts/check-functions.js",
+    "check:functions:strict": "node scripts/check-functions.js --strict",
+    "check:rules": "node scripts/check-rules.js",
+    "check:rules:strict": "node scripts/check-rules.js --strict",
+    "lint": "eslint assets/js --ext .js --cache --cache-location .eslintcache",
+    "lint:fix": "npm run lint -- --fix",
+    "ready:deploy": "npm run lint && npm run build:strict && npm run verify:strict && npm run check:rules:strict && npm run check:functions:strict",
+    "deploy:phase1-member": "firebase deploy --only functions:sendVerificationCode,functions:verifyEmailCode,firestore:rules",
+    "serve": "node scripts/ensure-dist.js && firebase serve",
+    "preview": "npm run build && node scripts/ensure-dist.js && firebase serve",
+    "serve:hosting": "node scripts/ensure-dist.js && firebase emulators:start --only hosting",
+    "emulators": "firebase emulators:start",
+    "prebuild:dev": "node scripts/prebuild.js --no-dev-remove",
+    "prebuild:restore": "node scripts/prebuild.js --restore",
+    "clean": "node scripts/clean-unused.js",
+    "build:clean": "npm run build && npm run clean",
+    "dev:restore": "npm run prebuild:restore",
+    "convert-webp": "node scripts/convert-webp.js",
+    "convert-images": "node tools/image-to-webp/convert.js",
+    "kor-to-eng": "node tools/kor-to-eng/convert.js",
+    "audit:firestore-fields": "node scripts/audit-firestore-fields.js",
+    "cleanup:instructor-legacy-fields": "node scripts/cleanup-instructor-legacy-fields.js",
+    "cleanup:instructor-legacy-fields:write": "node scripts/cleanup-instructor-legacy-fields.js --write"
+  },
+  "devDependencies": {
+    "cssnano": "^6.0.2",
+    "eslint": "^8.57.1",
+    "firebase-tools": "^15.20.0",
+    "postcss": "^8.4.35",
+    "sharp": "^0.33.0",
+    "terser": "^5.26.0"
+  }
+}

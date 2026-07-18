@@ -1,0 +1,47 @@
+/* 페이지네이션 */
+.pagination {
+  align-items:center;
+  display:flex;
+  gap:12px;
+  justify-content:center;
+  margin-top:32px
+}
+.pagination-btn {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  cursor:pointer;
+  font-weight:600;
+  padding:8px 16px;
+  transition:all .2s
+}
+.pagination-btn:hover:not(:disabled) {
+  background:var(--hover);
+  border-color:var(--brand);
+  color:var(--brand)
+}
+.pagination-btn:disabled {
+  cursor:not-allowed;
+  opacity:.5
+}
+.pagination-info {
+  color:var(--muted);
+  font-size:14px
+}
+
+/* 모바일 반응형 */
+@media (max-width:768px) {
+  .pagination {
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:24px
+  }
+  .pagination-btn {
+    font-size:14px;
+    padding:8px 12px
+  }
+  #noticePageNumbers {
+    gap:4px
+  }
+}

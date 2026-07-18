@@ -1,0 +1,274 @@
+/* 강사 그리드 */
+.grid-instructors {
+  display:grid;
+  gap:16px;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  margin-top:24px
+}
+.grid-instructors.is-2cols,.home .grid-instructors {
+  grid-template-columns:repeat(2,1fr)
+}
+@media (max-width:640px) {
+  .grid-instructors {
+    gap:12px
+  }
+  .grid-instructors,.grit-grid {
+    grid-template-columns:repeat(2,1fr)
+  }
+}
+
+/* 강사 카드 */
+.instructor-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:0 4px 8px rgba(0,0,0,.05);
+  overflow:hidden;
+  position:relative;
+  transition:transform .25s,box-shadow .25s
+}
+.instructor-card img {
+  aspect-ratio:4/5;
+  height:auto;
+  object-fit:cover;
+  object-position:center;
+  transition:transform .28s cubic-bezier(.2,.6,.2,1);
+  width:100%
+}
+.instructor-card .overlay {
+  align-items:center;
+  background:rgba(0,0,0,.5);
+  display:flex;
+  inset:0;
+  justify-content:center;
+  opacity:0;
+  pointer-events:none;
+  position:absolute;
+  text-align:center;
+  transition:opacity .18s;
+  z-index:2
+}
+.instructor-card:hover .overlay {
+  opacity:1
+}
+.instructor-card .overlay .txt {
+  color:#fff;
+  letter-spacing:.02em;
+  line-height:1.2;
+  text-shadow:0 1px 2px rgba(0,0,0,.35);
+  white-space:pre-line
+}
+.instructor-card .overlay .txt strong {
+  display:block;
+  font-size:1.05rem;
+  font-weight:800
+}
+.instructor-card .overlay .txt span {
+  display:block;
+  font-size:.95rem;
+  font-weight:700
+}
+.instructor-card:hover {
+  box-shadow:0 10px 20px rgba(0,0,0,.12);
+  transform:translateY(-5px)
+}
+.instructor-card:hover img {
+  transform:scale(1.03)
+}
+@media (max-width:640px) {
+  .instructor-card img {
+    aspect-ratio:3/4
+  }
+}
+
+/* 홈페이지 강사 */
+.home-instructors-sec {
+  margin:8px auto 24px;
+  max-width:1100px
+}
+.home-instructors {
+  display:grid;
+  gap:16px;
+  grid-template-columns:repeat(4,minmax(0,1fr))
+}
+@media (max-width:1100px) {
+  .home-instructors {
+    grid-template-columns:repeat(3,minmax(0,1fr))
+  }
+}
+@media (max-width:860px) {
+  .home-instructors {
+    grid-template-columns:repeat(2,minmax(0,1fr))
+  }
+}
+
+/* 강사 카드 (홈페이지용) */
+.inst-card {
+  background:var(--card,#fff);
+  border:1px solid var(--border,#e5e7eb);
+  border-radius:14px;
+  box-shadow:0 4px 8px rgba(0,0,0,.05);
+  display:block;
+  overflow:hidden;
+  position:relative;
+  transition:transform .25s ease,box-shadow .25s ease
+}
+.inst-card:focus-visible {
+  outline:2px solid var(--brand);
+  outline-offset:2px
+}
+.inst-card:hover {
+  box-shadow:0 10px 24px rgba(0,0,0,.12);
+  transform:translateY(-4px)
+}
+.inst-card img.inst-thumb,.inst-card>img {
+  aspect-ratio:3/4;
+  display:block;
+  object-fit:cover;
+  object-position:left center;
+  transition:transform .25s ease;
+  width:100%
+}
+.inst-card:hover img.inst-thumb,.inst-card:hover>img {
+  transform:scale(1.04)
+}
+.inst-overlay {
+  align-items:center;
+  background:rgba(0,0,0,.5);
+  display:flex;
+  flex-direction:column;
+  inset:0;
+  justify-content:center;
+  margin:0;
+  opacity:0;
+  padding:0;
+  pointer-events:none;
+  position:absolute;
+  transition:opacity .18s ease
+}
+.inst-card:focus-within .inst-overlay,.inst-card:hover .inst-overlay {
+  opacity:1
+}
+.inst-overlay__inner {
+  align-items:center;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  justify-content:center;
+  text-align:center
+}
+.inst-body .inst-name,.inst-overlay .inst-name {
+  color:#fff;
+  font-size:17px;
+  font-weight:800;
+  margin:0
+}
+.inst-row {
+  align-items:center;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px
+}
+.inst-body .inst-subject,.inst-overlay .inst-subject {
+  background:none!important;
+  border-radius:0;
+  color:#fff!important;
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  margin-top:4px;
+  padding:0
+}
+.inst-grades {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  margin-top:6px
+}
+.inst-grades .grade-tag {
+  background:hsla(0,0%,100%,.2);
+  border:1px solid hsla(0,0%,100%,.3);
+  border-radius:6px;
+  color:#fff;
+  display:inline-block;
+  font-size:11px;
+  font-weight:600;
+  line-height:1.2;
+  padding:3px 8px
+}
+.inst-thumb {
+  aspect-ratio:1/1;
+  display:block;
+  object-fit:cover;
+  width:100%
+}
+.inst-body {
+  padding:10px 12px 12px
+}
+.inst-chip {
+  background:var(--bg,#fff);
+  border:1px solid var(--border,#e5e7eb);
+  border-radius:999px;
+  color:var(--text,#111827);
+  font-size:12px;
+  line-height:1;
+  padding:4px 8px
+}
+html[data-theme=dark] .inst-chip {
+  background:var(--card,#111315);
+  border-color:var(--border,#2a2f36);
+  color:var(--text,#e5e7eb)
+}
+
+/* 과목별 배지 색상 */
+.subject--ko {
+  background:var(--sub-ko);
+  color:#fff
+}
+.subject--en {
+  background:var(--sub-en);
+  color:#fff
+}
+.subject--ma {
+  background:var(--sub-ma);
+  color:#fff
+}
+.subject--sc {
+  background:var(--sub-sc);
+  color:#202225
+}
+.subject--consult {
+  background:var(--sub-consult);
+  color:#fff
+}
+.badge[data-subject=\AD6D\C5B4],.inst-subject[data-subject=\AD6D\C5B4],.subject-badge[data-subject=\AD6D\C5B4] {
+  background:var(--sub-ko)!important;
+  color:#fff
+}
+.badge[data-subject=\C601\C5B4],.inst-subject[data-subject=\C601\C5B4],.subject-badge[data-subject=\C601\C5B4] {
+  background:var(--sub-en)!important;
+  color:#fff
+}
+.badge[data-subject=\C218\D559],.inst-subject[data-subject=\C218\D559],.subject-badge[data-subject=\C218\D559] {
+  background:var(--sub-ma)!important;
+  color:#fff
+}
+.badge[data-subject=\ACFC\D559],.inst-subject[data-subject=\ACFC\D559],.subject-badge[data-subject=\ACFC\D559] {
+  background:var(--sub-sc)!important;
+  color:#202225
+}
+.badge[data-subject=\CEE8\C124\D305],.inst-subject[data-subject=\CEE8\C124\D305],.subject-badge[data-subject=\CEE8\C124\D305] {
+  background:var(--sub-consult)!important;
+  color:#fff
+}
+.badge[data-subject=\C218\B9AC\B17C\C220],.inst-subject[data-subject=\C218\B9AC\B17C\C220],.subject-badge[data-subject=\C218\B9AC\B17C\C220] {
+  background:#0e7490!important;
+  color:#fff
+}
+
+/* 터치 디바이스에서 인스터럭터 오버레이 숨김 */
+@media (hover:none) and (pointer:coarse) {
+  .inst-overlay {
+    opacity:0
+  }
+}

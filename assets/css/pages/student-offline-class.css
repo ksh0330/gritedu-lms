@@ -1,0 +1,328 @@
+/* Student offline class detail — members/students/offline-class.html */
+
+.student-offline-class-page .student-offline-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-offline-class-page .student-offline-class-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-offline-class-page .student-offline-class-label {
+  align-self: center;
+  border-radius: 6px;
+  color: #fff;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0;
+  padding: 4px 10px;
+}
+
+.student-offline-class-page .student-offline-class-label[data-subject="국어"] {
+  background: var(--sub-ko);
+}
+
+.student-offline-class-page .student-offline-class-label[data-subject="영어"] {
+  background: var(--sub-en);
+}
+
+.student-offline-class-page .student-offline-class-label[data-subject="수학"] {
+  background: var(--sub-ma);
+}
+
+.student-offline-class-page .student-offline-class-label[data-subject="과학"] {
+  background: var(--sub-sc);
+}
+
+.student-offline-class-page .student-offline-class-label[data-subject="컨설팅"] {
+  background: var(--sub-consult);
+}
+
+.student-offline-class-page .student-offline-class-meta {
+  color: var(--muted);
+  font-size: clamp(13px, 1.9vw, 14px);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.student-offline-class-page .student-offline-class-meta--schedule {
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.student-offline-class-page .student-offline-class-meta--schedule-lines {
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.student-offline-class-page .student-offline-class-meta__label {
+  color: var(--text);
+  font-weight: 700;
+  margin-right: 0;
+}
+
+.student-offline-class-page .student-offline-archived-notice {
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 12%, transparent);
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 4px;
+  padding: 8px 10px;
+}
+
+.student-offline-class-page .student-offline-sessions-head {
+  margin-bottom: 8px;
+}
+
+.student-offline-class-page .student-offline-sessions-head .section-title {
+  margin: 0 0 2px;
+}
+
+.student-offline-class-page .student-offline-sessions-head .home-subdesc {
+  margin: 0;
+}
+
+.student-offline-class-page .student-offline-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-offline-class-page .student-offline-sessions-empty {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+  padding: 16px 2px;
+  text-align: center;
+}
+
+.student-offline-class-page .student-offline-session-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.student-offline-class-page .student-offline-session-card.is-open {
+  border-color: color-mix(in srgb, var(--brand, #ff7a00) 40%, var(--border));
+}
+
+.student-offline-class-page .student-offline-session-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.student-offline-class-page .student-offline-session-toggle:focus-visible {
+  outline: 2px solid var(--brand, #ff7a00);
+  outline-offset: -2px;
+}
+
+.student-offline-class-page .student-offline-session-toggle__row {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.student-offline-class-page .student-offline-session-no {
+  color: var(--brand, #ff7a00);
+  flex-shrink: 0;
+  font-size: clamp(12px, 1.8vw, 13px);
+  font-weight: 700;
+}
+
+.student-offline-class-page .student-offline-session-date {
+  color: var(--muted);
+  flex-shrink: 0;
+  font-size: clamp(11px, 1.7vw, 12px);
+}
+
+.student-offline-class-page .student-offline-session-title {
+  flex: 1;
+  font-size: clamp(13px, 1.9vw, 14px);
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-offline-class-page .student-offline-session-toggle__end {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.student-offline-class-page .student-offline-session-video-count {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.student-offline-class-page .student-offline-session-toggle__icon {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  flex-shrink: 0;
+  height: 7px;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  width: 7px;
+}
+
+.student-offline-class-page .student-offline-session-card.is-open .student-offline-session-toggle__icon {
+  transform: rotate(-135deg);
+  translate: 0 1px;
+}
+
+.student-offline-class-page .student-offline-session-panel {
+  border-top: 1px solid var(--border);
+  padding: 6px 10px 10px;
+}
+
+.student-offline-class-page .student-offline-session-panel[hidden] {
+  display: none;
+}
+
+.student-offline-class-page .student-offline-session-desc {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0 0 8px;
+}
+
+.student-offline-class-page .student-offline-video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.student-offline-class-page .student-offline-video-link {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand, #ff7a00) 8%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--brand, #ff7a00) 28%, var(--border));
+  border-radius: 6px;
+  color: var(--text);
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 8px 10px;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  width: 100%;
+}
+
+.student-offline-class-page .student-offline-video-link:hover {
+  background: color-mix(in srgb, var(--brand, #ff7a00) 14%, var(--card));
+  border-color: var(--brand, #ff7a00);
+}
+
+.student-offline-class-page .student-offline-video-link__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-offline-class-page .student-offline-video-link__go {
+  color: var(--brand, #ff7a00);
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.student-offline-class-page .student-offline-sessions-pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.student-offline-class-page .student-offline-sessions-pagination__info {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.student-offline-class-page .student-offline-sessions-pagination .btn {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 5px 10px;
+}
+
+/* Temporary debug panel (?debug=1) */
+.student-offline-debug-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 24px 16px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.student-offline-debug-panel__title {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.student-offline-debug-panel__hint {
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.student-offline-debug-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.student-offline-debug-panel__list li {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+  word-break: break-all;
+}
+
+.student-offline-debug-panel__list code {
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .student-offline-class-page .student-offline-session-toggle {
+    min-height: 40px;
+    padding: 7px 8px;
+  }
+
+  .student-offline-class-page .student-offline-session-toggle__row {
+    gap: 4px;
+  }
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>학원 안내 | 그릿에듀학원</title>
+
+  <meta name="description" content="그릿에듀학원의 교육 방향과 운영 철학, 중고등 내신과 입시 수업을 소개합니다.">
+  <link rel="canonical" href="https://gritedu.kr/story.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:site_name" content="그릿에듀학원">
+  <meta property="og:title" content="학원 안내 | 그릿에듀학원">
+  <meta property="og:description" content="그릿에듀학원의 교육 방향과 운영 철학, 중고등 내신과 입시 수업을 소개합니다.">
+  <meta property="og:url" content="https://gritedu.kr/story.html">
+  <meta property="og:image" content="https://gritedu.kr/assets/main.png">
+
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+  <script>
+    (function() {
+      const THEME_KEY = 'grit-theme';
+      function getCurrentTheme() {
+        try {
+          return localStorage.getItem(THEME_KEY) ||
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch {
+          return 'light';
+        }
+      }
+      const theme = getCurrentTheme();
+      document.documentElement.setAttribute('data-theme', theme);
+
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = theme === 'dark' ? '/assets/lightmode.png' : '/assets/darkmode.png';
+      document.head.appendChild(link);
+    })();
+  </script>
+
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/story.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container story">
+    <div id="story-page" class="story-page story-page--loading">
+      <h1 class="page-title visually-hidden">그릿에듀 학원 안내</h1>
+      <div id="story-dynamic" class="story-dynamic" hidden></div>
+      <div id="story-legacy-content" class="story-legacy-content" hidden></div>
+    </div>
+
+    <section class="grit-section" data-story-fallback aria-labelledby="fallback-s1" hidden>
+      <h2 id="fallback-s1">끝까지 해내는 힘, GRIT</h2>
+      <p>
+        같은 수업을 들어도 결과가 달라지는 이유는 <strong class="mark">지식의 양보다 지속력과 태도</strong>에 있습니다.
+        그릿(GRIT)은 어려움 속에서도 궤도를 유지하는 힘이며,
+        GRIT EDU는 이 힘을 키우는 <strong class="mark">학습 루틴과 피드백 시스템</strong>을 설계합니다.
+      </p>
+      <p class="keyline">“실력은 반복에서, 반복은 루틴에서, 루틴은 태도에서 나온다.”</p>
+      <p>
+        우리는 “얼마나 많이”보다 <strong class="mark">얼마나 꾸준히</strong>를 봅니다.
+        개념부터 적용과 복습까지 이어지는 단순하지만 강력한 루틴,
+        짧고 정확한 코칭, 기록 기반 점검으로 학생의 일과를 설계합니다.
+        <strong class="mark">흔들리지 않는 일상</strong>을 만드는 것이 곧 학습력입니다.
+      </p>
+    </section>
+
+    <section class="grit-section" data-story-fallback aria-labelledby="fallback-s2" hidden>
+      <h2 id="fallback-s2">왜 GRIT EDU인가</h2>
+      <p>
+        과목별 전문 강사진이 국어, 영어, 수학, 과학, 수리논술 전 영역을 커버합니다.
+        우리는 단기간 점수 상승보다 <strong class="mark">지속 가능한 성장</strong>을 목표로 합니다.
+        학교별 내신 대비 흐름을 학습 데이터와 주간 점검으로 관리합니다.
+      </p>
+    </section>
+
+    <section class="grit-section" data-story-fallback aria-labelledby="fallback-s3" hidden>
+      <h2 id="fallback-s3">우리의 교육 철학</h2>
+      <p class="keyline">“잘하는 아이가 아닌, 끝까지 해내는 아이로 성장시킵니다.”</p>
+      <p>
+        GRIT EDU의 교육은 문제 풀이 기술을 넘어,
+        <strong class="mark">개념의 맥락</strong>과 <strong class="mark">복습의 구조</strong>,
+        <strong class="mark">마음의 안정</strong>까지 함께 다룹니다.
+      </p>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>

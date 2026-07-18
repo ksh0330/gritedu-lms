@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>시간표 이미지 | 그릿에듀학원</title>
+  <meta name="robots" content="noindex,follow">
+  <meta name="description" content="그릿에듀학원에 등록된 시간표 이미지를 확인할 수 있습니다.">
+
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    (function() {
+      const THEME_KEY = "grit-theme";
+      function getCurrentTheme() {
+        try {
+          return localStorage.getItem(THEME_KEY) ||
+            (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        } catch {
+          return "light";
+        }
+      }
+      const theme = getCurrentTheme();
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/schedule-images.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+
+<body class="schedule-images-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container schedule-images">
+    <header class="schedule-images-page-header">
+      <h1 class="page-title">시간표 이미지</h1>
+      <p class="muted schedule-images-page-desc">등록된 시간표 이미지를 확인할 수 있습니다.</p>
+      <p class="schedule-images-page-back">
+        <a href="/schedule.html" class="btn sm">시간표 목록으로</a>
+      </p>
+    </header>
+
+    <nav id="scheduleImagesNav" class="schedule-images-nav grit-section" aria-label="시간표 이미지 바로가기" hidden></nav>
+
+    <section id="scheduleImagesMain" class="schedule-images-main grit-section" aria-live="polite">
+      <p id="scheduleImagesEmpty" class="muted schedule-images-empty" hidden>등록된 시간표 이미지가 없습니다.</p>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>

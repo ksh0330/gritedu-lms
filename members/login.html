@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 로그인</title>
+
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<!-- 테마 즉시 적용 및 조건부 이미지 프리로드 -->
+  <script>
+    (function() {
+      const THEME_KEY = 'grit-theme';
+      function getCurrentTheme() {
+        try {
+          return localStorage.getItem(THEME_KEY) || 
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch {
+          return 'light';
+        }
+      }
+      const theme = getCurrentTheme();
+      document.documentElement.setAttribute('data-theme', theme);
+      
+      // 현재 테마에 따라 필요한 이미지만 preload
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = theme === 'dark' ? '/assets/lightmode.png' : '/assets/darkmode.png';
+      document.head.appendChild(link);
+    })();
+  </script>
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/login.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+
+<body>
+  <div data-include="header"></div>
+
+  <main class="auth-wrap" aria-labelledby="loginTitle">
+    <div class="auth-card" role="form" aria-describedby="loginDesc">
+      <h1 id="loginTitle">로그인</h1>
+
+      <form id="loginForm" novalidate autocomplete="on">
+        <label for="email">이메일</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          required
+          placeholder="example@gritedu.com"
+          inputmode="email"
+          autocomplete="username"
+        />
+
+        <label for="password">비밀번호</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          required
+          placeholder="********"
+          autocomplete="current-password"
+        />
+
+        <p class="text-sm text-muted mt-8 mb-16">이메일 또는 비밀번호 관련 문의는 학원으로 연락해 주세요.</p>
+
+        <button type="submit" class="btn primary" id="loginButton">
+          <span class="button-text">로그인</span>
+          <span class="button-spinner hidden">
+            <span class="loading-spinner" style="width: 16px; height: 16px; border-width: 2px;"></span>
+          </span>
+        </button>
+        <p id="loginStatus" class="desc"></p>
+      </form>
+
+      <div class="signup-section">
+        <p>아직 계정이 없으신가요?</p>
+        <a href="/members/signup.html" class="btn w-full">회원가입</a>
+      </div>
+    </div>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>

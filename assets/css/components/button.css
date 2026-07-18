@@ -1,0 +1,106 @@
+.btn {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--text);
+  cursor:pointer;
+  font-weight:700;
+  padding:10px 16px;
+  transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease,box-shadow .15s ease,filter .15s ease
+}
+.btn:hover {
+  background:var(--hover);
+  transform:translateY(-1px)
+}
+.btn:active {
+  transform:translateY(0)
+}
+.btn:focus:not(:focus-visible) {
+  outline:none
+}
+.btn:focus-visible {
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 28%,transparent);
+  outline:none
+}
+.btn:disabled,
+.btn[disabled] {
+  cursor:not-allowed;
+  opacity:.62;
+  transform:none
+}
+.btn:is(.primary,.primary.sm,.sm.primary,.primary.small,.small.primary),
+.btn-primary {
+  background:var(--brand);
+  border-color:var(--brand);
+  color:#fff
+}
+.btn:is(.secondary,.secondary.sm,.sm.secondary,.secondary.small,.small.secondary) {
+  background:var(--muted);
+  border-color:var(--muted);
+  color:#fff
+}
+.btn:is(.outline,.outline.sm,.sm.outline,.outline.small,.small.outline) {
+  background:transparent;
+  border-color:var(--border);
+  color:var(--text)
+}
+.btn.sm,.btn.small {
+  font-size:.9rem;
+  padding:8px 12px
+}
+.btn:is(.primary,.primary.sm,.sm.primary,.primary.small,.small.primary):is(:hover,:active,:focus-visible),
+.btn-primary:is(:hover,:active,:focus-visible) {
+  background:var(--brand);
+  border-color:var(--brand);
+  color:#fff;
+  filter:brightness(1.08)
+}
+.btn:is(.primary,.primary.sm,.sm.primary,.primary.small,.small.primary):disabled,
+.btn:is(.primary,.primary.sm,.sm.primary,.primary.small,.small.primary)[disabled],
+.btn-primary:disabled,
+.btn-primary[disabled] {
+  background:var(--brand);
+  border-color:var(--brand);
+  color:#fff;
+  filter:none
+}
+.btn:is(.secondary,.secondary.sm,.sm.secondary,.secondary.small,.small.secondary):is(:hover,:active,:focus-visible) {
+  background:var(--muted);
+  border-color:var(--muted);
+  color:#fff;
+  filter:brightness(1.06)
+}
+.btn:is(.secondary,.secondary.sm,.sm.secondary,.secondary.small,.small.secondary):disabled,
+.btn:is(.secondary,.secondary.sm,.sm.secondary,.secondary.small,.small.secondary)[disabled] {
+  background:var(--muted);
+  border-color:var(--muted);
+  color:#fff;
+  filter:none
+}
+.btn:is(.outline,.outline.sm,.sm.outline,.outline.small,.small.outline):is(:hover,:active,:focus-visible) {
+  background:var(--hover);
+  border-color:var(--brand);
+  color:var(--text)
+}
+.btn:is(.danger,.danger.sm,.sm.danger,.danger.small,.small.danger) {
+  background:#dc3545;
+  border-color:#dc3545;
+  color:#fff
+}
+.btn:is(.danger,.danger.sm,.sm.danger,.danger.small,.small.danger):is(:hover,:active,:focus-visible) {
+  background:#c82333;
+  border-color:#c82333;
+  color:#fff;
+  filter:none
+}
+
+/* 모바일 터치 타겟 (min 44px) — migrated from assets/css/main.css */
+@media (max-width:768px) {
+  button,
+  a.btn,
+  .btn {
+    min-height:44px;
+    min-width:44px;
+    padding:12px 16px
+  }
+}

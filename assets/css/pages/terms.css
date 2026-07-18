@@ -1,0 +1,299 @@
+/* ------------------------------------------------------------------
+   Moved from terms.html (embedded <style>) — tabs + accordion policy UI
+   ------------------------------------------------------------------ */
+
+.policy-page-wrap {
+  max-width: 960px;
+  margin: 40px auto;
+  padding: 0 16px;
+}
+
+.policy-page-title {
+  font-size: 1.8rem;
+  margin-bottom: 0.75rem;
+  text-align: center;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.policy-sub-title {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.policy-tab-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.policy-tab-btn {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 8px 8px 0 0;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+  font-family: inherit;
+}
+
+.policy-tab-btn.active {
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom-color: var(--card);
+}
+
+.policy-tab-btn:not(.active):hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.policy-tab-panel-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 28px;
+  box-shadow: var(--shadow-soft);
+}
+
+.policy-tab-panel {
+  display: none;
+}
+
+.policy-tab-panel.active {
+  display: block;
+}
+
+/* 개인정보처리방침 아코디언 스타일 */
+.policy-intro {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.policy-intro p {
+  color: var(--text);
+  line-height: 1.8;
+  font-size: 0.95rem;
+}
+
+.policy-toc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.policy-toc-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.policy-toc-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.policy-toc-btn {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.policy-toc-btn:hover {
+  background: var(--hover);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.policy-accordion-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.policy-accordion-item:hover {
+  border-color: var(--brand);
+}
+
+.policy-accordion-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  background: var(--card);
+  user-select: none;
+  gap: 12px;
+}
+
+.policy-accordion-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.policy-accordion-title {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.policy-accordion-arrow {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  transition: transform 0.3s;
+  color: var(--muted);
+}
+
+.policy-accordion-item.active .policy-accordion-arrow {
+  transform: rotate(180deg);
+}
+
+.policy-accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background: var(--bg);
+}
+
+.policy-accordion-item.active .policy-accordion-content {
+  max-height: 5000px;
+}
+
+.policy-accordion-body {
+  padding: 20px 24px 24px 56px;
+  color: var(--text);
+  line-height: 1.8;
+}
+
+.policy-accordion-body h3 {
+  font-size: 1rem;
+  margin: 1.1rem 0 0.3rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.policy-accordion-body p {
+  margin: 0.4rem 0;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.8;
+}
+
+.policy-accordion-body ul {
+  margin: 0.4rem 0 0.8rem 1.1rem;
+  padding-left: 0.4rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.policy-accordion-body li {
+  margin-bottom: 0.3rem;
+  line-height: 1.7;
+}
+
+/* 이용약관 스타일 (기존 유지) */
+.policy-tab-panel h2 {
+  font-size: 1.2rem;
+  margin: 1.4rem 0 0.4rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.policy-tab-panel h2:first-child {
+  margin-top: 0;
+}
+
+.policy-tab-panel h3 {
+  font-size: 1rem;
+  margin: 1.1rem 0 0.3rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.policy-tab-panel p {
+  margin: 0.4rem 0;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.8;
+}
+
+.policy-tab-panel ul {
+  margin: 0.4rem 0 0.8rem 1.1rem;
+  padding-left: 0.4rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.policy-tab-panel li {
+  margin-bottom: 0.3rem;
+  line-height: 1.7;
+}
+
+.policy-muted {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  .policy-page-wrap {
+    padding: 24px 16px;
+  }
+
+  .policy-tab-panel-wrap {
+    padding: 24px 18px;
+  }
+
+  .policy-page-title {
+    font-size: 1.5rem;
+  }
+
+  .policy-tab-nav {
+    flex-direction: column;
+    gap: 0;
+    border-bottom: none;
+  }
+
+  .policy-tab-btn {
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    margin-bottom: 0;
+    padding: 12px 16px;
+    border-radius: 0;
+  }
+
+  .policy-tab-btn.active {
+    border-left-color: var(--brand);
+    border-bottom-color: var(--border);
+    border-top: none;
+    border-right: none;
+  }
+
+  .policy-accordion-body {
+    padding: 20px 20px 24px 20px;
+  }
+}

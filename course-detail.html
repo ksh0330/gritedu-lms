@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>강좌 상세 | 그릿에듀학원</title>
+  <meta name="description" content="그릿에듀학원 강좌의 커리큘럼, 강사 정보, 온라인 강의와 수업 구성을 확인하세요.">
+  <link rel="canonical" href="https://gritedu.kr/course-detail.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:site_name" content="그릿에듀학원">
+  <meta property="og:title" content="강좌 상세 | 그릿에듀학원">
+  <meta property="og:description" content="그릿에듀학원 강좌의 커리큘럼, 강사 정보, 온라인 강의와 수업 구성을 확인하세요.">
+  <meta property="og:url" content="https://gritedu.kr/course-detail.html">
+  <meta property="og:image" content="https://gritedu.kr/assets/main.png">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/course-detail.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body data-page="course-detail">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container course-detail-page" id="coursePage">
+    <div class="course-detail-shell">
+      <section class="course-detail-hero">
+        <div id="heroMedia" class="hero-media" style="display:none;"></div>
+        <div class="hero-content">
+          <p class="hero-meta-row" id="courseMetaRow">
+            <span id="courseYear">-</span>
+            <span class="hero-divider" aria-hidden="true">|</span>
+            <span id="courseGrade">-</span>
+            <span class="hero-divider" aria-hidden="true">|</span>
+            <span id="courseSubject">-</span>
+            <span class="hero-divider" aria-hidden="true">|</span>
+            <span id="courseInstructor">-</span>
+          </p>
+          <h1 class="hero-title" id="courseTitle">그릿에듀 강좌 상세</h1>
+          <p class="hero-description" id="courseSummary">중고등 내신과 입시를 위한 강좌 정보를 확인하세요.</p>
+          <div id="enrollSection" class="hero-action">
+            <button type="button" class="btn primary" data-enroll-cta="1">수강신청</button>
+            <p class="muted enroll-hint" data-enroll-hint="1" style="display:none;"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="course-tabs-section">
+        <div class="course-tabs" id="courseTabs" role="tablist" aria-label="강좌 상세 탭">
+          <button id="tab-introduction" type="button" class="course-tab-btn active" data-tab="introduction" role="tab" aria-selected="true" aria-controls="panel-introduction">강좌 소개</button>
+          <button id="tab-instructor" type="button" class="course-tab-btn" data-tab="instructor" role="tab" aria-selected="false" aria-controls="panel-instructor">강사 정보</button>
+          <button id="tab-lecture" type="button" class="course-tab-btn" data-tab="lecture" role="tab" aria-selected="false" aria-controls="panel-lecture">강의 목록</button>
+        </div>
+
+        <div class="course-tab-panels">
+          <section id="panel-introduction" class="course-tab-panel active" data-panel="introduction" role="tabpanel" aria-labelledby="tab-introduction">
+            <h2 class="section-title">강좌 소개</h2>
+            <div id="courseDescription" class="section-content"></div>
+          </section>
+
+          <section id="panel-instructor" class="course-tab-panel" data-panel="instructor" role="tabpanel" aria-labelledby="tab-instructor" hidden>
+            <h2 class="section-title">강사 정보</h2>
+            <div id="courseInstructorInfo" class="section-content instructor-info-card">
+              <a id="courseInstructorProfileLink" class="instructor-profile-link is-disabled" href="#" aria-label="강사 상세 보기" aria-disabled="true">
+                <div id="courseInstructorAvatar" class="instructor-avatar" aria-hidden="true">강사</div>
+                <div class="instructor-profile-text">
+                  <p id="courseInstructorNameText" class="instructor-profile-name">강사명</p>
+                  <p id="courseInstructorSubjectText" class="instructor-profile-subject">과목</p>
+                </div>
+              </a>
+              <div id="courseInstructorContentText" class="instructor-extra-text"></div>
+            </div>
+          </section>
+
+          <section id="panel-lecture" class="course-tab-panel" data-panel="lecture" role="tabpanel" aria-labelledby="tab-lecture" hidden>
+            <h2 class="section-title">강의 목록</h2>
+            <div id="weeksContent" class="section-content"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="enrollRoleNoticeModal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="enrollRoleNoticeTitle">
+    <div class="modal-content auth-card" style="max-width:460px;">
+      <button type="button" class="modal-close" id="closeEnrollRoleNoticeModal" aria-label="닫기">×</button>
+      <h2 id="enrollRoleNoticeTitle" style="margin:0 0 12px;font-size:1.25rem;">안내</h2>
+      <p id="enrollRoleNoticeMessage" class="desc" style="margin:0;line-height:1.65;">학생 계정에서만 수강신청이 가능합니다.</p>
+      <button type="button" class="btn primary" id="confirmEnrollRoleNoticeModal" style="width:100%;margin-top:20px;">확인</button>
+    </div>
+  </div>
+
+  <div data-include="footer"></div>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>학원비, 수강료 안내 | 그릿에듀학원</title>
+
+  <meta name="description" content="그릿에듀학원 학원정보조회, 교습비, 수강료와 환불규정을 확인하세요.">
+  <link rel="canonical" href="https://gritedu.kr/tuition.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:title" content="학원비, 수강료 안내 | 그릿에듀학원">
+  <meta property="og:description" content="그릿에듀학원 학원정보조회, 교습비, 수강료와 환불규정을 확인하세요.">
+  <meta property="og:url" content="https://gritedu.kr/tuition.html">
+  <meta property="og:image" content="https://gritedu.kr/assets/main.png">
+  <meta property="og:site_name" content="그릿에듀학원">
+
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<!-- 폰트 로드 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <!-- Pretendard는 CSS에서 @font-face로 로드 (font-display: swap 적용) -->
+
+  <!-- 테마 즉시 적용 및 조건부 이미지 프리로드 -->
+  <script>
+    (function() {
+      const THEME_KEY = 'grit-theme';
+      function getCurrentTheme() {
+        try {
+          return localStorage.getItem(THEME_KEY) || 
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch {
+          return 'light';
+        }
+      }
+      const theme = getCurrentTheme();
+      document.documentElement.setAttribute('data-theme', theme);
+      
+      // 현재 테마에 따라 필요한 이미지만 preload
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = theme === 'dark' ? '/assets/lightmode.png' : '/assets/darkmode.png';
+      document.head.appendChild(link);
+    })();
+  </script>
+  
+  <!-- 헤더/푸터는 common.js에서만 로드 (인라인 fetch와 중복 시 DOM/이벤트가 꼬일 수 있음) -->
+
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/assets/js/pages/tuition-images.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="tuition-container">
+      <h1 class="page-title">학원정보조회, 교습비 및 환불규정</h1>
+      
+      <!-- 탭 메뉴 -->
+      <div class="tuition-tabs" role="tablist">
+        <button class="tuition-tab active" role="tab" aria-selected="true" aria-controls="aca-content" id="aca-tab" onclick="switchTab('aca')">
+          학원정보조회
+        </button>
+        <button class="tuition-tab" role="tab" aria-selected="false" aria-controls="fee-content" id="fee-tab" onclick="switchTab('fee')">
+          교습비
+        </button>
+        <button class="tuition-tab" role="tab" aria-selected="false" aria-controls="refund-content" id="refund-tab" onclick="switchTab('refund')">
+          환불규정
+        </button>
+      </div>
+      
+      <!-- 학원정보조회 내용 -->
+      <div id="aca-content" class="tuition-content active" role="tabpanel" aria-labelledby="aca-tab">
+        <div class="tuition-media-wrapper" data-tuition-gallery="academy">
+          <p class="tuition-gallery-status">이미지를 불러오는 중입니다.</p>
+        </div>
+        
+        <div class="tuition-page-nav">
+          <button class="tuition-nav-btn" disabled>이전</button>
+          <span class="tuition-page-info">1 / 3</span>
+          <button class="tuition-nav-btn" onclick="switchTab('fee')">다음: 교습비 →</button>
+        </div>
+      </div>
+      
+      <!-- 교습비 내용 -->
+      <div id="fee-content" class="tuition-content" role="tabpanel" aria-labelledby="fee-tab">
+        <div class="tuition-media-wrapper" data-tuition-gallery="fee">
+          <p class="tuition-gallery-status">이미지를 불러오는 중입니다.</p>
+        </div>
+        
+        <div class="tuition-page-nav">
+          <button class="tuition-nav-btn" onclick="switchTab('aca')">← 이전: 학원정보조회</button>
+          <span class="tuition-page-info">2 / 3</span>
+          <button class="tuition-nav-btn" onclick="switchTab('refund')">다음: 환불규정 →</button>
+        </div>
+      </div>
+      
+      <!-- 환불규정 내용 -->
+      <div id="refund-content" class="tuition-content" role="tabpanel" aria-labelledby="refund-tab">
+        <div class="tuition-media-wrapper" data-tuition-gallery="refund">
+          <p class="tuition-gallery-status">이미지를 불러오는 중입니다.</p>
+        </div>
+        
+        <div class="tuition-page-nav">
+          <button class="tuition-nav-btn" onclick="switchTab('fee')">← 이전: 교습비</button>
+          <span class="tuition-page-info">3 / 3</span>
+          <button class="tuition-nav-btn" disabled>다음</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div data-include="footer"></div>
+  
+  <script>
+    function switchTab(tabName) {
+      // 모든 탭과 컨텐츠 비활성화
+      document.querySelectorAll('.tuition-tab').forEach(tab => {
+        tab.classList.remove('active');
+        tab.setAttribute('aria-selected', 'false');
+      });
+      document.querySelectorAll('.tuition-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      
+      // 선택된 탭과 컨텐츠 활성화
+      if (tabName === 'aca') {
+        document.getElementById('aca-tab').classList.add('active');
+        document.getElementById('aca-tab').setAttribute('aria-selected', 'true');
+        document.getElementById('aca-content').classList.add('active');
+      } else if (tabName === 'fee') {
+        document.getElementById('fee-tab').classList.add('active');
+        document.getElementById('fee-tab').setAttribute('aria-selected', 'true');
+        document.getElementById('fee-content').classList.add('active');
+      } else if (tabName === 'refund') {
+        document.getElementById('refund-tab').classList.add('active');
+        document.getElementById('refund-tab').setAttribute('aria-selected', 'true');
+        document.getElementById('refund-content').classList.add('active');
+      }
+      
+      // URL 해시 업데이트 (aca는 기본값이므로 해시 제거)
+      if (tabName === 'aca') {
+        if (window.location.hash) {
+          history.replaceState(null, '', window.location.pathname);
+        }
+      } else {
+        history.replaceState(null, '', window.location.pathname + '#' + tabName);
+      }
+      
+      // 페이지 상단으로 스크롤
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // 페이지 로드 시 URL 해시 확인하여 해당 탭으로 이동
+    function initTabFromHash() {
+      const hash = window.location.hash.replace('#', '');
+      const validTabs = ['aca', 'fee', 'refund'];
+      
+      if (hash && validTabs.includes(hash)) {
+        switchTab(hash);
+      } else {
+        // 해시가 없거나 유효하지 않으면 기본 탭(aca)으로
+        switchTab('aca');
+      }
+    }
+    
+    // 페이지 로드 시 실행
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initTabFromHash);
+    } else {
+      initTabFromHash();
+    }
+    
+    // 브라우저 뒤로/앞으로 버튼 처리
+    window.addEventListener('hashchange', function() {
+      initTabFromHash();
+    });
+    
+    // 키보드 네비게이션 지원
+    document.addEventListener('keydown', function(e) {
+      const activeTab = document.querySelector('.tuition-tab.active');
+      if (!activeTab) return;
+      
+      if (e.key === 'ArrowLeft') {
+        if (activeTab.id === 'refund-tab') {
+          switchTab('fee');
+        } else if (activeTab.id === 'fee-tab') {
+          switchTab('aca');
+        }
+      } else if (e.key === 'ArrowRight') {
+        if (activeTab.id === 'aca-tab') {
+          switchTab('fee');
+        } else if (activeTab.id === 'fee-tab') {
+          switchTab('refund');
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+

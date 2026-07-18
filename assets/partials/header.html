@@ -1,0 +1,45 @@
+<header class="grit-header fixed" id="siteHeader" aria-label="Site header">
+  <div class="grit-header__wrap">
+    <!-- 테마 토글 버튼 (데스크탑/모바일 공통) -->
+    <button id="themeToggle" aria-label="테마 전환" class="theme-toggle-btn">
+      <img src="/assets/darkmode.png" alt="테마 전환 아이콘" id="themeIcon">
+    </button>
+
+    <!-- 로고 -->
+    <a class="grit-logo" href="/" aria-label="그릿에듀학원 홈">
+      <img id="logoImg"
+           src="/assets/logo.png"
+           data-light="/assets/logo.png"
+           data-dark="/assets/logo-dark.png"
+           alt="그릿에듀학원 로고" />
+    </a>
+
+    <!-- 가운데 네비 -->
+    <nav class="grit-nav" id="siteNav" aria-label="주 메뉴" role="navigation">
+      <ul>
+        <li class="has-sub">
+          <a href="/story.html" class="toplink" aria-haspopup="true" aria-expanded="false">학원 안내</a>
+          <ul class="submenu" aria-label="학원 안내 하위" role="menu">
+            <li><a href="/story.html">학원 소개</a></li>
+            <li><a href="/schedule.html">시간표</a></li>
+            <li><a href="/contact.html">상담 문의</a></li>
+          </ul>
+        </li>
+        <li><a href="/instructors.html" class="toplink">강사진</a></li>
+        <li><a href="/courses.html" class="toplink">모든 강좌</a></li>
+        <li><a href="/members/dashboard.html" id="menu-myclass" class="toplink requires-login">내 강의실</a></li>
+      </ul>
+    </nav>
+
+    <!-- 데스크탑: 우측 컨트롤 -->
+    <div class="grit-controls">
+      <a href="/members/login.html" id="menu-login" class="toplink">로그인</a>
+      <a href="#" id="menu-logout" class="toplink" style="display:none">로그아웃</a>
+    </div>
+
+    <!-- 모바일: 오른쪽 햄버거 -->
+    <button class="menu-toggle" id="menuToggle" aria-label="메뉴 열기/닫기" aria-controls="siteNav" aria-expanded="false" style="display:none">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>

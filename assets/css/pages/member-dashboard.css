@@ -1,0 +1,353 @@
+.member-dashboard-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  text-align: left;
+}
+
+.member-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.member-dashboard-kicker {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 122, 0, 0.1);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.member-parent-section {
+  display: block;
+}
+
+.member-parent-section[hidden],
+#memberCoursesSection[hidden],
+#memberCoursesCta[hidden],
+#memberTertiarySummaryCard[hidden] {
+  display: none;
+}
+
+.member-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 0 0 24px;
+}
+
+.member-summary-stats[data-purpose="general"] {
+  grid-template-columns: minmax(0, 240px);
+}
+
+.member-stat-card {
+  min-height: 116px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+}
+
+.member-stat-label {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.member-stat-card strong {
+  display: block;
+  margin: 10px 0 6px;
+  color: var(--text);
+  font-size: clamp(24px, 4vw, 32px);
+  line-height: 1.1;
+}
+
+.member-summary-card,
+.member-child-link-card,
+.member-linked-children-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.member-section-header {
+  margin-bottom: 16px;
+}
+
+.member-parent-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.member-profile-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.member-profile-list div {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.member-profile-list dt {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.member-profile-list dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.member-course-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.member-course-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.member-child-link-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.member-child-link-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.member-child-link-form input,
+.member-child-link-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.member-school-search {
+  position: relative;
+}
+
+.member-school-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+}
+
+.member-school-option {
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.member-school-option:hover,
+.member-school-option:focus-visible {
+  background: rgba(255, 122, 0, 0.1);
+  outline: none;
+}
+
+.member-child-link-form button {
+  align-self: end;
+}
+
+.member-child-link-message {
+  min-height: 22px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.member-child-link-message[data-type="success"] {
+  color: var(--success-color);
+}
+
+.member-child-link-message[data-type="error"] {
+  color: var(--error-color);
+}
+
+.member-linked-children {
+  margin: 0;
+}
+
+.member-linked-children h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.member-linked-children-list {
+  display: grid;
+  gap: 10px;
+}
+
+.member-linked-child-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.member-linked-child-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.member-linked-child-card strong {
+  color: var(--text);
+}
+
+.member-linked-child-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.member-linked-child-date {
+  white-space: nowrap;
+}
+
+.member-linked-child-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.member-linked-child-counts span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 122, 0, 0.1);
+  color: var(--brand);
+}
+
+.member-child-details {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.member-child-details summary {
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.member-child-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.member-child-detail-grid section {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.member-child-detail-grid h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.member-child-detail-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member-child-detail-list li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.member-child-detail-list li span {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .member-dashboard-hero,
+  .member-linked-child-head,
+  .member-course-empty {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .member-summary-stats,
+  .member-parent-grid,
+  .member-profile-list,
+  .member-child-detail-grid,
+  .member-child-link-form {
+    grid-template-columns: 1fr;
+  }
+
+  .member-dashboard-actions {
+    justify-content: flex-start;
+  }
+
+  .member-summary-stats[data-purpose="general"] {
+    grid-template-columns: 1fr;
+  }
+}

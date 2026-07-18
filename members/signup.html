@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 회원가입</title>
+
+  <link rel="icon" href="/assets/favicon.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<!-- 테마 즉시 적용 및 조건부 이미지 프리로드 -->
+  <script>
+    (function() {
+      const THEME_KEY = 'grit-theme';
+      function getCurrentTheme() {
+        try {
+          return localStorage.getItem(THEME_KEY) || 
+            (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        } catch {
+          return 'light';
+        }
+      }
+      const theme = getCurrentTheme();
+      document.documentElement.setAttribute('data-theme', theme);
+      
+      // 현재 테마에 따라 필요한 이미지만 preload
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = theme === 'dark' ? '/assets/lightmode.png' : '/assets/darkmode.png';
+      document.head.appendChild(link);
+    })();
+  </script>
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/features/signup/index.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+
+<body>
+  <div data-include="header"></div>
+
+  <main class="auth-wrap" aria-labelledby="signupTitle">
+    <div class="auth-card signup-card" role="form">
+      <!-- 진행 단계 표시 -->
+      <div class="signup-steps">
+        <div class="step-item" data-step="1">
+          <div class="step-number">1</div>
+          <div class="step-label">회원유형<br>선택</div>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" data-step="2">
+          <div class="step-number">2</div>
+          <div class="step-label">본인인증<br>약관동의</div>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" data-step="3">
+          <div class="step-number">3</div>
+          <div class="step-label">정보<br>입력</div>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" data-step="4">
+          <div class="step-number">4</div>
+          <div class="step-label">가입<br>완료</div>
+        </div>
+      </div>
+
+      <!-- 1단계: 회원 유형 선택 -->
+      <div id="step1" class="signup-step active">
+        <h1 id="signupTitle">회원가입</h1>
+        <p class="desc">그릿에듀 회원가입을 시작합니다.</p>
+
+        <form id="step1Form" novalidate>
+          <div class="form-group">
+            <label>회원 유형 <span class="required">*</span></label>
+            <div class="radio-group vertical">
+              <label class="radio-label" style="cursor:pointer;">
+                <input type="radio" name="userType" value="student" id="userTypeStudent" checked required />
+                <div class="radio-icon" aria-hidden="true">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                    <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+                    <path d="M6 12l6 3"></path>
+                    <path d="M18 12l-6 3"></path>
+                  </svg>
+                </div>
+                <span class="radio-title">학생 회원</span>
+                <span class="radio-desc">중학생, 고등학생은 학생 회원으로 가입합니다. 만 14세 미만은 보호자와 함께 학원에 문의해 주세요.</span>
+              </label>
+              <label class="radio-label" style="cursor:pointer;">
+                <input type="radio" name="userType" value="member" id="userTypeMember" required />
+                <div class="radio-icon" aria-hidden="true">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                </div>
+                <span class="radio-title">일반 회원</span>
+                <span class="radio-desc">학부모 또는 일반 회원은 이 유형으로 가입합니다. 자녀 정보 입력은 가입 후 별도 단계에서 진행됩니다.</span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn primary" id="step1NextButton" disabled>다음 단계</button>
+        </form>
+      </div>
+
+      <!-- 2단계: 약관 동의 및 본인인증 -->
+      <div id="step2" class="signup-step hidden">
+        <h1><span id="step2UserTypeLabel"></span>약관동의 및 본인인증</h1>
+        <p class="desc">약관 동의와 본인인증을 진행해 주세요.</p>
+
+        <form id="step2Form" novalidate>
+
+          <!-- 약관 동의 -->
+          <div class="form-group form-group-spacing">
+            <label class="form-group-label">회원 약관 동의 <span class="required">*</span></label>
+            <div class="terms-box">
+              <label class="checkbox-label">
+                <input type="checkbox" id="agreeAll" class="agree-all-checkbox" />
+                <span style="font-weight: 700;">모두 확인하였으며 동의합니다.</span>
+              </label>
+              <div class="terms-desc">
+                필수 약관과 개인정보 수집 및 이용 동의가 필요합니다. 광고성 정보 수신 동의는 선택이며, 동의하지 않아도 온라인 학습 서비스 이용에는 제한이 없습니다.
+              </div>
+              <div class="terms-list">
+                <!-- 이용약관 -->
+                <div class="terms-item">
+                  <div class="terms-item-header">
+                    <div class="terms-item-header-left">
+                      <input type="checkbox" name="terms" id="agreeTerms" required class="terms-checkbox" />
+                    </div>
+                    <div class="terms-item-header-center">
+                      <label for="agreeTerms" class="terms-item-header-content">이용약관 전체 동의 (필수)</label>
+                    </div>
+                    <div class="terms-item-header-right">
+                      <button type="button" class="terms-view-btn" data-terms="terms" onclick="event.stopPropagation();">보기</button>
+                    </div>
+                  </div>
+                  <div class="terms-item-content hidden" data-terms="terms"></div>
+                </div>
+
+                <!-- 개인정보 수집 및 이용 -->
+                <div class="terms-item">
+                  <div class="terms-item-header">
+                    <div class="terms-item-header-left">
+                      <input type="checkbox" name="terms" id="agreePrivacy" required class="terms-checkbox" />
+                    </div>
+                    <div class="terms-item-header-center">
+                      <label for="agreePrivacy" class="terms-item-header-content">개인정보 수집 및 이용 (필수)</label>
+                    </div>
+                    <div class="terms-item-header-right">
+                      <button type="button" class="terms-view-btn" data-terms="privacy" onclick="event.stopPropagation();">보기</button>
+                    </div>
+                  </div>
+                  <div class="terms-item-content hidden" data-terms="privacy"></div>
+                </div>
+
+                <!-- 광고성 정보 수신 -->
+                <div class="terms-item">
+                  <div class="terms-item-header">
+                    <div class="terms-item-header-left">
+                      <input type="checkbox" name="marketing" id="agreeMarketing" class="terms-checkbox" />
+                    </div>
+                    <div class="terms-item-header-center">
+                      <label for="agreeMarketing" class="terms-item-header-content">광고성 정보 수신 동의 (선택)</label>
+                    </div>
+                    <div class="terms-item-header-right">
+                      <button type="button" class="terms-view-btn" data-terms="marketing" onclick="event.stopPropagation();">보기</button>
+                    </div>
+                  </div>
+                  <div class="terms-item-content hidden" data-terms="marketing"></div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- 이메일 인증번호 (Cloud Functions) -->
+          <div class="form-group form-group-spacing">
+            <label class="form-group-label">본인인증 (이메일) <span class="required">*</span></label>
+            
+            <div class="form-group-spacing-sm">
+              <label class="verify-label">이메일</label>
+              <div class="email-verify-group">
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  required
+                  placeholder="example@email.com"
+                  inputmode="email"
+                  autocomplete="email"
+                />
+                <button type="button" id="sendVerificationBtn" class="btn-verify">
+                  <span class="send-btn-text">인증번호 발송</span>
+                  <span class="send-btn-spinner hidden">
+                    <span class="loading-spinner" style="width: 14px; height: 14px; border-width: 2px; margin-left: 6px;"></span>
+                  </span>
+                </button>
+              </div>
+              <div class="verification-send-meta">
+                <small class="send-btn-timer hidden"></small>
+                <small class="verify-note">6자리 인증번호가 이메일로 발송됩니다.</small>
+              </div>
+            </div>
+
+            <div id="verificationCodeGroup" class="hidden mt-16">
+              <label class="verify-label">인증번호</label>
+              <div class="verify-group">
+                <input
+                  type="text"
+                  id="verificationCode"
+                  name="verificationCode"
+                  placeholder="인증번호 6자리"
+                  maxlength="6"
+                  inputmode="numeric"
+                />
+                <button type="button" id="verifyCodeBtn" class="btn-verify">
+                  <span class="verify-btn-text">인증확인</span>
+                  <span class="verify-btn-spinner hidden">
+                    <span class="loading-spinner" style="width: 14px; height: 14px; border-width: 2px; margin-left: 6px;"></span>
+                  </span>
+                  <span class="verify-check-icon hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+              <div class="verify-status-container">
+                <small class="verify-note" id="verificationStatus"></small>
+                <small class="verify-timer" id="verificationTimer" style="display: block; margin-top: 4px; font-weight: 600;"></small>
+                <div class="timer-progress hidden" id="timerProgress">
+                  <div class="timer-progress-bar" id="timerProgressBar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="backToStep1" class="btn">이전</button>
+            <button type="submit" class="btn primary">다음 단계</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 3단계: 정보입력 -->
+      <div id="step3" class="signup-step hidden">
+        <h1>정보입력</h1>
+        <p class="desc">회원 정보를 입력해 주세요.</p>
+
+        <form id="step3Form" novalidate>
+          <input type="hidden" id="userType" name="userType" />
+          <input type="hidden" id="verifiedEmail" name="verifiedEmail" />
+
+          <!-- 학생 정보 -->
+          <div id="studentFields">
+            <div class="form-group">
+              <label for="studentName">이름 <span class="required">*</span></label>
+              <input
+                type="text"
+                id="studentName"
+                name="name"
+                required
+                placeholder="실명을 입력해 주세요"
+                autocomplete="name"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="studentSchool">학교 <span class="required">*</span></label>
+              <input
+                type="text"
+                id="studentSchool"
+                name="school"
+                required
+                placeholder="학교명을 입력해 주세요"
+                autocomplete="off"
+                readonly
+                class="cursor-pointer"
+              />
+              <button type="button" class="btn mt-8 w-full" onclick="openSchoolSearchModal('studentSchool')">학교 검색</button>
+            </div>
+
+            <div class="form-group">
+              <label for="studentGrade">학년 <span class="required">*</span></label>
+              <select id="studentGrade" name="grade" required>
+                <option value="">선택</option>
+                <option value="1">중1</option>
+                <option value="2">중2</option>
+                <option value="3">중3</option>
+                <option value="4">고1</option>
+                <option value="5">고2</option>
+                <option value="6">고3</option>
+                <option value="7">졸업/N수</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="studentPhone">연락처 <span class="required">*</span></label>
+              <div style="position: relative;">
+                <input
+                  type="tel"
+                  id="studentPhone"
+                  name="phone"
+                  required
+                  placeholder="010-1234-5678"
+                  inputmode="tel"
+                  autocomplete="tel"
+                />
+                <small class="phone-format-hint" style="display: none; color: var(--muted); font-size: 12px; margin-top: 4px; position: absolute; right: 0; top: 100%;">
+                  형식: 010-1234-5678
+                </small>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="signupSource">가입 경로</label>
+              <select id="signupSource" name="signupSource">
+                <option value="">선택 안 함</option>
+                <option value="search">인터넷 검색</option>
+                <option value="friend">지인 소개</option>
+                <option value="sns">SNS</option>
+                <option value="ad">광고, 홍보</option>
+                <option value="other">기타</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>아이디 </label>
+              <input
+                type="email"
+                id="studentEmail"
+                name="email"
+                readonly
+                class="readonly-input"
+              />
+              <small class="note">아이디는 본인인증 시 입력한 이메일을 사용합니다.</small>
+            </div>
+          </div>
+
+          <!-- 일반 회원 정보 -->
+          <div id="memberFields" class="hidden">
+            <div class="form-group">
+              <label for="memberName">이름 <span class="required">*</span></label>
+              <input
+                type="text"
+                id="memberName"
+                name="memberName"
+                required
+                placeholder="실명을 입력해 주세요"
+                autocomplete="name"
+                disabled
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="memberPhone">연락처 <span class="required">*</span></label>
+              <div style="position: relative;">
+                <input
+                  type="tel"
+                  id="memberPhone"
+                  name="memberPhone"
+                  required
+                  placeholder="010-1234-5678"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  disabled
+                />
+                <small class="phone-format-hint" style="display: none; color: var(--muted); font-size: 12px; margin-top: 4px; position: absolute; right: 0; top: 100%;">
+                  형식: 010-1234-5678
+                </small>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="memberPurpose">가입 목적 <span class="required">*</span></label>
+              <select id="memberPurpose" name="memberPurpose" required disabled>
+                <option value="">선택</option>
+                <option value="parent">학부모</option>
+                <option value="general">일반</option>
+              </select>
+            </div>
+
+            <div class="form-group hidden" id="memberSignupSourceGroup">
+              <label for="memberSignupSource">가입 경로 <span class="required">*</span></label>
+              <select id="memberSignupSource" name="memberSignupSource" disabled>
+                <option value="">선택</option>
+                <option value="search">인터넷 검색</option>
+                <option value="friend">지인 소개</option>
+                <option value="sns">SNS</option>
+                <option value="ad">광고, 홍보</option>
+                <option value="other">기타</option>
+              </select>
+            </div>
+
+            <div class="form-group hidden" id="memberSignupSourceOtherGroup">
+              <label for="memberSignupSourceOther">기타 가입 경로 <span class="required">*</span></label>
+              <input
+                type="text"
+                id="memberSignupSourceOther"
+                name="memberSignupSourceOther"
+                placeholder="가입 경로를 입력해 주세요"
+                disabled
+              />
+            </div>
+
+            <div class="form-group">
+              <label>아이디 </label>
+              <input
+                type="email"
+                id="memberEmail"
+                name="memberEmail"
+                readonly
+                class="readonly-input"
+                disabled
+              />
+              <small class="note">아이디는 본인인증 시 입력한 이메일을 사용합니다.</small>
+            </div>
+          </div>
+
+          <!-- 공통: 비밀번호 -->
+          <div class="form-group">
+            <label for="password">비밀번호 <span class="required">*</span></label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              placeholder="영문, 숫자, 특수문자 포함 8자 이상"
+              autocomplete="new-password"
+            />
+            <small class="note">영문, 숫자, 특수문자를 각각 포함하여 8자 이상 입력해 주세요.<br>사용 가능한 특수문자: ! @ # $ % & * _ ; : , . \ / ?</small>
+          </div>
+
+          <div class="form-group">
+            <label for="passwordConfirm">비밀번호 확인 <span class="required">*</span></label>
+            <input
+              type="password"
+              id="passwordConfirm"
+              name="passwordConfirm"
+              required
+              placeholder="비밀번호를 다시 입력해 주세요"
+              autocomplete="new-password"
+            />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn primary" id="signupSubmitButton" disabled>
+              <span class="button-text">가입하기</span>
+              <span class="button-spinner hidden">
+                <span class="loading-spinner" style="width: 16px; height: 16px; border-width: 2px;"></span>
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 4단계: 가입완료 -->
+      <div id="step4" class="signup-step hidden">
+        <div class="success-message">
+          <div class="success-icon hidden" id="successIcon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          <h1 id="step4Title">가입완료</h1>
+          <p class="desc" id="step4Desc">회원가입이 완료되었습니다. 로그인 화면으로 이동해 주세요.</p>
+          <p class="success-info" id="successInfo"></p>
+          <div class="form-actions hidden" id="step4Actions">
+            <a href="/members/login.html" class="btn primary" id="loginLinkButton">로그인</a>
+            <a href="/" class="btn">홈으로</a>
+          </div>
+        </div>
+      </div>
+
+      <p id="signupStatus" class="desc mt-16"></p>
+    </div>
+  </main>
+
+  <!-- 학교 검색 모달 -->
+  <div id="schoolSearchModal" class="school-search-modal hidden">
+    <div class="school-search-modal-overlay" onclick="closeSchoolSearchModal()"></div>
+    <div class="school-search-modal-content">
+      <div class="school-search-modal-header">
+        <h2>학교 검색</h2>
+        <button type="button" class="school-search-modal-close" onclick="closeSchoolSearchModal()">×</button>
+      </div>
+      <div class="school-search-modal-body">
+        <div class="school-search-input-wrapper">
+          <input
+            type="text"
+            id="schoolSearchInput"
+            placeholder="학교명을 입력해 주세요"
+            autocomplete="off"
+            lang="ko"
+          />
+        </div>
+        <div id="schoolSearchResults" class="school-search-results">
+          <div class="school-search-empty">검색 결과가 없습니다.</div>
+        </div>
+        <div class="school-search-actions">
+          <button type="button" class="btn" onclick="selectDirectInput()">직접 입력</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div data-include="footer"></div>
+  <script>
+    (function() {
+      function syncStep2SignupTypeTitle() {
+        const checkedType = document.querySelector('#step1Form input[name="userType"]:checked')?.value || "";
+        const label = document.getElementById("step2UserTypeLabel");
+        if (!label) return;
+
+        label.textContent = checkedType === "student" ? "학생 " : checkedType === "member" ? "일반 " : "";
+      }
+
+      document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('#step1Form input[name="userType"]').forEach(function(input) {
+          input.addEventListener("change", syncStep2SignupTypeTitle);
+        });
+
+        const step1Form = document.getElementById("step1Form");
+        if (step1Form) {
+          step1Form.addEventListener("submit", syncStep2SignupTypeTitle, true);
+        }
+
+        syncStep2SignupTypeTitle();
+      });
+
+      document.addEventListener("signup:userTypeChanged", syncStep2SignupTypeTitle);
+      document.addEventListener("signup:step2", syncStep2SignupTypeTitle);
+    })();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,113 @@
+# ============================================
+# GRIT EDU 프로젝트 .gitignore
+# ============================================
+
+# 관리자 로컬 툴(민감키/엑셀 포함) - 절대 공개 레포에 올리지 않기
+/gritedu_lms/
+!gritedu_lms/manage.py
+!gritedu_lms/requirements.txt
+!gritedu_lms/config.json.sample
+
+# 민감키
+**/serviceAccountKey.json
+**/serviceAccountKey-*.json
+
+# 로컬 산출물 / 데이터
+*.csv
+!assets/school.csv
+*.xlsx
+directory_structure.txt
+url.txt
+
+# members/plans는 추적 예외
+!/members/plans/
+!/members/plans/*.json
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log
+
+# 편의
+.DS_Store
+Thumbs.db
+*.log
+
+# 임시 파일
+temp_*
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+node_modules
+.eslintcache
+
+# 빌드 출력
+dist/
+build/
+*.backup
+*.dev.backup
+backup/
+
+# CSS 백업 파일
+assets/css/*.backup
+assets/css/*.min.css
+
+# 빌드 시 생성되는 통합 CSS (Phase 3에서 추가될 예정)
+# assets/css/main.css
+
+# 소스맵 파일
+*.map
+*.sourcemap
+
+# 문서 파일
+# 중요한 문서 파일은 추적 예외 (부정 패턴은 와일드카드보다 나중에 나와야 함)
+*.md
+!PROJECT_STATE.md
+!PROJECT_DOCS_INDEX.md
+!ONLINE_COURSE_SYSTEM_STATE.md
+!CSS_CLEANUP_PROGRESS.md
+!OFFLINE_CLASS_SYSTEM_PLAN.md
+!md/DATABASE_SCHEMA.md
+!md/**/*.md
+!docs/**/*.md
+!COLLECTIONS_SUMMARY.md
+!DATABASE_SCHEMA.md
+!PROJECT_PLAN.md
+!PROJECT_STATUS.md
+!BUILD_GUIDE.md
+!QUICK_START.md
+!WORKFLOW_GUIDE.md
+!FIREBASE_FUNCTIONS_SETUP.md
+!CLOUD_FUNCTIONS_LIST.md
+!IMPLEMENTATION_SUMMARY.md
+!DEPLOYMENT_OPTIMIZATION.md
+!PRODUCTION_CHECKLIST.md
+!PRODUCTION_VERIFICATION.md
+!OPTIMIZATION_GUIDE.md
+!ADDITIONAL_OPTIMIZATIONS.md
+.build/
+_work/
+_r2-upload/
+
+# tools/kor-to-eng 작업용 이미지 (커밋 금지)
+/tools/kor-to-eng/input/
+/tools/kor-to-eng/output/
+
+# 공개 포트폴리오 제외: 검색엔진 소유권 인증 파일
+/google*.html
+/naver*.html
+
+# 공개 포트폴리오 제외: 이미지 변환 작업 원본/산출물
+/tools/image-to-webp/input/*
+!/tools/image-to-webp/input/.gitkeep
+/tools/image-to-webp/output/*
+!/tools/image-to-webp/output/.gitkeep

@@ -1,0 +1,55 @@
+:root {
+  --brand:#ff7a00;
+  --accent:#f68b1f;
+  --bg:#fff;
+  --card:#fff;
+  --text:#202225;
+  --muted:#6b7280;
+  --border:#e5e7eb;
+  --hover:#fff6ec;
+  --header-bg:#ffffffcc;
+  --footer-bg:#f7f8fa;
+  --container:1080px;
+  --header-h:64px;
+  --shadow:0 8px 24px rgba(0,0,0,.08);
+  --shadow-soft:0 4px 14px rgba(0,0,0,.06);
+  --grit-orange:#ff7a00;
+  --grit-text-dark:#222;
+  --grit-gray:#999;
+  --grit-bg-soft:#fffaf5;
+  --sub-ko:#e95045;
+  --sub-en:#2f7ae5;
+  --sub-ma:#34a853;
+  --sub-sc:#f6c445;
+  --sub-consult:#8e44ad;
+  --success-color:#27ae60;
+  --success-bg:#e8f5e9;
+  --error-color:#e74c3c;
+  --error-bg:#ffebee
+}
+html[data-theme=dark] {
+  --bg:#111214;
+  --card:#17181b;
+  --text:#e9ecf1;
+  --muted:#b7bcc7;
+  --border:#2a2d33;
+  --hover:#1a1c20;
+  --header-bg:#16171acc;
+  --footer-bg:#16171a;
+  --success-color:#4ade80;
+  --success-bg:rgba(74,222,128,.15);
+  --error-color:#f87171;
+  --error-bg:hsla(0,91%,71%,.15)
+}
+@media (prefers-color-scheme:dark) {
+  html:not([data-theme=light]) {
+    --bg:#111214;
+    --card:#17181b;
+    --text:#e9ecf1;
+    --muted:#b7bcc7;
+    --border:#2a2d33;
+    --hover:#1a1c20;
+    --header-bg:#16171acc;
+    --footer-bg:#16171a
+  }
+}

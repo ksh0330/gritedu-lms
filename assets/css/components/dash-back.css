@@ -1,0 +1,9 @@
+/* Member area — back link to role dashboard (admin / instructor / student) */
+.dash-back {
+  margin-bottom: 16px;
+}
+.dash-back .btn {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}

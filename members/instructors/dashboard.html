@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <title>그릿에듀 | 강사 LMS</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/instructor-dashboard.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body class="instructor-dashboard-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <section class="grit-section">
+      <div>
+        <h1 class="page-title instructor-dashboard-title">강사 LMS</h1>
+        <p class="home-subdesc" id="instructorInfo">로그인 확인 중...</p>
+      </div>
+    </section>
+
+    <section class="grit-section instructor-dashboard-section">
+      <h2 class="instructor-section-title">현황 통계</h2>
+      <div id="statsGrid" class="instructor-stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="23 7 16 12 23 17 23 7"></polygon>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            </svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">담당 온라인 강좌</div>
+            <div class="stat-value dashboard-skeleton dashboard-skeleton--stat" id="statCourses">-</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">온라인 수강생</div>
+            <div class="stat-value dashboard-skeleton dashboard-skeleton--stat" id="statEnrollments">-</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">담당 오프라인 반</div>
+            <div class="stat-value dashboard-skeleton dashboard-skeleton--stat" id="statOfflineClasses">-</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-label">오프라인 수강생</div>
+            <div class="stat-value dashboard-skeleton dashboard-skeleton--stat" id="statOfflineStudents">-</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grit-section instructor-dashboard-section">
+      <div class="instructor-section-toolbar instructor-section-toolbar--row">
+        <h2 class="instructor-section-title">담당 온라인 강좌</h2>
+        <div class="instructor-toolbar-controls">
+          <input type="search" id="courseSearch" class="instructor-search-input" placeholder="강좌명 검색" aria-label="담당 온라인 강좌 검색">
+          <select id="courseYearFilter" class="instructor-select" aria-label="연도 필터">
+            <option value="">전체 연도</option>
+          </select>
+          <select id="courseGradeFilter" class="instructor-select" aria-label="학년 필터">
+            <option value="">전체 학년</option>
+          </select>
+          <select id="courseAccessFilter" class="instructor-select" aria-label="강좌 유형 필터">
+            <option value="">전체 유형</option>
+            <option value="public">공개 강좌</option>
+            <option value="memberOnly">회원전용 강좌</option>
+          </select>
+          <select id="courseFormatFilter" class="instructor-select" aria-label="형식 필터">
+            <option value="">전체 형식</option>
+            <option value="single">특강</option>
+            <option value="series">시리즈</option>
+          </select>
+        </div>
+      </div>
+      <div class="instructor-table-wrap">
+        <table id="coursesTable" class="progress-table instructor-data-table">
+          <thead>
+            <tr>
+              <th>강좌명</th>
+              <th>연도</th>
+              <th>학년</th>
+              <th>강좌 유형</th>
+              <th>특강/시리즈</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="coursesPagination" class="instructor-pagination"></div>
+    </section>
+
+    <section class="grit-section instructor-dashboard-section">
+      <div class="instructor-section-toolbar instructor-section-toolbar--row">
+        <h2 class="instructor-section-title">온라인 수강생 현황</h2>
+        <div class="instructor-toolbar-controls">
+          <button type="button" id="loadEnrollmentsBtn" class="btn sm primary">수강생 불러오기</button>
+          <input type="search" id="enrollmentSearch" class="instructor-search-input" placeholder="이름, 강좌명 검색" aria-label="온라인 수강생 검색">
+          <select id="enrollmentCourseFilter" class="instructor-select" aria-label="강좌 필터">
+            <option value="">전체 강좌</option>
+          </select>
+          <select id="enrollmentGradeFilter" class="instructor-select" aria-label="학년 필터">
+            <option value="">전체 학년</option>
+          </select>
+        </div>
+      </div>
+      <p id="courseInfo" class="instructor-section-meta muted">
+        <span id="courseInfoLoading" class="dashboard-skeleton dashboard-skeleton--text">불러오는 중...</span>
+      </p>
+      <div class="instructor-table-wrap">
+        <table id="enrollmentTable" class="progress-table instructor-data-table">
+          <thead>
+            <tr>
+              <th>수강생명</th>
+              <th>학교</th>
+              <th>학년</th>
+              <th>전화번호</th>
+              <th>담당 강좌</th>
+              <th>상세</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="enrollmentsPagination" class="instructor-pagination"></div>
+    </section>
+
+    <section class="grit-section instructor-dashboard-section">
+      <div class="instructor-section-toolbar instructor-section-toolbar--row">
+        <h2 class="instructor-section-title">담당 오프라인 반</h2>
+        <div class="instructor-toolbar-controls">
+          <input type="search" id="offlineClassSearch" class="instructor-search-input" placeholder="반명, 과목 검색" aria-label="담당 오프라인 반 검색">
+          <select id="offlineClassStatusFilter" class="instructor-select" aria-label="반 상태 필터">
+            <option value="">전체 상태</option>
+            <option value="active">운영중</option>
+            <option value="archived">보관</option>
+          </select>
+          <select id="offlineClassSubjectFilter" class="instructor-select" aria-label="과목 필터">
+            <option value="">전체 과목</option>
+          </select>
+          <select id="offlineClassGradeFilter" class="instructor-select" aria-label="학년 필터">
+            <option value="">전체 학년</option>
+          </select>
+        </div>
+      </div>
+      <p id="offlineClassesMeta" class="instructor-section-meta muted dashboard-skeleton dashboard-skeleton--text">불러오는 중...</p>
+      <div class="instructor-table-wrap">
+        <table id="offlineClassesTable" class="progress-table instructor-data-table">
+          <thead>
+            <tr>
+              <th>반명</th>
+              <th>과목</th>
+              <th>학교/학년</th>
+              <th>시간표</th>
+              <th>상태</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="offlineClassesPagination" class="instructor-pagination"></div>
+    </section>
+
+    <section class="grit-section instructor-dashboard-section">
+      <div class="instructor-section-toolbar instructor-section-toolbar--row">
+        <h2 class="instructor-section-title">오프라인 수강생 현황</h2>
+        <div class="instructor-toolbar-controls">
+          <button type="button" id="loadOfflineEnrollmentsBtn" class="btn sm primary">수강생 불러오기</button>
+          <input type="search" id="offlineEnrollmentSearch" class="instructor-search-input" placeholder="이름, 반명 검색" aria-label="오프라인 수강생 검색">
+          <select id="offlineEnrollmentClassFilter" class="instructor-select" aria-label="반 필터">
+            <option value="">전체 반</option>
+          </select>
+          <select id="offlineEnrollmentGradeFilter" class="instructor-select" aria-label="학년 필터">
+            <option value="">전체 학년</option>
+          </select>
+        </div>
+      </div>
+      <p id="offlineEnrollmentInfo" class="instructor-section-meta muted dashboard-skeleton dashboard-skeleton--text">불러오는 중...</p>
+      <div class="instructor-table-wrap">
+        <table id="offlineEnrollmentTable" class="progress-table instructor-data-table">
+          <thead>
+            <tr>
+              <th>수강생명</th>
+              <th>학교</th>
+              <th>학년</th>
+              <th>전화번호</th>
+              <th>담당 반</th>
+              <th>상세</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="offlineEnrollmentsPagination" class="instructor-pagination"></div>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+/* 폼 요소 스타일 */
+.form-group-label {
+  display:block;
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:16px
+}
+.form-group-spacing {
+  margin-bottom:32px
+}
+.form-group-spacing-sm {
+  margin-bottom:16px
+}
+.form-actions {
+  display:flex;
+  gap:12px;
+  margin-top:24px
+}
+.form-actions .btn {
+  flex:1;
+  font-size:15px;
+  height:48px
+}
+
+/* 다크 모드 폼 요소 */
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea {
+  background:#131417;
+  border-color:var(--border);
+  color:var(--text)
+}
+
+/* 모바일 반응형 */
+@media (max-width:768px) {
+  .form-group-label {
+    font-size:15px
+  }
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  select,
+  textarea {
+    min-height:44px;
+    font-size:16px; /* iOS 줌 방지 */
+  }
+}
+.admin-catalog-tag__input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  min-width: 72px;
+  padding: 4px 2px;
+  width: min(150px, 32vw);
+}
+.admin-catalog-tag__input:hover { border-bottom-color: var(--border); }
+.admin-catalog-tag__input:focus { border-bottom-color: var(--brand); outline: 0; }

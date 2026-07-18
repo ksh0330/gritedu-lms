@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 오프라인 반 관리</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/admin-offline-classes.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body class="admin-offline-classes-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="dash-back">
+      <a href="/members/admin/dashboard.html" class="btn sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        관리자 CMS로 돌아가기
+      </a>
+    </div>
+
+    <div class="admin-offline-classes-head">
+      <div>
+        <h1 class="page-title">오프라인 반 관리</h1>
+        <p class="muted admin-offline-classes-desc">반·강사·수업을 관리합니다.</p>
+      </div>
+      <div class="admin-offline-classes-head__actions">
+        <button type="button" class="btn sm" id="btnRefresh">새로고침</button>
+        <button type="button" class="btn primary sm" id="addOfflineClassBtn">+ 반 추가</button>
+      </div>
+    </div>
+
+    <div id="adminScheduleGroupTabs" class="admin-schedule-group-tabs grit-section" role="tablist" aria-label="시간표 그룹"></div>
+
+    <details class="admin-catalog-panel grit-section" id="offlineCatalogPanel">
+      <summary class="admin-catalog-panel__summary">반 선택 목록</summary>
+      <p class="muted admin-catalog-panel__lead">
+        오프라인 반을 만들거나 수정할 때 사용할 과목, 학년, 학교, 강의실 목록을 관리합니다.
+        현재 그룹: <strong id="offlineCatalogGroupLabel">정규</strong>.
+        시간표 그룹의 추가·순서·노출 설정은 시간표 관리 페이지에서 관리합니다.
+      </p>
+      <ul class="admin-catalog-panel__notes muted">
+        <li>변경 후 ‘목록 저장’을 누르세요.</li>
+        <li>저장 후 선택 목록에 반영되기까지 잠시 걸릴 수 있습니다.</li>
+        <li>목록에서 삭제해도 이미 등록된 반 데이터는 삭제되지 않습니다.</li>
+        <li>반별 값은 직접 입력할 수 있으며 선택 목록에는 추가되지 않습니다.</li>
+      </ul>
+      <div class="admin-catalog-panel__grid">
+        <div class="admin-catalog-field">
+          <span class="admin-catalog-field__label">과목</span>
+          <div class="admin-catalog-field__row">
+            <input type="text" class="admin-catalog-field__input" id="offlineCatalogSubjectInput" placeholder="과목명" autocomplete="off">
+            <button type="button" class="btn sm" data-catalog-add="subjects">추가</button>
+          </div>
+          <div class="admin-catalog-tags" data-catalog-tags="subjects" aria-live="polite"></div>
+        </div>
+        <div class="admin-catalog-field">
+          <span class="admin-catalog-field__label">학년</span>
+          <div class="admin-catalog-field__row">
+            <input type="text" class="admin-catalog-field__input" id="offlineCatalogGradeInput" placeholder="예: 고3" autocomplete="off">
+            <button type="button" class="btn sm" data-catalog-add="grades">추가</button>
+          </div>
+          <div class="admin-catalog-tags" data-catalog-tags="grades" aria-live="polite"></div>
+        </div>
+        <div class="admin-catalog-field">
+          <span class="admin-catalog-field__label">학교</span>
+          <div class="admin-catalog-field__row">
+            <input type="text" class="admin-catalog-field__input" id="offlineCatalogSchoolInput" placeholder="학교명" autocomplete="off">
+            <button type="button" class="btn sm" data-catalog-add="schools">추가</button>
+          </div>
+          <div class="admin-catalog-tags" data-catalog-tags="schools" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="admin-catalog-panel__actions">
+        <button type="button" class="btn primary sm" id="offlineCatalogSaveBtn">목록 저장</button>
+      </div>
+    </details>
+
+    <div class="grit-section" style="margin-bottom:16px;padding:14px 16px;border-left:4px solid #f59e0b;">
+      <strong>오프라인 반 보관/삭제 안내</strong>
+      <p class="muted" style="margin:6px 0 0;line-height:1.6;"><strong>보관</strong>은 숨김, <strong>영구 삭제</strong>는 연결 기록까지 삭제합니다.</p>
+    </div>
+
+    <section class="grit-section">
+      <div class="admin-toolbar">
+        <label class="sr-only" for="filterSearch">반명 검색</label>
+        <div class="admin-toolbar__search-wrap">
+          <input type="search" id="filterSearch" class="admin-toolbar__search-input" placeholder="반명 검색" autocomplete="off">
+        </div>
+        <select id="filterSubject" class="admin-toolbar__select" title="과목 필터">
+          <option value="">전체 과목</option>
+        </select>
+        <select id="filterGrade" class="admin-toolbar__select" title="학년 필터">
+          <option value="">전체 학년</option>
+        </select>
+        <select id="filterInstructor" class="admin-toolbar__select" title="강사 필터">
+          <option value="">전체 강사</option>
+          <option value="__unassigned__">미배정</option>
+        </select>
+        <select id="filterStatus" class="admin-toolbar__select" title="상태 필터">
+          <option value="">전체</option>
+          <option value="active">운영 중</option>
+          <option value="archived">보관</option>
+        </select>
+      </div>
+
+      <p id="offlineClassesMeta" class="muted admin-offline-classes-meta" aria-live="polite"></p>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="tblOfflineClasses">
+          <thead>
+            <tr>
+              <th>반명</th>
+              <th>과목</th>
+              <th>학교/학년</th>
+              <th>담당 강사</th>
+              <th>요일/시간</th>
+              <th>상태</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="7" class="muted admin-table-empty">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="statusMsg" class="admin-offline-classes-toast" aria-live="polite"></div>
+  </main>
+
+  <div data-include="footer"></div>
+
+  <div id="offlineClassMembersModal" class="modal admin-offline-members-modal" hidden>
+    <div class="modal-content admin-offline-members-modal__content">
+      <div class="modal-header">
+        <div>
+          <h2 id="offlineClassMembersModalTitle">반 학생 관리</h2>
+          <p id="offlineClassMembersModalSubtitle" class="muted admin-offline-members-subtitle"></p>
+        </div>
+        <button type="button" class="modal-close" id="offlineClassMembersModalClose" aria-label="닫기">&times;</button>
+      </div>
+      <div id="offlineClassMembersArchivedNotice" class="offline-members-archived-notice" hidden role="status">
+        이 반은 보관 상태입니다. 학생 목록은 조회할 수 있으나 신규 입반은 제한됩니다.
+      </div>
+      <section class="offline-members-add-section" aria-labelledby="offlineMembersAddHeading">
+        <h3 id="offlineMembersAddHeading" class="offline-members-section-title">학생 추가</h3>
+        <div class="offline-members-add-toolbar">
+          <label class="sr-only" for="offlineMemberStudentSearch">학생 검색</label>
+          <input type="search" id="offlineMemberStudentSearch" class="admin-toolbar__search-input" placeholder="이름, 학교, 전화번호 검색" autocomplete="off">
+          <button type="button" class="btn primary sm" id="offlineMemberAddBtn" disabled>선택 학생 입반</button>
+        </div>
+        <p class="muted offline-members-meta">여러 학생을 한 번에 선택할 수 있습니다.</p>
+        <div id="offlineMemberSearchResults" class="offline-member-search-results muted">검색어를 입력하세요.</div>
+      </section>
+      <section class="offline-members-list-section" aria-labelledby="offlineMembersListHeading">
+        <h3 id="offlineMembersListHeading" class="offline-members-section-title">반 학생 목록</h3>
+        <p id="offlineMembersMeta" class="muted offline-members-meta" aria-live="polite"></p>
+        <div class="admin-table-wrap offline-members-table-wrap">
+          <table class="admin-table" id="tblOfflineClassMembers">
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>학교</th>
+                <th>학년</th>
+                <th>전화번호</th>
+                <th>입반일</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="muted admin-table-empty">로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="offlineClassSessionsModal" class="modal admin-offline-sessions-modal" hidden>
+    <div class="modal-content admin-offline-sessions-modal__content">
+      <div class="modal-header">
+        <div>
+          <h2 id="offlineClassSessionsModalTitle">수업 관리</h2>
+          <p id="offlineClassSessionsModalSubtitle" class="muted admin-offline-sessions-subtitle"></p>
+        </div>
+        <div class="offline-sessions-header-actions">
+          <button type="button" class="btn primary sm" id="offlineSessionAddBtn">+ 수업 추가</button>
+          <button type="button" class="modal-close" id="offlineClassSessionsModalClose" aria-label="닫기">&times;</button>
+        </div>
+      </div>
+      <div id="offlineClassSessionsArchivedNotice" class="offline-sessions-archived-notice" hidden role="status">
+        이 반은 보관 상태입니다. 수업 목록은 조회할 수 있으나 신규 수업 등록은 제한됩니다.
+      </div>
+      <p id="offlineSessionsMeta" class="muted offline-sessions-meta" aria-live="polite"></p>
+      <div class="admin-table-wrap offline-sessions-table-wrap">
+        <table class="admin-table" id="tblOfflineClassSessions">
+          <thead>
+            <tr>
+              <th>수업</th>
+              <th>수업일</th>
+              <th>제목</th>
+              <th>영상</th>
+              <th>상태</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6" class="muted admin-table-empty">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="offlineSessionFormModal" class="modal admin-offline-session-form-modal" hidden>
+    <div class="modal-content admin-offline-session-form-modal__content">
+      <div class="modal-header">
+        <h2 id="offlineSessionFormModalTitle">수업 추가</h2>
+        <button type="button" class="modal-close" id="offlineSessionFormModalClose" aria-label="닫기">&times;</button>
+      </div>
+      <form id="offlineSessionForm" class="admin-offline-session-form">
+        <input type="hidden" id="offlineSessionEditId" value="">
+        <div class="form-grid">
+          <div class="form-group form-half">
+            <label for="sessionNo">수업 번호 <span class="required">*</span></label>
+            <input type="number" id="sessionNo" name="sessionNo" min="1" step="1" required>
+          </div>
+          <div class="form-group form-half">
+            <label for="sessionDate">수업일 <span class="required">*</span></label>
+            <input type="date" id="sessionDate" name="sessionDate" required>
+          </div>
+          <div class="form-group form-full">
+            <label for="sessionTitle">제목 <span class="required">*</span></label>
+            <input type="text" id="sessionTitle" name="title" required autocomplete="off">
+          </div>
+          <div class="form-group form-full">
+            <label for="sessionDescription">설명</label>
+            <textarea id="sessionDescription" name="description" rows="3"></textarea>
+          </div>
+          <div class="form-group form-half">
+            <label class="offline-session-checkbox-label" for="sessionHasVideo">
+              <input type="checkbox" id="sessionHasVideo" name="hasVideo"> 영상 있음
+            </label>
+            <p class="muted offline-session-form-hint">영상이 있을 때만 입력하세요.</p>
+          </div>
+          <div id="sessionVideosSection" class="form-group form-full offline-session-videos-section" hidden>
+            <div class="offline-session-videos-head">
+              <span class="form-label">영상 목록</span>
+              <button type="button" class="btn sm" id="sessionVideoAddBtn">+ 영상 추가</button>
+            </div>
+            <div id="sessionVideosList" class="offline-session-videos-list" aria-live="polite"></div>
+          </div>
+          <div class="form-group form-half">
+            <label for="sessionStatus">상태</label>
+            <select id="sessionStatus" name="status">
+              <option value="published">게시</option>
+              <option value="archived">보관</option>
+            </select>
+            <p class="muted offline-session-form-hint">게시하면 학생 화면에 표시됩니다.</p>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary" id="offlineSessionFormSubmit">저장</button>
+          <button type="button" class="btn" id="offlineSessionFormCancel">취소</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="offlineSessionAccessModal" class="modal admin-offline-access-modal" hidden>
+    <div class="modal-content admin-offline-access-modal__content">
+      <div class="modal-header">
+        <div>
+          <h2 id="offlineSessionAccessModalTitle">예외 권한 관리</h2>
+          <p id="offlineSessionAccessModalSubtitle" class="muted admin-offline-access-subtitle"></p>
+          <p id="offlineSessionAccessModalMeta" class="muted admin-offline-access-meta"></p>
+        </div>
+        <button type="button" class="modal-close" id="offlineSessionAccessModalClose" aria-label="닫기">&times;</button>
+      </div>
+      <p id="offlineSessionAccessHint" class="muted offline-session-access-hint">
+        기본 권한을 바꿀 때만 수동 허용·차단을 사용하세요.
+      </p>
+      <div class="admin-table-wrap offline-access-table-wrap">
+        <table class="admin-table" id="tblSessionAccess">
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>학교</th>
+              <th>학년</th>
+              <th>전화번호</th>
+              <th>회원</th>
+              <th>가입일</th>
+              <th>접근 상태</th>
+              <th>예외 유형</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="9" class="muted admin-table-empty">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="offlineClassModal" class="modal admin-offline-class-modal" hidden>
+    <div class="modal-content admin-offline-class-modal__content">
+      <div class="modal-header">
+        <h2 id="offlineClassModalTitle">오프라인 반 추가</h2>
+        <button type="button" class="modal-close" id="offlineClassModalClose" aria-label="닫기">&times;</button>
+      </div>
+      <form id="offlineClassForm" class="admin-offline-class-form">
+        <input type="hidden" id="offlineClassEditId" value="">
+        <div class="admin-offline-class-form-layout">
+          <div class="admin-offline-class-form-main">
+            <section class="admin-offline-form-section" aria-labelledby="offlineClassBasicHeading">
+              <h3 id="offlineClassBasicHeading" class="admin-offline-form-section__title">기본 정보</h3>
+              <div class="form-grid">
+                <div class="form-group form-full">
+                  <label for="offlineClassGroupId">시간표 그룹</label>
+                  <select id="offlineClassGroupId" name="groupId"></select>
+                </div>
+                <div class="form-group form-full">
+                  <label for="className">반명 <span class="required">*</span></label>
+                  <input type="text" id="className" name="className" required autocomplete="off">
+                </div>
+                <div class="form-group form-half">
+                  <label for="classSubject">과목 <span class="required">*</span></label>
+                  <select id="classSubject" name="subject" required>
+                    <option value="">불러오는 중...</option>
+                  </select>
+                  <input type="text" id="classSubjectCustom" class="admin-offline-custom-field" placeholder="과목명 직접 입력" autocomplete="off" hidden>
+                </div>
+                <div class="form-group form-half">
+                  <label for="classGrade">학년</label>
+                  <select id="classGrade" name="grade">
+                    <option value="">불러오는 중...</option>
+                  </select>
+                  <input type="text" id="classGradeCustom" class="admin-offline-custom-field" placeholder="학년 직접 입력" autocomplete="off" hidden>
+                </div>
+                <div class="form-group form-half">
+                  <label for="classSchool">학교</label>
+                  <select id="classSchool" name="school"><option value="">선택</option></select>
+                </div>
+                <div class="form-group form-half">
+                  <label for="classStatus">상태</label>
+                  <select id="classStatus" name="status">
+                    <option value="active">운영 중</option>
+                    <option value="archived">보관</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+            <section class="admin-offline-form-section" aria-labelledby="offlineClassInstructorHeading">
+              <h3 id="offlineClassInstructorHeading" class="admin-offline-form-section__title">담당 강사</h3>
+              <div class="form-grid">
+                <div class="form-group form-full">
+                  <label for="classInstructorUid">담당 강사</label>
+                  <select id="classInstructorUid" name="instructorUid">
+                    <option value="">미배정</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+            <section class="admin-offline-form-section" aria-labelledby="offlineClassScheduleHeading">
+              <h3 id="offlineClassScheduleHeading" class="admin-offline-form-section__title">일정</h3>
+              <div class="form-grid">
+                <div class="form-group form-full">
+                  <span class="form-label">수업 일정</span>
+                  <p class="muted schedule-items-hint">요일별로 시간과 강의실을 입력하세요.</p>
+                  <label class="offline-session-checkbox-label" for="classScheduleVisible">
+                    <input type="checkbox" id="classScheduleVisible" name="scheduleVisible" checked>
+                    학생/강사 화면에 수업 일정 표시
+                  </label>
+                  <div id="scheduleItemsList" class="schedule-items-list"></div>
+                  <button type="button" class="btn sm" id="scheduleItemAddBtn">+ 수업 일정 추가</button>
+                </div>
+              </div>
+            </section>
+            <section class="admin-offline-form-section" aria-labelledby="offlineClassDescHeading">
+              <h3 id="offlineClassDescHeading" class="admin-offline-form-section__title">수업 정보</h3>
+              <div class="form-grid">
+                <div class="form-group form-full">
+                  <label for="classDescription">설명</label>
+                  <textarea id="classDescription" name="description" rows="3"></textarea>
+                </div>
+              </div>
+            </section>
+          </div>
+          <aside class="admin-offline-class-preview-panel" aria-labelledby="offlineClassPreviewHeading">
+            <h3 id="offlineClassPreviewHeading" class="admin-offline-class-preview__title">미리보기</h3>
+            <div id="offlineClassPreview" class="admin-offline-class-preview" aria-live="polite"></div>
+          </aside>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary" id="offlineClassFormSubmit">저장</button>
+          <button type="button" class="btn" id="offlineClassFormCancel">취소</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <datalist id="classroomOptions"></datalist>
+  <datalist id="schoolOptions"></datalist>
+</body>
+</html>

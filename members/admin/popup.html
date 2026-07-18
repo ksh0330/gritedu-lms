@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 팝업창 관리</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/admin-popup.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="dash-back">
+      <a href="/members/admin/dashboard.html" class="btn sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        관리자 CMS로 돌아가기
+      </a>
+    </div>
+    
+    <div class="section-head page-header-row">
+      <h1 class="page-title">팝업창 관리</h1>
+      <div class="page-header-actions">
+        <button class="btn" onclick="location.reload()" title="페이지 새로고침">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>새로고침
+        </button>
+        <button class="btn primary" onclick="openAddPopupModal()">+ 팝업창 추가</button>
+      </div>
+    </div>
+
+    <section class="grit-section">
+      <p class="muted" style="margin-bottom:16px;">
+        홈 화면에 표시할 간단한 팝업을 관리합니다. 이미지는 로컬 WebP 파일을 준비하고, 문구와 노출 여부만 쉽게 설정합니다.
+      </p>
+      
+      <!-- 팝업 목록 -->
+      <div id="popupListContainer">
+        <div class="muted" style="text-align:center;padding:40px;">로딩 중...</div>
+      </div>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+
+  <div id="popupUnsavedConfirmModal" class="modal" style="display:none;z-index:100010;" role="dialog" aria-modal="true" aria-labelledby="popupUnsavedConfirmTitle">
+    <div class="modal-content" style="max-width:440px;">
+      <div class="modal-header"><h2 id="popupUnsavedConfirmTitle">변경사항 확인</h2><button type="button" class="modal-close" data-popup-confirm="cancel" aria-label="닫기">&times;</button></div>
+      <p style="line-height:1.6;margin:8px 0 22px;">저장하지 않은 변경사항이 있습니다. 편집을 종료하시겠습니까?</p>
+      <div class="form-actions" style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn" data-popup-confirm="cancel">계속 편집</button>
+        <button type="button" class="btn danger" data-popup-confirm="discard">변경사항 버리기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 팝업 설정 모달 -->
+  <div id="popupEditModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:1200px;max-height:95vh;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="modal-header" style="flex-shrink:0;">
+        <h2 id="popupModalTitle">팝업창 추가</h2>
+        <button class="modal-close" onclick="closePopupModal()">&times;</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;overflow:hidden;min-height:0;">
+        <!-- 1단: 내용 수정 -->
+        <div style="overflow-y:auto;padding-right:10px;">
+          <form id="popupEditForm" class="form-grid">
+        <div id="popupModalAlert" class="admin-modal-alert" role="alert" hidden></div>
+        <input type="hidden" name="popupId" id="popupEditId">
+        
+        <div class="form-group form-full">
+          <label>
+            <input type="checkbox" name="enabled" id="popupEditEnabled" style="margin-right:8px;">
+            팝업 활성화
+          </label>
+          <small class="form-hint">체크하면 메인 홈페이지에 팝업창이 표시됩니다.</small>
+        </div>
+
+        <div class="form-group form-full">
+          <label>CMS 제목</label>
+          <input type="text" name="title" id="popupEditTitle" placeholder="예: 겨울 특강 안내">
+          <small class="form-hint">관리자 목록에서만 보이는 제목입니다. 비워두면 팝업 1, 팝업 2처럼 표시됩니다.</small>
+        </div>
+
+
+        <div class="form-group">
+          <label>팝업 위치</label>
+          <select name="position" id="popupEditPosition" required>
+            <option value="center">중앙</option>
+            <option value="top-left">좌측 상단</option>
+            <option value="top-right">우측 상단</option>
+            <option value="bottom-left">좌측 하단</option>
+            <option value="bottom-right">우측 하단</option>
+            <option value="custom" hidden>사용자 지정</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="positionCustomGroup" style="display:none;" hidden>
+          <label>사용자 지정 위치</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="font-size:12px;color:var(--muted);">X 위치 (px 또는 %)</label>
+              <input type="text" id="popupEditPositionX" placeholder="50% 또는 100px" style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--muted);">Y 위치 (px 또는 %)</label>
+              <input type="text" id="popupEditPositionY" placeholder="50% 또는 100px" style="width:100%;">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group form-full">
+          <label>팝업 이미지 URL</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" name="imageUrl" id="popupEditImageUrl" placeholder="https://assets.gritedu.kr/public/popup/파일명.webp" style="flex:1;min-width:200px;">
+            <button type="button" class="btn sm" onclick="clearPopupImage()">이미지 제거</button>
+          </div>
+          <div style="margin-top:8px;">
+            <label style="font-size:12px;color:var(--muted);">이미지 클릭 시 이동할 URL</label>
+            <input type="text" name="imageLinkUrl" id="popupEditImageLinkUrl" placeholder="/notice.html?id=1 또는 https://example.com" style="width:100%;margin-top:4px;">
+          </div>
+          <small class="form-hint">공개 이미지 URL · PNG/JPG/WEBP</small>
+          <div id="popupImagePathStatus" style="margin-top:8px;font-size:12px;font-weight:700;color:var(--muted);"></div>
+          <div id="popupImagePreview" style="margin-top:12px;display:none;">
+            <img id="popupImagePreviewImg" src="" alt="미리보기" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border);object-fit:contain;">
+          </div>
+        </div>
+
+        <div class="form-group form-full">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+            <label style="margin:0;">팝업 문구 목록</label>
+            <button type="button" class="btn sm" id="popupAddTextItemBtn">문구 추가</button>
+          </div>
+          <input type="hidden" id="popupTextItemsCount" value="0">
+          <div id="popupTextItemsList" class="popup-text-items-admin-list"></div>
+          <small class="form-hint">각 문구별 URL과 정렬을 설정할 수 있습니다. 빈 문구는 저장되지 않습니다.</small>
+        </div>
+
+        <div class="form-group form-full" style="display:none;" aria-hidden="true">
+          <label>레거시 팝업 문구 (호환용)</label>
+          <div class="rich-editor-wrapper" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card);">
+            <div class="editor-toolbar" style="display:none;">
+              <!-- 포맷팅 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <button type="button" class="toolbar-btn-icon" onclick="formatPopupText('bold')" title="굵게" style="font-weight:700;">B</button>
+                <button type="button" class="toolbar-btn-icon" onclick="formatPopupText('italic')" title="기울임" style="font-style:italic;">I</button>
+                <button type="button" class="toolbar-btn-icon" onclick="formatPopupText('underline')" title="밑줄" style="text-decoration:underline;">U</button>
+                <button type="button" class="toolbar-btn-icon" onclick="formatPopupText('strikeThrough')" title="취소선" style="text-decoration:line-through;">S</button>
+              </div>
+              
+              <!-- 정렬 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <button type="button" class="toolbar-btn-icon" onclick="alignPopupText('left')" title="좌측 정렬" style="font-size:18px;">⬅</button>
+                <button type="button" class="toolbar-btn-icon" onclick="alignPopupText('center')" title="중앙 정렬" style="font-size:18px;">↔</button>
+                <button type="button" class="toolbar-btn-icon" onclick="alignPopupText('right')" title="우측 정렬" style="font-size:18px;">➡</button>
+                <button type="button" class="toolbar-btn-icon" onclick="alignPopupText('justify')" title="양쪽 정렬" style="font-size:18px;">⬌</button>
+              </div>
+              
+              <!-- 글꼴 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <label style="font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;">글꼴</label>
+                <select class="toolbar-select-modern" id="popupFontFamily" onchange="changePopupFontFamily()" title="글꼴">
+                  <option value="">기본</option>
+                  <option value="맑은 고딕">맑은 고딕</option>
+                  <option value="나눔고딕">나눔고딕</option>
+                  <option value="돋움">돋움</option>
+                  <option value="굴림">굴림</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Helvetica">Helvetica</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Courier New">Courier New</option>
+                  <option value="Verdana">Verdana</option>
+                  <option value="Georgia">Georgia</option>
+                </select>
+              </div>
+              
+              <!-- 크기 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <label style="font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;">크기</label>
+                <select class="toolbar-select-modern" id="popupFontSize" onchange="changePopupFontSize()" title="글자 크기">
+                  <option value="">기본</option>
+                  <option value="12px">12px</option>
+                  <option value="14px">14px</option>
+                  <option value="16px" selected>16px</option>
+                  <option value="18px">18px</option>
+                  <option value="20px">20px</option>
+                  <option value="24px">24px</option>
+                  <option value="28px">28px</option>
+                  <option value="32px">32px</option>
+                </select>
+              </div>
+              
+              <!-- 색상 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <label style="font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;">글자색</label>
+                <input type="color" class="toolbar-color-modern" id="popupFontColor" onchange="changePopupFontColor()" title="글자 색깔" value="#000000">
+              </div>
+              
+              <!-- 배경 색상 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <label style="font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;">배경색</label>
+                <input type="color" class="toolbar-color-modern" id="popupBackgroundColor" onchange="changePopupBackgroundColor()" title="배경 색깔" value="#ffffff">
+              </div>
+              
+              <!-- 위첨자/아래첨자 그룹 -->
+              <div class="toolbar-group" style="padding-right:8px;border-right:1px solid var(--border);margin-right:8px;">
+                <button type="button" class="toolbar-btn-icon" onclick="formatPopupText('superscript')" title="위첨자" style="font-size:12px;vertical-align:super;">x²</button>
+                <button type="button" class="toolbar-btn-icon" onclick="formatPopupText('subscript')" title="아래첨자" style="font-size:12px;vertical-align:sub;">x₂</button>
+              </div>
+              
+              <!-- legacy rich editor: 이미지 첨부 비활성화 (R2 URL 직접 입력만 허용) -->
+            </div>
+            <div id="popupContent" contenteditable="true" class="rich-editor" 
+              style="min-height:160px;padding:16px;border:none;background:var(--card);color:var(--text);outline:none;line-height:1.7;font-size:16px;"></div>
+          </div>
+        </div>
+
+        <div class="form-group form-full" style="display:none;" aria-hidden="true">
+          <label>문구/버튼 클릭 시 이동할 URL (레거시)</label>
+          <input type="text" name="contentLinkUrl" id="popupEditContentLinkUrl" placeholder="/notice.html 또는 https://example.com">
+        </div>
+
+        <div class="form-group form-full" style="display:none;">
+          <h3 style="margin:0 0 16px 0;font-size:16px;">팝업창 크기 설정</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label>너비 (px 또는 %)</label>
+              <input type="text" name="width" id="popupEditWidth" placeholder="600px 또는 80%" value="auto">
+              <small class="form-hint">예: 600px, 80%, auto</small>
+            </div>
+            <div class="form-group">
+              <label>높이 (px 또는 %)</label>
+              <input type="text" name="height" id="popupEditHeight" placeholder="400px 또는 auto" value="auto">
+              <small class="form-hint">예: 400px, auto</small>
+            </div>
+          </div>
+          <small class="form-hint" style="margin-top:8px;display:block;">미리보기에서 조절하거나 직접 입력하세요. auto는 내용에 맞춥니다.</small>
+        </div>
+
+        <div class="form-group form-actions form-full" style="border-top:2px solid var(--border);padding-top:20px;margin-top:20px;">
+          <button type="submit" class="btn primary">저장</button>
+          <button type="button" class="btn" onclick="closePopupModal()">취소</button>
+        </div>
+          </form>
+        </div>
+        
+        <!-- 2단: 실시간 미리보기 -->
+        <div style="display:flex;flex-direction:column;overflow:hidden;border-left:2px solid var(--border);padding-left:20px;">
+          <div style="margin:0 0 16px 0;flex-shrink:0;">
+            <h3 style="margin:0 0 8px 0;font-size:16px;">실시간 미리보기</h3>
+            <small class="form-hint" style="display:block;margin-top:4px;color:var(--muted);font-size:12px;">
+              홈 화면과 비슷한 크기와 위치로 미리 확인합니다. 실제 노출 크기는 기기 화면에 맞게 자동 조정됩니다.
+            </small>
+          </div>
+          <div id="popupPreviewContainer" style="flex:1;position:relative;border:2px dashed var(--border);border-radius:12px;padding:20px;background:var(--bg);min-height:0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;">
+            <div class="muted" style="text-align:center;">미리보기를 표시하려면 내용을 입력하세요.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* 모달 스타일 */
+    #popupEditModal.modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      z-index: 10000;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    body.modal-open {
+      overflow: hidden !important;
+      height: 100vh;
+    }
+    html.modal-open {
+      overflow: hidden !important;
+      height: 100vh;
+    }
+    #popupEditModal .modal-content {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 24px;
+      width: 100%;
+      max-width: 1200px;
+      max-height: calc(95vh);
+      margin: 0;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    @media (max-width: 1200px) {
+      #popupEditModal .modal-content > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        overflow-y: auto !important;
+        padding-right: 4px;
+      }
+      #popupEditModal .modal-content > div[style*="grid-template-columns"] > div:last-child {
+        border-left: none !important;
+        border-top: 2px solid var(--border) !important;
+        padding-left: 0 !important;
+        padding-top: 20px !important;
+        margin-top: 20px !important;
+      }
+    }
+    @media (max-width: 768px) {
+      #popupEditModal.modal {
+        padding: 10px;
+      }
+      #popupEditModal .modal-content {
+        max-height: 90vh;
+        padding: 16px;
+      }
+      .popup-preview-stage {
+        min-height: 360px;
+        padding: 12px;
+      }
+      .popup-preview-content-simple {
+        max-width: calc(100% - 24px);
+        max-height: calc(100% - 24px);
+      }
+      .popup-preview-content-simple--image-only .popup-preview-body-simple {
+        padding: 10px;
+      }
+      .popup-preview-stage--top-left .popup-preview-content-simple,
+      .popup-preview-stage--top-right .popup-preview-content-simple,
+      .popup-preview-stage--bottom-left .popup-preview-content-simple,
+      .popup-preview-stage--bottom-right .popup-preview-content-simple {
+        left: 12px;
+        right: 12px;
+      }
+      .popup-preview-stage--top-left .popup-preview-content-simple,
+      .popup-preview-stage--top-right .popup-preview-content-simple {
+        top: 12px;
+      }
+      .popup-preview-stage--bottom-left .popup-preview-content-simple,
+      .popup-preview-stage--bottom-right .popup-preview-content-simple {
+        bottom: 12px;
+      }
+      .popup-preview-main-image {
+        max-height: 280px;
+      }
+      .popup-preview-footer-simple {
+        flex-direction: column;
+      }
+      .popup-preview-footer-simple button {
+        width: 100%;
+      }
+    }
+    #popupEditModal .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    #popupEditModal .modal-header h2 {
+      margin: 0;
+      font-size: 20px;
+      color: var(--text);
+    }
+    #popupEditModal .modal-close {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      transition: color 0.2s;
+    }
+    #popupEditModal .modal-close:hover {
+      color: var(--text);
+    }
+    
+    /* 팝업 카드 스타일 */
+    .popup-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      background: var(--card);
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .popup-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-color: var(--brand);
+    }
+    .popup-card.dragging {
+      opacity: 0.5;
+      border-color: var(--brand);
+    }
+    .popup-card.drag-over {
+      border-top: 3px solid var(--brand);
+    }
+    .popup-drag-handle {
+      user-select: none;
+    }
+    .popup-drag-handle:hover {
+      color: var(--brand);
+    }
+    .popup-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .popup-card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+    }
+    .popup-card-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .popup-card-body {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .popup-card-info {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .popup-card-info strong {
+      color: var(--text);
+      margin-right: 8px;
+    }
+
+    .popup-preview-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 420px;
+      background: rgba(0,0,0,0.28);
+      border-radius: 12px;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .popup-preview-content-simple {
+      position: absolute;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      width: auto;
+      max-width: min(90%, 640px);
+      max-height: calc(100% - 40px);
+    }
+    .popup-preview-content-simple--image-only {
+      max-width: min(94%, 720px);
+    }
+    .popup-preview-stage--center .popup-preview-content-simple {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .popup-preview-stage--top-left .popup-preview-content-simple {
+      top: 20px;
+      left: 20px;
+    }
+    .popup-preview-stage--top-right .popup-preview-content-simple {
+      top: 20px;
+      right: 20px;
+    }
+    .popup-preview-stage--bottom-left .popup-preview-content-simple {
+      bottom: 20px;
+      left: 20px;
+    }
+    .popup-preview-stage--bottom-right .popup-preview-content-simple {
+      right: 20px;
+      bottom: 20px;
+    }
+    .popup-preview-body-simple {
+      padding: 20px;
+      overflow: auto;
+      min-height: 0;
+    }
+    .popup-preview-content-simple--image-only .popup-preview-body-simple {
+      padding: 12px;
+      overflow: visible;
+    }
+    .popup-preview-main-image {
+      display: block;
+      max-width: 100%;
+      max-height: min(420px, 58vh);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      margin: 0 auto;
+    }
+    .popup-preview-content-simple--image-only .popup-preview-main-image {
+      max-height: min(460px, 66vh);
+      border-radius: 8px;
+      margin: 0 auto;
+    }
+    .popup-preview-image-link {
+      display: block;
+      text-decoration: none;
+    }
+    .popup-preview-content-simple--image-only .popup-preview-image-link {
+      line-height: 0;
+    }
+    .popup-preview-text-simple {
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .popup-text-items-admin-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .popup-text-item-admin-row {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--bg);
+    }
+    .popup-text-item-admin-row label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .popup-text-item-admin-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .popup-text-items .popup-text-item {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      text-decoration: none;
+    }
+    .popup-text-items .popup-text-item + .popup-text-item {
+      margin-top: 10px;
+    }
+    .popup-text-items .popup-text-item--left { text-align: left; }
+    .popup-text-items .popup-text-item--center { text-align: center; }
+    .popup-text-items .popup-text-item--right { text-align: right; }
+    .popup-text-items .popup-text-item:hover,
+    .popup-text-items .popup-text-item:focus {
+      color: var(--brand);
+    }
+    .popup-preview-text-items .popup-text-item {
+      font-size: 14px;
+    }
+    .popup-preview-text-simple:not(:first-child) {
+      margin-top: 12px;
+    }
+    .popup-preview-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 12px 0 0 auto;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--brand);
+      color: #fff !important;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .popup-preview-cta:hover,
+    .popup-preview-cta:focus {
+      background: var(--brand);
+      color: #fff !important;
+      text-decoration: none;
+    }
+    .popup-preview-footer-simple {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+      background: var(--card);
+    }
+    .popup-preview-content-simple--image-only .popup-preview-footer-simple {
+      padding: 8px 10px 10px;
+    }
+    .popup-preview-footer-simple button {
+      padding: 6px 12px;
+      border: 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--hover);
+      color: var(--text);
+    }
+    .popup-preview-footer-simple button.primary {
+      background: var(--brand);
+      color: #fff;
+    }
+    .popup-preview-btn-x {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      font-weight: bold;
+    }
+    
+    /* 리치 에디터 툴바 스타일 */
+    .toolbar-btn-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+    .toolbar-btn-icon:hover {
+      background: var(--hover);
+      border-color: var(--brand);
+      color: var(--brand);
+      transform: translateY(-1px);
+    }
+    .toolbar-btn-icon:active {
+      transform: translateY(0);
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand);
+    }
+    
+    .toolbar-select-modern {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      outline: none;
+      min-width: 120px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 32px;
+    }
+    .toolbar-select-modern:hover {
+      background-color: var(--hover);
+      border-color: var(--brand);
+    }
+    .toolbar-select-modern:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
+    }
+    
+    .toolbar-color-modern {
+      width: 48px;
+      height: 36px;
+      padding: 2px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .toolbar-color-modern::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    .toolbar-color-modern::-webkit-color-swatch {
+      border: none;
+      border-radius: 4px;
+    }
+    .toolbar-color-modern:hover {
+      border-color: var(--brand);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .rich-editor {
+      font-family: 'Noto Sans KR', 'Pretendard', system-ui, sans-serif;
+    }
+    .rich-editor:focus {
+      outline: none;
+    }
+    .rich-editor p {
+      margin: 8px 0;
+    }
+    .rich-editor img {
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      border-radius: 8px;
+      margin: 8px 0;
+      cursor: move;
+      transition: all 0.2s ease;
+      user-select: none;
+      object-fit: contain;
+    }
+    .rich-editor img:hover {
+      opacity: 0.9;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    /* 팝업창 내 이미지 자동 크기 조절 */
+    .popup-text img,
+    .popup-body img {
+      max-width: 100% !important;
+      width: auto !important;
+      height: auto !important;
+      object-fit: contain !important;
+    }
+    
+    /* 이미지 그리드 스타일 */
+    [data-image-grid] {
+      display: grid;
+      gap: 8px;
+      width: 100%;
+      margin: 8px 0;
+    }
+    
+    [data-image-grid] img {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    
+    [data-image-grid] a {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* 드래그 앤 드롭 스타일 */
+    .popup-draggable {
+      user-select: none;
+    }
+    .popup-draggable:active {
+      cursor: grabbing !important;
+    }
+    .popup-resize-handle:hover {
+      opacity: 1 !important;
+      transform: scale(1.1);
+    }
+    .popup-resize-handle:active {
+      opacity: 1 !important;
+    }
+  </style>
+</body>
+</html>

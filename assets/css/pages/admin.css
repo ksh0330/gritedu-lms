@@ -1,0 +1,652 @@
+.admin-tabs {
+  border-bottom:2px solid var(--border);
+  display:flex;
+  gap:8px;
+  margin:24px 0
+}
+.admin-tabs button {
+  background:none;
+  border:none;
+  border-bottom:2px solid transparent;
+  color:var(--muted);
+  cursor:pointer;
+  font-weight:700;
+  margin-bottom:-2px;
+  padding:12px 20px;
+  transition:color .2s,border-color .2s
+}
+.admin-tabs button:hover {
+  background:var(--hover);
+  color:var(--text)
+}
+.admin-tabs button.active {
+  border-bottom-color:var(--brand);
+  color:var(--brand)
+}
+.admin-section {
+  display:none
+}
+.admin-section.active {
+  display:block
+}
+.admin-table {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-collapse:collapse;
+  border-radius:12px;
+  margin-top:16px;
+  overflow:hidden;
+  width:100%
+}
+.admin-table thead {
+  background:color-mix(in srgb,var(--brand) 8%,var(--hover))
+}
+.admin-table th {
+  border-bottom:2px solid var(--border);
+  color:var(--text);
+  font-weight:700;
+  text-align:left;
+  vertical-align:middle;
+  white-space:nowrap
+}
+.admin-table td,.admin-table th {
+  font-size:14px;
+  padding:12px 16px
+}
+.admin-table td {
+  border-bottom:1px solid var(--border)
+}
+.admin-table tbody tr:last-child td {
+  border-bottom:none
+}
+.admin-table tbody tr:hover {
+  background:var(--hover)
+}
+.admin-table .btn.small,.admin-table .btn.sm {
+  font-size:12px;
+  margin:0 4px;
+  padding:6px 12px
+}
+@media (max-width:1024px) {
+  .admin-section.active {
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch
+  }
+  .admin-table {
+    min-width:900px
+  }
+  .admin-table th,
+  .admin-table td {
+    white-space:nowrap
+  }
+  .admin-table td.review-content {
+    min-width:220px;
+    white-space:normal
+  }
+}
+.admin-toolbar {
+  align-items:center;
+  background:color-mix(in srgb,var(--brand) 6%,var(--card));
+  border:1px solid color-mix(in srgb,var(--brand) 28%,var(--border));
+  border-radius:12px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-bottom:16px;
+  padding:12px 14px
+}
+html[data-theme=dark] .admin-toolbar {
+  background:color-mix(in srgb,var(--brand) 10%,var(--card));
+  border-color:color-mix(in srgb,var(--brand) 35%,var(--border))
+}
+.admin-toolbar__search-wrap {
+  align-items:center;
+  background:var(--card);
+  border:1px solid color-mix(in srgb,var(--brand) 38%,var(--border));
+  border-radius:8px;
+  display:inline-flex;
+  flex:1 1 220px;
+  max-width:min(100%,380px);
+  min-height:40px;
+  padding:0 10px 0 12px;
+  transition:border-color .2s ease,box-shadow .2s ease
+}
+.admin-toolbar__search-wrap:focus-within {
+  border-color:var(--brand);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 22%,transparent)
+}
+.admin-toolbar__search-icon {
+  color:var(--muted);
+  display:flex;
+  flex-shrink:0;
+  margin-right:6px;
+  pointer-events:none
+}
+.admin-toolbar__search-icon svg {
+  display:block;
+  height:18px;
+  width:18px
+}
+.admin-toolbar__search-input {
+  -webkit-appearance:none;
+  appearance:none;
+  background:transparent;
+  border:0;
+  color:var(--text);
+  flex:1 1 auto;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
+  line-height:1.35;
+  min-height:36px;
+  min-width:0;
+  padding:8px 4px 8px 0
+}
+.admin-toolbar__search-input::placeholder {
+  color:var(--muted);
+  font-weight:500
+}
+.admin-toolbar__search-input:focus {
+  outline:none
+}
+.admin-toolbar__select {
+  background:var(--card);
+  border:1px solid color-mix(in srgb,var(--brand) 38%,var(--border));
+  border-radius:8px;
+  color:var(--text);
+  cursor:pointer;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
+  min-height:40px;
+  padding:8px 12px;
+  transition:border-color .2s ease,box-shadow .2s ease
+}
+.admin-toolbar__select:hover {
+  border-color:var(--accent)
+}
+.admin-toolbar__select:focus {
+  border-color:var(--brand);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 18%,transparent);
+  outline:none
+}
+.form-group {
+  margin-bottom:16px
+}
+.form-group label {
+  color:var(--text);
+  display:block;
+  font-size:14px;
+  font-weight:700;
+  margin-bottom:6px
+}
+.form-group .required {
+  color:var(--brand)
+}
+.form-group input[type=email],.form-group input[type=file],.form-group input[type=password],.form-group input[type=text],.form-group select {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  font-size:14px;
+  padding:10px 12px;
+  transition:border-color .2s,box-shadow .2s;
+  width:100%
+}
+.form-group input:focus,.form-group select:focus {
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(255,122,0,.1);
+  outline:none
+}
+.form-group select {
+  cursor:pointer
+}
+/* 관리자 페이지 포스터 미리보기 그리드 */
+.posters-preview-grid {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px
+}
+@media (max-width:768px) {
+  .posters-preview-grid {
+    grid-template-columns:repeat(2,1fr);
+    gap:12px
+  }
+}
+@media (max-width:640px) {
+  .posters-preview-grid {
+    grid-template-columns:1fr;
+    gap:12px
+  }
+}
+/* 관리자 페이지 포스터 편집 미리보기 그리드 */
+.poster-edit-preview-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:12px;
+  margin-top:12px
+}
+/* 관리자 페이지 스케줄 관리 day-item 그리드 */
+.day-item {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr 1fr auto;
+  gap:8px;
+  align-items:end;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:var(--card)
+}
+.arrangement-edit-day-item {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr 1fr auto;
+  gap:12px;
+  align-items:end;
+  padding:12px;
+  background:var(--card);
+  border-radius:8px;
+  border:1px solid var(--border);
+  margin-top:8px
+}
+/* QnA 목록 컨테이너 */
+.qna-list-container {
+  display:flex;
+  flex-direction:column;
+  gap:16px
+}
+/* 비디오 컨테이너 */
+.videos-container {
+  display:flex;
+  flex-direction:column;
+  gap:8px
+}
+/* 비디오 URL 아이템 */
+.video-url-item {
+  display:flex;
+  gap:8px;
+  align-items:center
+}
+/* 갤러리 미리보기 페이지네이션 */
+.gallery-preview-pagination {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  justify-content:center;
+  margin-top:24px
+}
+/* 갤러리 미리보기 페이지 번호 */
+.gallery-preview-page-numbers {
+  display:flex;
+  gap:4px;
+  flex-wrap:wrap
+}
+/* 동적 생성 모달 기본 스타일 */
+.dynamic-modal-overlay {
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:rgba(0,0,0,0.5);
+  z-index:10000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px
+}
+@media (max-width:768px) {
+  .dynamic-modal-overlay {
+    align-items:flex-start;
+    overflow-y:auto;
+    padding:16px
+  }
+  .dynamic-modal-overlay > * {
+    max-height:calc(100dvh - 32px);
+    max-width:min(100%, calc(100vw - 32px));
+    overflow-y:auto
+  }
+}
+/* QnA 검색 컨테이너 */
+.qna-search-container {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:24px;
+  flex-wrap:wrap
+}
+/* QnA 검색 입력 필드 컨테이너 */
+.qna-search-input-container {
+  flex:1;
+  min-width:200px;
+  max-width:400px
+}
+/* 스케줄 관리 페이지 그리드 */
+.schedule-days-grid {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:12px
+}
+.schedule-day-items {
+  display:flex;
+  flex-direction:column;
+  gap:8px
+}
+.calendar-grid {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:2px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden
+}
+.calendar-day-schedules {
+  display:flex;
+  flex-direction:column;
+  gap:2px
+}
+.arrangement-edit-days-container {
+  display:flex;
+  flex-direction:column;
+  gap:8px
+}
+/* 폼 필드 레이아웃 */
+.form-fields-column {
+  display:flex;
+  flex-direction:column;
+  gap:16px
+}
+.form-field-row {
+  display:flex;
+  align-items:center;
+  gap:8px
+}
+/* 교시 설정 리스트 */
+.periods-list-container {
+  display:flex;
+  flex-direction:column;
+  gap:12px
+}
+.period-item {
+  display:flex;
+  align-items:center;
+  gap:12px
+}
+.period-item-controls {
+  display:flex;
+  flex-direction:column;
+  gap:4px
+}
+/* 버튼 그룹 */
+.button-group-horizontal {
+  display:flex;
+  gap:8px
+}
+/* 체크박스/라디오 레이블 아이템 */
+.checkbox-label-item,
+.radio-label-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  background:var(--card);
+  border-radius:8px;
+  border:1px solid var(--border);
+  cursor:pointer;
+  transition:background 0.2s
+}
+.radio-label-item {
+  gap:8px;
+  background:var(--hover);
+  margin-bottom:8px
+}
+.radio-label-item:last-child {
+  margin-bottom:0
+}
+.radio-options-column {
+  display:flex;
+  flex-direction:column;
+  gap:12px
+}
+/* 관리자 페이지 공통 레이아웃 */
+.page-header-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center
+}
+.order-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:16px
+}
+/* 에디터 툴바 */
+.editor-toolbar {
+  display:flex;
+  align-items:center;
+  gap:0;
+  flex-wrap:wrap
+}
+.toolbar-group {
+  display:flex;
+  align-items:center;
+  gap:2px
+}
+.toolbar-group:has(select),
+.toolbar-group:has(input[type="color"]) {
+  gap:8px
+}
+/* QnA 페이지네이션 */
+.qna-pagination {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:8px;
+  margin-top:24px;
+  flex-wrap:wrap
+}
+/* 스케줄 아이템 행 */
+.schedule-item-row {
+  display:flex;
+  gap:8px;
+  align-items:center
+}
+/* 날짜 헤더 행 */
+.date-header-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px
+}
+/* 편집 필드 행 */
+.edit-field-row-flex {
+  display:flex;
+  gap:8px;
+  align-items:start
+}
+/* 배열 아이템 행 */
+.array-item-row {
+  display:flex;
+  gap:4px;
+  margin-bottom:4px;
+  align-items:center
+}
+/* 강의 비디오 URL 아이템 */
+.course-video-url-item {
+  display:flex;
+  gap:8px;
+  align-items:center
+}
+/* 폼 그리드 레이아웃 */
+.form-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:20px;
+  flex:1;
+  overflow-y:auto
+}
+@media (max-width:768px) {
+  .form-grid {
+    grid-template-columns:1fr
+  }
+}
+.form-group textarea {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  font-family:inherit;
+  font-size:14px;
+  padding:10px 12px;
+  resize:vertical;
+  transition:border-color .2s,box-shadow .2s;
+  width:100%
+}
+.form-group textarea:focus {
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(255,122,0,.1);
+  outline:none
+}
+@media (max-width:768px) {
+  .admin-toolbar__search-input,
+  .admin-toolbar__select,
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size:16px
+  }
+}
+.form-group.form-full {
+  grid-column:1/-1
+}
+.form-group.form-actions {
+  display:flex;
+  gap:8px;
+  margin-top:20px
+}
+.form-hint {
+  color:var(--muted);
+  font-size:12px;
+  margin-top:-4px
+}
+/* 필터 섹션 */
+.filter-section {
+  display:flex;
+  gap:12px;
+  margin-bottom:20px;
+  flex-wrap:wrap;
+  align-items:center
+}
+.filter-item {
+  display:flex;
+  align-items:center;
+  gap:8px
+}
+.filter-item label {
+  color:var(--text);
+  font-weight:600
+}
+.filter-item select {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  padding:8px 12px
+}
+/* 별점 스타일 */
+.rating-stars-container {
+  display:flex;
+  gap:8px;
+  font-size:32px;
+  cursor:pointer
+}
+.rating-stars-container .star {
+  color:var(--muted);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  transition:color .2s
+}
+.rating-stars-container .star.active {
+  color:#fbbf24
+}
+.rating-stars {
+  display:flex;
+  gap:2px;
+  font-size:16px
+}
+.rating-stars .star {
+  color:#fbbf24
+}
+.rating-stars .star.empty {
+  color:var(--muted)
+}
+/* 페이지 헤더 액션 버튼 그룹 */
+.page-header-actions {
+  display:flex;
+  gap:8px
+}
+.page-header-actions .btn {
+  display:inline-flex;
+  align-items:center;
+  gap:6px
+}
+/* 뒤로가기: components/dash-back.css (.dash-back) */
+/* 후기 내용 셀 스타일 */
+.admin-table td.review-content {
+  max-width:300px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+/* 토글 스위치 스타일 */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border);
+  transition: 0.3s;
+  border-radius: 26px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--brand);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(24px);
+}
+
+.toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

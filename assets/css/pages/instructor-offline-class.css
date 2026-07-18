@@ -1,0 +1,268 @@
+/* Instructor offline class detail — members/instructors/offline-class.html */
+
+.instructor-offline-class-page .instructor-offline-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.instructor-offline-class-page .instructor-offline-class-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.instructor-offline-class-page .instructor-offline-class-label {
+  align-self: center;
+}
+
+.instructor-offline-class-page .instructor-offline-class-dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-class-dl > div {
+  display: grid;
+  gap: 2px;
+  grid-template-columns: minmax(72px, 88px) 1fr;
+}
+
+.instructor-offline-class-page .instructor-offline-class-dl dt {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-class-dl dd {
+  color: var(--muted);
+  font-size: clamp(13px, 1.9vw, 14px);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-class-desc {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+.instructor-offline-class-page .instructor-offline-access-note {
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.instructor-offline-class-page .instructor-offline-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.instructor-offline-class-page .instructor-offline-sessions-empty {
+  margin: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-session-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.instructor-offline-class-page .instructor-offline-session-toggle {
+  align-items: center;
+  background: var(--card);
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.instructor-offline-class-page .instructor-offline-session-toggle__row {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-session-no {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.instructor-offline-class-page .instructor-offline-session-date {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.instructor-offline-class-page .instructor-offline-session-title {
+  flex: 1 1 120px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-session-toggle__end {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.instructor-offline-class-page .instructor-offline-session-status {
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.instructor-offline-class-page .instructor-offline-session-status--published {
+  background: color-mix(in srgb, var(--success-color, #22c55e) 18%, transparent);
+  color: var(--text);
+}
+
+.instructor-offline-class-page .instructor-offline-session-status--archived,
+.instructor-offline-class-page .instructor-offline-session-status--legacy {
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+  color: var(--muted);
+}
+
+.instructor-offline-class-page .instructor-offline-session-video-count {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.instructor-offline-class-page .instructor-offline-session-toggle__icon::before {
+  content: "▾";
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.instructor-offline-class-page .instructor-offline-session-card:not(.is-open) .instructor-offline-session-toggle__icon::before {
+  transform: rotate(-90deg);
+}
+
+.instructor-offline-class-page .instructor-offline-session-panel {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px 12px;
+}
+
+.instructor-offline-class-page .instructor-offline-session-panel[hidden] {
+  display: none;
+}
+
+.instructor-offline-class-page .instructor-offline-session-desc {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
+
+.instructor-offline-class-page .instructor-offline-video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.instructor-offline-class-page .instructor-offline-video-link {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: inherit;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.instructor-offline-class-page .instructor-offline-video-link:hover {
+  border-color: var(--brand);
+}
+
+.instructor-offline-class-page .instructor-offline-video-link__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.instructor-offline-class-page .instructor-offline-no-videos {
+  font-size: 13px;
+  margin: 0;
+}
+
+.instructor-dashboard-page .instructor-offline-status {
+  border-radius: 4px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
+.instructor-dashboard-page .instructor-offline-status--active {
+  background: color-mix(in srgb, var(--success-color, #22c55e) 18%, transparent);
+}
+
+.instructor-dashboard-page .instructor-offline-status--archived {
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  color: var(--muted);
+}
+
+.instructor-dashboard-page .instructor-offline-schedule-cell {
+  font-size: 13px;
+  line-height: 1.45;
+  min-width: 100px;
+  white-space: normal;
+}
+
+.instructor-dashboard-page .instructor-offline-class-name {
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.instructor-offline-class-page .instructor-offline-sessions-pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.instructor-offline-class-page .instructor-offline-sessions-pagination__info {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .instructor-offline-class-page .instructor-offline-class-dl > div {
+    grid-template-columns: 1fr;
+  }
+
+  .instructor-offline-class-page .instructor-offline-session-toggle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .instructor-offline-class-page .instructor-offline-session-toggle__end {
+    width: 100%;
+  }
+}

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 강좌 관리</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/admin-courses.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/pages/admin-courses.css">
+</head>
+<body class="admin-courses-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="dash-back">
+      <a href="/members/admin/dashboard.html" class="btn sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        관리자 CMS로 돌아가기
+      </a>
+    </div>
+
+    <div class="admin-courses-head">
+      <h1 class="page-title">강좌 관리</h1>
+      <div class="admin-courses-head__actions">
+        <button type="button" class="btn sm" onclick="location.reload()">새로고침</button>
+        <button type="button" class="btn primary sm" onclick="openAddContentModal()">+ 강좌 추가</button>
+      </div>
+    </div>
+
+    <details class="admin-catalog-panel grit-section" id="courseCatalogPanel">
+      <summary class="admin-catalog-panel__summary">강좌 선택 목록</summary>
+      <p class="muted admin-catalog-panel__lead">강좌의 과목·학년·연도 선택 목록입니다.</p>
+      <ul class="admin-catalog-panel__notes muted">
+        <li>변경 후 ‘목록 저장’을 누르세요.</li>
+        <li>저장 후 선택 목록에 반영되기까지 잠시 걸릴 수 있습니다.</li>
+        <li>화면에 보이는 과목명은 수정할 수 있습니다. 내부 식별값은 자동 생성되며 관리자가 직접 지정하지 않습니다.</li>
+        <li>목록에서 삭제해도 이미 등록된 강좌 데이터는 삭제되지 않습니다.</li>
+        <li>특정 강좌에만 필요한 과목명, 학년, 연도는 등록/수정 화면에서 직접 입력할 수 있으며, 공개 필터에 자동으로 추가되지 않습니다.</li>
+      </ul>
+      <div class="admin-catalog-panel__grid">
+        <div class="admin-catalog-field admin-catalog-field--wide">
+          <span class="admin-catalog-field__label">온라인 강좌 과목</span>
+          <div class="course-catalog-subject-editor" id="courseCatalogSubjectEditor"></div>
+          <div class="admin-catalog-field__row">
+            <input type="text" id="courseCatalogSubjectLabelInput" class="admin-catalog-field__input" placeholder="과목명 (예: 국어)" autocomplete="off">
+            <button type="button" class="btn sm" id="courseCatalogSubjectAddBtn">추가</button>
+          </div>
+        </div>
+        <div class="admin-catalog-field">
+          <span class="admin-catalog-field__label">학년</span>
+          <div class="admin-catalog-field__row">
+            <input type="text" id="courseCatalogGradeInput" class="admin-catalog-field__input" placeholder="예: 고2" autocomplete="off">
+            <button type="button" class="btn sm" id="courseCatalogGradeAddBtn">추가</button>
+          </div>
+          <div id="courseCatalogGradeTags" class="admin-catalog-tags" aria-live="polite"></div>
+        </div>
+        <div class="admin-catalog-field">
+          <span class="admin-catalog-field__label">연도</span>
+          <div class="admin-catalog-field__row">
+            <input type="text" id="courseCatalogYearInput" class="admin-catalog-field__input" placeholder="예: 2026" autocomplete="off">
+            <button type="button" class="btn sm" id="courseCatalogYearAddBtn">추가</button>
+          </div>
+          <div id="courseCatalogYearTags" class="admin-catalog-tags" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="admin-catalog-panel__actions">
+        <button type="button" class="btn primary sm" id="courseCatalogSaveBtn">목록 저장</button>
+      </div>
+    </details>
+
+    <div class="grit-section" style="margin-bottom:16px;padding:14px 16px;border-left:4px solid #f59e0b;">
+      <strong>강좌 접근 긴급 차단 안내</strong>
+      <p class="muted" style="margin:6px 0 0;line-height:1.6;"><strong>보관/차단</strong>은 수강 기록을 유지한 채 강좌를 숨깁니다.</p>
+    </div>
+
+    <section class="grit-section">
+      <div class="admin-toolbar">
+        <label class="sr-only" for="adminContentSearch">강좌 검색</label>
+        <div class="admin-toolbar__search-wrap">
+          <input type="search" id="adminContentSearch" class="admin-toolbar__search-input" placeholder="강좌명 검색" autocomplete="off">
+        </div>
+        <select id="adminFilterStatus" class="admin-toolbar__select" title="운영 상태 필터">
+          <option value="all">전체 운영 상태</option>
+          <option value="published">게시</option>
+          <option value="archived">보관 / 일시 차단</option>
+        </select>
+        <select id="adminFilterAccessType" class="admin-toolbar__select" title="수강 유형 필터">
+          <option value="all">전체 수강유형</option>
+          <option value="public">공개 강좌</option>
+          <option value="memberOnly">회원전용 강좌</option>
+        </select>
+        <button type="button" id="adminAdvancedFilterToggle" class="btn sm" aria-expanded="false" aria-controls="adminAdvancedFilters">상세 필터</button>
+        <button type="button" id="adminFilterReset" class="btn sm">필터 초기화</button>
+      </div>
+      <div id="adminAdvancedFilters" class="admin-toolbar admin-toolbar--advanced" hidden>
+        <select id="adminFilterSubject" class="admin-toolbar__select" title="과목 필터">
+          <option value="all">전체 과목</option>
+        </select>
+        <select id="adminFilterGrade" class="admin-toolbar__select" title="학년 필터">
+          <option value="all">전체 학년</option>
+        </select>
+        <select id="adminFilterInstructor" class="admin-toolbar__select" title="강사 필터">
+          <option value="all">전체 강사</option>
+        </select>
+        <select id="adminFilterCourseFormat" class="admin-toolbar__select" title="강좌 형식 필터">
+          <option value="all">전체 형식</option>
+          <option value="single">특강</option>
+          <option value="series">시리즈</option>
+        </select>
+      </div>
+
+      <p id="adminCoursesMeta" class="muted admin-courses-meta" aria-live="polite"></p>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="tblContents">
+          <thead>
+            <tr>
+              <th>강좌명</th>
+              <th>과목</th>
+              <th>학년</th>
+              <th>연도</th>
+              <th>강사</th>
+              <th>수강유형</th>
+              <th>형식</th>
+              <th>운영 상태</th>
+              <th>등록일</th>
+              <th>관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="10" class="muted">불러오는 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav id="adminPagination" class="admin-courses-pagination" aria-label="강좌 목록 페이지"></nav>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+
+  <div id="contentEditModal" class="modal admin-courses-modal" role="dialog" aria-modal="true" aria-labelledby="contentModalTitle">
+    <div class="modal-content content-edit-modal">
+      <div class="modal-header">
+        <h2 id="contentModalTitle">강좌 추가</h2>
+        <button class="modal-close" onclick="closeContentModal()" aria-label="닫기">&times;</button>
+      </div>
+
+      <form id="contentEditForm" class="content-edit-form">
+        <input type="hidden" id="contentEditId">
+
+        <div class="content-edit-modal__scroll">
+          <div class="content-edit-layout">
+          <div class="content-edit-layout__form">
+          <div class="content-edit-section">
+            <h3 class="content-edit-section__title">기본 정보</h3>
+            <div class="form-group">
+              <label for="contentEditTitle">강좌명 <span class="required">*</span></label>
+              <input type="text" id="contentEditTitle" required placeholder="강좌명을 입력하세요">
+            </div>
+            <div class="form-group">
+              <label for="contentEditShortDescription">강좌 카드 내용</label>
+              <textarea id="contentEditShortDescription" rows="2" placeholder="강좌 목록 카드에 표시되는 소개"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="contentEditDescription">강좌 소개</label>
+              <textarea id="contentEditDescription" rows="5" placeholder="강좌 상세 페이지 본문 소개"></textarea>
+            </div>
+          </div>
+
+          <div class="content-edit-section">
+            <h3 class="content-edit-section__title">강좌 메타</h3>
+            <div class="form-group">
+              <label for="contentEditSubjectQuick">과목 <span class="required">*</span></label>
+              <select id="contentEditSubjectQuick" required aria-label="과목 선택"></select>
+              <input type="text" id="contentEditSubject" class="admin-offline-custom-field" placeholder="과목명 직접 입력" autocomplete="off" aria-label="과목 직접 입력" hidden>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="contentEditGradeQuick">학년</label>
+                <select id="contentEditGradeQuick" aria-label="학년 선택"></select>
+                <input type="text" id="contentEditGrade" placeholder="직접 입력 학년" autocomplete="off" aria-label="학년 직접 입력">
+              </div>
+              <div class="form-group">
+                <label for="contentEditYearQuick">연도</label>
+                <select id="contentEditYearQuick" aria-label="연도 선택"></select>
+                <input type="text" id="contentEditYear" placeholder="직접 입력 연도" maxlength="10" autocomplete="off" aria-label="연도 직접 입력">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="contentEditInstructorUid">강사 배정</label>
+              <select id="contentEditInstructorUid">
+                <option value="">강사 선택</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="contentEditAccessType">수강 유형</label>
+                <select id="contentEditAccessType">
+                  <option value="public">공개 강좌</option>
+                  <option value="memberOnly">회원전용 강좌</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="contentEditStatus">운영 상태</label>
+                <select id="contentEditStatus">
+                  <option value="published">게시</option>
+                  <option value="archived">보관 / 일시 차단</option>
+                </select>
+                <p class="muted content-edit-hint">강좌는 숨겨지지만 수강 기록은 유지됩니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-edit-section">
+            <h3 class="content-edit-section__title">학습 콘텐츠</h3>
+            <div class="form-group">
+              <label for="contentEditPreviewVideoUrl">미리보기 영상 URL</label>
+              <input type="url" id="contentEditPreviewVideoUrl" placeholder="https://... (상세 페이지 미리보기 전용)">
+              <p class="muted content-edit-hint">비우면 미리보기를 숨깁니다.</p>
+            </div>
+            <div class="form-group">
+              <label for="contentEditCourseFormat">강좌 형식</label>
+              <select id="contentEditCourseFormat">
+                <option value="single">특강 / 단일 영상</option>
+                <option value="series">시리즈 / 주차별 영상</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="content-edit-section">
+            <h3 class="content-edit-section__title">커리큘럼</h3>
+            <div id="contentEditCurriculumSingle" class="content-edit-curriculum-mode" hidden>
+              <div class="form-group">
+                <label for="contentEditSingleVideoUrl">학습 영상 URL</label>
+                <input type="url" id="contentEditSingleVideoUrl" placeholder="https://...">
+                <p class="muted content-edit-hint">특강형 강좌의 실제 학습 영상입니다.</p>
+              </div>
+            </div>
+            <div id="contentEditCurriculumSeries" class="content-edit-curriculum-mode">
+              <div id="contentEditWeeksList" class="course-weeks-editor"></div>
+              <div class="content-edit-curriculum-actions">
+                <button type="button" class="btn sm" id="contentEditAddWeekBtn">+ 주차 추가</button>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <aside class="content-edit-live-preview" id="contentEditLivePreview" aria-live="polite">
+            <h3 class="content-edit-live-preview__title">강좌 카드 미리보기</h3>
+            <p class="muted content-edit-live-preview__note">저장되지 않는 미리보기입니다.</p>
+            <div id="contentEditLivePreviewBody" class="admin-course-card-preview-wrap"></div>
+          </aside>
+          </div>
+        </div>
+
+        <div class="content-edit-modal__footer">
+          <button type="button" class="btn" onclick="closeContentModal()">취소</button>
+          <button type="submit" class="btn primary">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="courseEnrollmentsModal" class="modal admin-courses-modal admin-courses-modal--support" role="dialog" aria-modal="true" aria-labelledby="courseEnrollmentsTitle">
+    <div class="modal-content admin-courses-support-modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="courseEnrollmentsTitle">수강생 확인</h2>
+          <p id="courseEnrollmentsSubtitle" class="muted admin-courses-modal-note"></p>
+        </div>
+        <button class="modal-close" onclick="closeCourseEnrollmentsModal()" aria-label="닫기">&times;</button>
+      </div>
+      <div id="courseEnrollmentsBody" class="admin-courses-modal-body">
+        <p class="muted">수강 기록을 불러오는 중...</p>
+      </div>
+      <div class="admin-courses-modal-footer">
+        <button type="button" class="btn" onclick="closeCourseEnrollmentsModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="enrollmentRemoveConfirmModal" class="modal admin-courses-modal admin-courses-modal--support" role="dialog" aria-modal="true" aria-labelledby="enrollmentRemoveConfirmTitle">
+    <div class="modal-content admin-courses-support-modal admin-courses-support-modal--narrow">
+      <div class="modal-header">
+        <div>
+          <h2 id="enrollmentRemoveConfirmTitle">수강 기록 제거</h2>
+          <p id="enrollmentRemoveConfirmSubtitle" class="muted admin-courses-modal-note"></p>
+        </div>
+        <button class="modal-close" onclick="closeEnrollmentRemoveConfirmModal()" aria-label="닫기">&times;</button>
+      </div>
+      <div id="enrollmentRemoveConfirmBody" class="admin-courses-modal-body"></div>
+      <div class="admin-courses-modal-footer">
+        <button type="button" class="btn" onclick="closeEnrollmentRemoveConfirmModal()">취소</button>
+        <button type="button" class="btn danger" onclick="confirmEnrollmentRemoval()">수강 기록 제거</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="courseDeleteEmptyModal" class="modal admin-courses-modal admin-courses-modal--support" role="dialog" aria-modal="true" aria-labelledby="courseDeleteEmptyTitle">
+    <div class="modal-content admin-courses-support-modal admin-courses-support-modal--narrow">
+      <div class="modal-header">
+        <div>
+          <h2 id="courseDeleteEmptyTitle">강좌 영구 삭제</h2>
+          <p id="courseDeleteEmptySubtitle" class="muted admin-courses-modal-note"></p>
+        </div>
+        <button class="modal-close" onclick="closeCourseDeleteEmptyModal()" aria-label="닫기">&times;</button>
+      </div>
+      <div class="admin-courses-modal-body">
+        <div class="admin-courses-danger-box">
+          <strong>이 강좌 문서가 영구 삭제됩니다.</strong>
+          <p style="margin:6px 0 0;">현재 연결된 수강 기록은 없습니다. 학생/회원/강사 계정은 삭제하지 않습니다.</p>
+          <p style="margin:4px 0 0;">일반 운영에서는 삭제보다 보관으로 전환을 먼저 사용하세요.</p>
+        </div>
+        <label class="admin-courses-confirm-label" for="courseDeleteEmptyConfirmInput">확인 문구 입력</label>
+        <input id="courseDeleteEmptyConfirmInput" class="admin-courses-confirm-input" type="text" autocomplete="off" placeholder="강좌 삭제">
+        <p class="muted admin-courses-modal-note">삭제하려면 <strong>강좌 삭제</strong>를 정확히 입력하세요.</p>
+        <p id="courseDeleteEmptyFeedback" class="admin-courses-modal-note" role="status" aria-live="polite" hidden></p>
+      </div>
+      <div class="admin-courses-modal-footer">
+        <button type="button" class="btn" onclick="closeCourseDeleteEmptyModal()">취소</button>
+        <button type="button" class="btn danger" onclick="confirmNoEnrollmentCourseDelete()">강좌 영구 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="courseDeleteBlockedModal" class="modal admin-courses-modal admin-courses-modal--support" role="dialog" aria-modal="true" aria-labelledby="courseDeleteBlockedTitle">
+    <div class="modal-content admin-courses-support-modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="courseDeleteBlockedTitle">수강 기록이 있는 강좌입니다</h2>
+          <p id="courseDeleteBlockedSubtitle" class="muted admin-courses-modal-note"></p>
+        </div>
+        <button class="modal-close" onclick="closeCourseDeleteBlockedModal()" aria-label="닫기">&times;</button>
+      </div>
+      <div id="courseDeleteBlockedBody" class="admin-courses-modal-body"></div>
+      <div class="admin-courses-modal-footer admin-courses-modal-footer--split">
+        <button type="button" class="btn" onclick="openEnrollmentsFromDeleteBlocked()">수강생 관리</button>
+        <button type="button" class="btn" onclick="archiveCourseFromDeleteBlocked()">보관으로 전환</button>
+        <button type="button" class="btn danger" onclick="forceDeleteCourseFromDeleteBlocked()">강좌·수강 기록 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="courseForceDeleteModal" class="modal admin-courses-modal admin-courses-modal--support" role="dialog" aria-modal="true" aria-labelledby="courseForceDeleteTitle">
+    <div class="modal-content admin-courses-support-modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="courseForceDeleteTitle">수강 기록까지 삭제하고 강좌 영구 삭제</h2>
+          <p id="courseForceDeleteSubtitle" class="muted admin-courses-modal-note"></p>
+        </div>
+        <button class="modal-close" onclick="closeCourseForceDeleteModal()" aria-label="닫기">&times;</button>
+      </div>
+      <div id="courseForceDeleteBody" class="admin-courses-modal-body"></div>
+      <div class="admin-courses-modal-footer">
+        <button type="button" class="btn" onclick="closeCourseForceDeleteModal()">취소</button>
+        <button type="button" class="btn danger" onclick="confirmForceCourseDelete()">강좌·수강 기록 삭제</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 사이트 관리</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/admin-site.js"></script>
+  <script type="module" src="/assets/js/pages/admin-story-cms.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/pages/admin-site.css">
+</head>
+<body>
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="dash-back">
+      <a href="/members/admin/dashboard.html" class="btn sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        관리자 CMS로 돌아가기
+      </a>
+    </div>
+    
+    <div class="section-head page-header-row">
+      <div>
+        <h1 class="page-title">사이트 관리</h1>
+        <p class="desc">사이트 공개 콘텐츠와 기본 설정을 관리합니다.</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn sm" onclick="location.reload()" title="페이지 새로고침">새로고침</button>
+      </div>
+    </div>
+
+    <!-- 메인 메뉴 탭 -->
+    <div class="site-admin-tabs">
+      <button class="tab-btn active" data-tab="academy">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        학원안내
+      </button>
+      <button class="tab-btn" data-tab="instructors">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        강사진
+      </button>
+      <button class="tab-btn" data-tab="dday">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+          <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+          <path d="M16 2v4M8 2v4M3 10h18"></path>
+          <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"></path>
+        </svg>
+        D-DAY 설정
+      </button>
+      <button class="tab-btn" data-tab="footer">푸터 정보</button>
+    </div>
+
+    <!-- 학원안내 탭 -->
+    <div id="tab-academy" class="tab-content active">
+      <div class="submenu-tabs">
+        <button class="submenu-btn active" data-submenu="story">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          학원 안내
+        </button>
+        <button class="submenu-btn" data-submenu="contact">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+          </svg>
+          상담문의
+        </button>
+        <button class="submenu-btn" data-submenu="kakao-channel">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+            <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.74 1.79 5.14 4.5 6.55-.18.66-.66 2.4-.76 2.78-.12.47.17.46.36.34.15-.1 2.36-1.6 3.32-2.25.85.12 1.73.18 2.58.18 5.523 0 10-3.477 10-7.6S17.523 3 12 3z"></path>
+          </svg>
+          카카오톡 채널
+        </button>
+      </div>
+
+      <!-- 학원 안내 -->
+      <div id="submenu-story" class="submenu-content active">
+        <div class="content-editor-wrapper story-admin-wrap">
+          <p class="story-admin-intro">학원 안내 페이지의 배너, 대표 인사말, 대표 사진, 하단 GRIT 문구를 관리합니다.</p>
+          <div class="story-admin-toolbar">
+            <h2>학원 안내</h2>
+            <div class="story-admin-toolbar-actions">
+              <button class="btn primary" type="button" onclick="saveStoryContent()">저장</button>
+            </div>
+          </div>
+          <div class="story-editor-layout">
+            <form id="story-admin-form" class="story-admin-form">
+              <fieldset class="story-admin-fieldset">
+                <legend>상단 배너</legend>
+                <p class="story-admin-fieldset-desc">공개 페이지 최상단에 표시되는 단체 배너 이미지입니다.</p>
+                <div class="story-admin-field">
+                  <label for="story-heroImageUrl">상단 배너 이미지 URL</label>
+                  <input type="url" id="story-heroImageUrl" placeholder="https://assets.gritedu.kr/public/story/banner_main.webp" autocomplete="off">
+                  <p class="story-admin-field-hint">assets.gritedu.kr/public/story/ 경로의 jpg, png, webp URL을 입력하세요.</p>
+                </div>
+              </fieldset>
+
+              <fieldset class="story-admin-fieldset">
+                <legend>대표 인사말</legend>
+                <p class="story-admin-fieldset-desc">제목, 부제, 본문, 서명이 배너 아래 메인 텍스트 영역에 표시됩니다.</p>
+                <div class="story-admin-field-row story-admin-field-row--2">
+                  <div class="story-admin-field">
+                    <label for="story-greetingTitle">제목</label>
+                    <input type="text" id="story-greetingTitle" autocomplete="off">
+                  </div>
+                  <div class="story-admin-field">
+                    <label for="story-greetingSubtitle">부제</label>
+                    <input type="text" id="story-greetingSubtitle" autocomplete="off">
+                  </div>
+                </div>
+                <div class="story-admin-field story-admin-field--body">
+                  <label for="story-greetingBody">본문</label>
+                  <textarea id="story-greetingBody" rows="16"></textarea>
+                  <p class="story-admin-field-hint">줄바꿈은 공개 페이지에 그대로 반영됩니다.</p>
+                </div>
+                <div class="story-admin-field-row story-admin-field-row--2">
+                  <div class="story-admin-field">
+                    <label for="story-signatureTitle">회사명 / 직함</label>
+                    <input type="text" id="story-signatureTitle" autocomplete="off" placeholder="그릿에듀 대표이사">
+                  </div>
+                  <div class="story-admin-field">
+                    <label for="story-signatureName">대표명</label>
+                    <input type="text" id="story-signatureName" autocomplete="off" placeholder="유홍석">
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset class="story-admin-fieldset">
+                <legend>대표 사진</legend>
+                <p class="story-admin-fieldset-desc">대표 인사말 오른쪽(모바일에서는 본문 아래)에 표시됩니다.</p>
+                <div class="story-admin-field">
+                  <label for="story-ceoImageUrl">대표 사진 URL</label>
+                  <input type="url" id="story-ceoImageUrl" placeholder="https://assets.gritedu.kr/public/story/ceo-yhs.webp" autocomplete="off">
+                  <p class="story-admin-field-hint">assets.gritedu.kr/public/story/ 경로의 jpg, png, webp URL을 입력하세요.</p>
+                </div>
+              </fieldset>
+
+              <fieldset class="story-admin-fieldset">
+                <legend>하단 GRIT 문구</legend>
+                <p class="story-admin-fieldset-desc">대표 인사말 아래 G/R/I/T 설명과 마지막 강조 문구입니다.</p>
+                <div class="story-grit-admin-list">
+                  <div class="story-grit-admin-row">
+                    <span class="story-grit-admin-label">G Growth</span>
+                    <input type="text" id="story-grit-0-title" autocomplete="off" aria-label="G Growth 설명">
+                  </div>
+                  <div class="story-grit-admin-row">
+                    <span class="story-grit-admin-label">R Resilience</span>
+                    <input type="text" id="story-grit-1-title" autocomplete="off" aria-label="R Resilience 설명">
+                  </div>
+                  <div class="story-grit-admin-row">
+                    <span class="story-grit-admin-label">I Integrity</span>
+                    <input type="text" id="story-grit-2-title" autocomplete="off" aria-label="I Integrity 설명">
+                  </div>
+                  <div class="story-grit-admin-row">
+                    <span class="story-grit-admin-label">T Tenacity</span>
+                    <input type="text" id="story-grit-3-title" autocomplete="off" aria-label="T Tenacity 설명">
+                  </div>
+                </div>
+                <div class="story-admin-field-row story-admin-field-row--2">
+                  <div class="story-admin-field">
+                    <label for="story-closingLine1">마지막 멘트 1줄</label>
+                    <input type="text" id="story-closingLine1" autocomplete="off" placeholder="꾸준히 하는 아이가 결국 끝까지 해냅니다.">
+                  </div>
+                  <div class="story-admin-field">
+                    <label for="story-closingLine2">마지막 멘트 2줄</label>
+                    <input type="text" id="story-closingLine2" autocomplete="off" placeholder="그릿에듀는 그 힘을 길러냅니다.">
+                  </div>
+                </div>
+              </fieldset>
+            </form>
+          </div>
+          <p class="story-admin-note">저장 버튼을 눌러야 공개 페이지에 반영됩니다.</p>
+        </div>
+      </div>
+
+      <!-- 상담문의 -->
+      <div id="submenu-contact" class="submenu-content">
+        <div class="content-editor-wrapper">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <h2 style="margin:0;">상담문의</h2>
+            <button class="btn primary" onclick="saveContactContent()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>저장
+            </button>
+          </div>
+          <div class="manager-split">
+            <div class="manager-panel">
+              <div class="editor-panel" style="overflow-y:auto;max-height:70vh;">
+                <div id="contact-editor-fields" style="display:flex;flex-direction:column;gap:8px;">
+                  <!-- 편집 필드들이 여기에 동적으로 생성됩니다 -->
+                  <div class="muted" style="text-align:center;padding:40px;">로딩 중...</div>
+                </div>
+              </div>
+            </div>
+            <div class="preview-panel">
+              <h3 style="margin:0 0 12px 0;font-size:16px;">실시간 미리보기</h3>
+              <div id="contactPreview" class="content-preview" style="padding:16px;background:var(--bg);border-radius:10px;border:1px solid var(--border);max-height:70vh;overflow:auto;">
+                <p class="muted" style="margin:0;">미리보기가 여기에 표시됩니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 카카오톡 채널 -->
+      <div id="submenu-kakao-channel" class="submenu-content">
+        <div class="content-editor-wrapper">
+          <div class="kakao-channel-admin-head">
+            <div>
+              <h2>카카오톡 채널</h2>
+              <p class="muted">공개 페이지 우측 하단에 표시할 카카오톡 채널 링크 버튼을 관리합니다.</p>
+            </div>
+            <button class="btn primary" type="button" onclick="saveKakaoChannelSettings()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>저장
+            </button>
+          </div>
+
+          <div class="manager-split">
+            <div class="manager-panel">
+              <form class="kakao-channel-admin-form">
+                <div class="form-group">
+                  <label class="kakao-channel-toggle">
+                    <input type="checkbox" id="kakaoChannelEnabled" onchange="updateKakaoChannelPreview()">
+                    카카오톡 채널 버튼 사용
+                  </label>
+                </div>
+
+                <div class="form-group">
+                  <label for="kakaoChannelUrl">카카오톡 채널 URL</label>
+                  <input type="url" id="kakaoChannelUrl" placeholder="https://pf.kakao.com/_WdXgXX/chat" autocomplete="off" oninput="updateKakaoChannelPreview()">
+                  <p class="note">https://pf.kakao.com/... 형식만 입력하세요. 채팅으로 바로 연결하려면 /chat이 포함된 URL을 입력할 수 있습니다.</p>
+                </div>
+
+                <div class="form-group">
+                  <label for="kakaoChannelButtonLabel">버튼 문구</label>
+                  <input type="text" id="kakaoChannelButtonLabel" placeholder="카톡 상담" autocomplete="off" oninput="updateKakaoChannelPreview()">
+                  <p class="note">비워두면 공개 페이지 버튼은 SVG 아이콘만 표시됩니다.</p>
+                </div>
+
+                <div class="form-group">
+                  <label>노출 페이지 선택</label>
+                  <div class="kakao-channel-page-grid">
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-home" onchange="updateKakaoChannelPreview()"> 메인 홈</label>
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-story" onchange="updateKakaoChannelPreview()"> 학원 안내</label>
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-schedule" onchange="updateKakaoChannelPreview()"> 시간표</label>
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-contact" onchange="updateKakaoChannelPreview()"> 상담 문의</label>
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-instructors" onchange="updateKakaoChannelPreview()"> 강사진</label>
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-courses" onchange="updateKakaoChannelPreview()"> 모든 강좌</label>
+                  </div>
+                </div>
+
+                <div class="kakao-channel-admin-note">
+                  <p>카카오톡 SDK를 사용하지 않고 단순 링크로 연결됩니다.</p>
+                  <p>사업자 인증, 월렛, 매장 연결과는 별개로 동작합니다.</p>
+                </div>
+              </form>
+            </div>
+
+            <div class="preview-panel">
+              <h3 style="margin:0 0 12px 0;font-size:16px;">설정 미리보기</h3>
+              <div id="kakaoChannelPreview" class="content-preview kakao-channel-admin-preview">
+                <p class="muted" style="margin:0;">카카오톡 채널 설정을 불러오는 중입니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 강사진 탭 -->
+    <div id="tab-instructors" class="tab-content">
+      <div class="content-manager">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <h2 style="margin:0;">강사진 순서</h2>
+            <div style="display:flex;gap:4px;background:var(--hover);padding:4px;border-radius:6px;">
+              <button id="instructorPageFilterHome" class="btn sm" onclick="switchInstructorPageType('home')" style="min-width:80px;">메인홈 순서</button>
+              <button id="instructorPageFilterInstructors" class="btn sm" onclick="switchInstructorPageType('instructors')" style="min-width:80px;">강사진 순서</button>
+            </div>
+          </div>
+          <div>
+            <button class="btn sm" onclick="sortInstructors('alpha')">가나다순</button>
+            <button class="btn sm" onclick="sortInstructors('subject')">과목순</button>
+            <button class="btn sm" onclick="sortInstructors('newest')">최신순</button>
+            <button class="btn primary" onclick="saveInstructorOrder()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>순서 저장
+            </button>
+            <button class="btn" onclick="cleanupInstructorOrder()" title="존재하지 않는 ID를 순서에서 자동으로 제거" style="display:flex;align-items:center;gap:6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>순서 정리
+            </button>
+          </div>
+        </div>
+        
+        <div class="manager-split">
+          <div class="manager-panel">
+            <h3 style="margin:0 0 12px 0;font-size:16px;">강사진 목록 (드래그로 순서 변경)</h3>
+            <ul id="instructorOrderList" class="sortable-list"></ul>
+            <p class="note" style="margin-top:12px;font-size:12px;color:var(--muted);">
+              ☰ 아이콘을 드래그하여 순서를 변경할 수 있습니다.
+            </p>
+          </div>
+          <div class="preview-panel">
+            <h3 style="margin:0 0 12px 0;font-size:16px;">미리보기</h3>
+            <div id="instructorPreview" class="preview-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D-DAY 설정 탭 -->
+    <div id="tab-dday" class="tab-content">
+      <div class="content-manager">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h2 style="margin:0;">D-DAY 설정</h2>
+            <p class="muted" style="margin:6px 0 0;">수능일을 저장하면 메인홈과 내 강의실에서 자동으로 남은 날짜를 계산합니다.</p>
+          </div>
+          <button class="btn primary" onclick="saveDdaySettings()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>저장
+          </button>
+        </div>
+
+        <div class="manager-split">
+          <div class="manager-panel">
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="ddayEnabled" onchange="updateDdayPreview()">
+                D-DAY 표시
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="ddayTitle">시험명</label>
+              <input type="text" id="ddayTitle" placeholder="2027학년도 수능" oninput="updateDdayPreview()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            </div>
+            <div class="form-group">
+              <label for="ddayTargetDate">시험일 <span class="required">*</span></label>
+              <input type="date" id="ddayTargetDate" onchange="updateDdayPreview()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            </div>
+            <div class="form-group">
+              <label style="display:block;margin-bottom:8px;">표시 위치</label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <input type="checkbox" id="ddayShowHome" onchange="updateDdayPreview()">
+                메인홈 히어로 문구 아래
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="ddayShowDashboard" onchange="updateDdayPreview()">
+                내 강의실 환영 인사 아래
+              </label>
+            </div>
+          </div>
+          <div class="preview-panel">
+            <h3 style="margin:0 0 12px 0;font-size:16px;">미리보기</h3>
+            <div id="ddayPreview" style="padding:20px;background:var(--bg);border:1px solid var(--border);border-radius:12px;">
+              <p class="muted" style="margin:0;">D-DAY 설정을 불러오는 중입니다.</p>
+            </div>
+            <p class="note" style="margin-top:12px;font-size:12px;color:var(--muted);">
+              날짜 계산은 한국 시간 기준으로 처리됩니다. 시험일 당일에는 D-Day로 표시됩니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-footer" class="tab-content">
+      <div class="content-manager">
+        <div class="manager-panel" style="max-width:860px;">
+          <h2 style="margin-top:0;">푸터 정보 관리</h2>
+          <p class="muted">사업자 정보와 SNS 링크를 모든 페이지 푸터에 공통 적용합니다.</p>
+          <form id="footerSettingsForm" class="form-grid">
+            <div class="form-group form-full"><label for="footerSettingCompanyName">사업자명</label><input id="footerSettingCompanyName" required></div>
+            <div class="form-group form-half"><label for="footerSettingBusinessNumber">사업자번호</label><input id="footerSettingBusinessNumber" required></div>
+            <div class="form-group form-half"><label for="footerSettingRepresentative">대표자명</label><input id="footerSettingRepresentative" required></div>
+            <div class="form-group form-half"><label for="footerSettingPhone">대표전화</label><input id="footerSettingPhone" required></div>
+            <div class="form-group form-full"><label for="footerSettingAddress">주소</label><input id="footerSettingAddress" required></div>
+            <div class="form-group form-full"><label for="footerSettingInstagram">인스타그램 URL</label><input id="footerSettingInstagram" type="url"></div>
+            <div class="form-group form-full"><label for="footerSettingYoutube">유튜브 URL</label><input id="footerSettingYoutube" type="url"></div>
+            <div class="form-group form-full"><label for="footerSettingBlog">블로그 URL</label><input id="footerSettingBlog" type="url"></div>
+            <div class="form-group form-full"><button type="submit" class="btn primary">푸터 정보 저장</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="content-manager tuition-image-admin" style="margin-top:20px;">
+        <div class="tuition-image-admin__head">
+          <div>
+            <h2>학원정보·교습비·환불규정 이미지</h2>
+            <p class="muted">R2 <code>public/footer/</code>에 올린 이미지 URL을 여러 개 등록하고 공개 페이지 표시 순서를 관리합니다.</p>
+          </div>
+          <button id="saveTuitionImages" class="btn primary" type="button">변경사항 저장</button>
+        </div>
+        <div id="tuitionImageSections" class="tuition-image-sections"></div>
+        <p id="tuitionImageUploadStatus" class="muted" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <!-- Toast 메시지 -->
+    <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:100000;min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
+  </main>
+
+  <div data-include="footer"></div>
+
+  
+</body>
+</html>
+

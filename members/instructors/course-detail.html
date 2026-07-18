@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <title>그릿에듀 | 강좌 상세</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+<script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/instructor-course-detail.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body class="instructor-course-detail-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <div class="dash-back">
+      <a href="/members/instructors/dashboard.html" class="btn sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        강사 LMS로 돌아가기
+      </a>
+    </div>
+
+    <section class="grit-section" id="courseHeader">
+      <div class="course-label" id="courseSubject">과목</div>
+      <h1 class="page-title" id="courseTitle">강좌명</h1>
+      <div class="muted" id="courseMeta">로딩 중...</div>
+    </section>
+
+    <section class="grit-section instructor-course-content-section" id="courseContentSection">
+      <h2 class="instructor-section-title">강의 정보</h2>
+      <div id="courseContentPanel" class="instructor-course-content-panel">
+        <p class="muted">강의 영상을 불러오는 중입니다...</p>
+      </div>
+    </section>
+
+    <section class="grit-section instructor-enrollments-section" id="enrollmentsSection">
+      <div class="instructor-section-toolbar instructor-section-toolbar--row" id="enrollmentsToolbar">
+        <h2 class="instructor-section-title">수강생</h2>
+        <div class="instructor-toolbar-controls">
+          <input type="search" id="courseDetailEnrollmentSearch" class="instructor-search-input" placeholder="이름, 학교, 학년, 전화번호 검색" aria-label="수강생 검색">
+        </div>
+      </div>
+      <div class="instructor-table-wrap">
+        <table class="progress-table instructor-data-table">
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>학교</th>
+              <th>학년</th>
+              <th>전화번호</th>
+              <th>수강신청일</th>
+            </tr>
+          </thead>
+          <tbody id="enrollmentsTableBody"></tbody>
+        </table>
+      </div>
+      <div id="courseDetailEnrollmentsPagination" class="instructor-pagination"></div>
+    </section>
+  </main>
+
+  <div data-include="footer"></div>
+</body>
+</html>
