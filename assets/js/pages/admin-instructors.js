@@ -5,7 +5,7 @@ import {
   doc, getDoc, setDoc, serverTimestamp, deleteField,
   collection, query, where, getDocs, getDocsFromServer, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 import { escapeHtml } from "/assets/js/utils/html.js";
 import { setAdminRefreshButtonState } from "/assets/js/utils/admin-refresh.js";
 import {

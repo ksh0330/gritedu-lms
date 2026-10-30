@@ -455,7 +455,15 @@ async function assertSignupTypeEnabled(signupType) {
   }
 }
 
-async function enforceSignupSendRateLimit({email, ip}) {
+// Evaluates the rolling email/IP send window and returns the accepted-send
+// event for the caller to write. Pass a transaction-bound readQuery so the
+// evaluation and the event write commit together.
+async function checkSignupSendRateLimit({
+  email,
+  ip,
+  now,
+  readQuery = (query) => query.get(),
+}) {
   const normalizedEmail = String(email || "").toLowerCase().trim();
   const normalizedIp = String(ip || "unknown").trim() || "unknown";
 
@@ -463,20 +471,19 @@ async function enforceSignupSendRateLimit({email, ip}) {
     throw new functions.https.HttpsError("invalid-argument", "email 필드는 필수입니다.");
   }
 
-  const now = admin.firestore.Timestamp.now();
   const signupAttemptsRef = db.collection("signupAttempts");
 
   // Use single-field queries and filter the rolling window in memory to
   // avoid requiring composite indexes during signup.
-  const emailAttempts = await signupAttemptsRef
-    .where("email", "==", normalizedEmail)
-    .get();
+  const emailAttempts = await readQuery(
+    signupAttemptsRef.where("email", "==", normalizedEmail)
+  );
 
   let ipAttempts = {docs: []};
   if (normalizedIp !== "unknown") {
-    ipAttempts = await signupAttemptsRef
-      .where("ip", "==", normalizedIp)
-      .get();
+    ipAttempts = await readQuery(
+      signupAttemptsRef.where("ip", "==", normalizedIp)
+    );
   }
 
   const decision = evaluateSignupRateLimit({
@@ -506,14 +513,14 @@ async function enforceSignupSendRateLimit({email, ip}) {
     );
   }
 
-  await signupAttemptsRef.add({
+  return {
     email: normalizedEmail,
     ip: normalizedIp,
     timestamp: now,
     cleanupAt: admin.firestore.Timestamp.fromMillis(
       now.toMillis() + SIGNUP_RATE_LIMIT_POLICY.attemptRetentionMs
     ),
-  });
+  };
 }
 
 exports.linkMemberChild = functions.https.onCall(async (data, context) => {
@@ -812,16 +819,11 @@ exports.sendVerificationCode = functions
       await assertSignupTypeEnabled(signupType);
       currentStage = "signup-settings-check-passed";
 
+      const requestIp = resolveRequestIp(context);
+
       currentStage = "signup-email-availability-check-start";
       await assertSignupEmailAvailable(rawEmail, email);
       currentStage = "signup-email-availability-check-passed";
-
-      currentStage = "rate-limit-check-start";
-      await enforceSignupSendRateLimit({
-        email,
-        ip: resolveRequestIp(context),
-      });
-      currentStage = "rate-limit-check-passed";
 
       const colRef = db.collection("emailVerifications");
       const verificationDocRef = colRef.doc(email);
@@ -853,12 +855,26 @@ exports.sendVerificationCode = functions
             }
           }
 
+          // Evaluate once after cooldown. IP concurrency still requires real
+          // Firestore verification; mocked serialization does not prove it.
+          const acceptedAttempt = await checkSignupSendRateLimit({
+            email,
+            ip: requestIp,
+            now,
+            readQuery: (query) => transaction.get(query),
+          });
+
           const nextCode = generateVerificationCode(existingData.code);
           const expiresAt = admin.firestore.Timestamp.fromMillis(
             now.toMillis() + EMAIL_VERIFICATION_POLICY.codeTtlMs
           );
           const cleanupAt = admin.firestore.Timestamp.fromMillis(
             expiresAt.toMillis() + EMAIL_VERIFICATION_POLICY.cleanupGraceMs
+          );
+          // Record the send only after the cooldown accepted it.
+          transaction.create(
+            db.collection("signupAttempts").doc(),
+            acceptedAttempt
           );
           transaction.set(verificationDocRef, {
             email,

@@ -111,7 +111,7 @@ test("student list has exactly one visible load action in each state", () => {
   const body = code.slice(code.indexOf("function setStudentStatusButtonsLoading("), code.indexOf("function hasStudentSummary("));
   const buttons = Object.fromEntries(["#loadStudentsStatus", "#refreshBtn", "#dlStudents"].map(id => [id, {hidden:false,disabled:false,textContent:""}]));
   const context = {
-    $: id => buttons[id], hasLoadedStudentStatus: false,
+    $: id => buttons[id], hasLoadedStudentStatus: false, filteredStudents: [],
     setAdminRefreshButtonState(button, loading, {disabledWhenReady}) { button.disabled = loading || disabledWhenReady; }
   };
   vm.createContext(context);
@@ -152,4 +152,18 @@ test("student detail Escape closes and restores its opener's focus", () => {
   assert.equal(prevented, true);
   assert.equal(modal.style.display, "none");
   assert.equal(focused, true);
+});
+
+
+test("legacy session dates remain plain text and are escaped only in table HTML", () => {
+  const code = source("assets/js/pages/admin-offline-classes.js");
+  const start = code.indexOf("function formatSessionDateDisplay(");
+  const end = code.indexOf("function sortSessions(", start);
+  const format = vm.runInNewContext(`(${code.slice(start, end).trim()})`, {parseSessionDateValue: () => 0});
+  for (const raw of ['TBD "A"', "<img src=x onerror=alert(1)>", "A & B"]) {
+    assert.equal(format(raw), raw);
+  }
+  assert.equal(format("2026-10-30"), "2026. 10. 30.");
+  assert.equal(format(""), "-");
+  assert.match(code, /<td>\$\{escapeHtml\(formatSessionDateDisplay\(row.sessionDate\)\)\}<\/td>/);
 });

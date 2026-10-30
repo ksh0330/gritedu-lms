@@ -18,7 +18,7 @@ import {
 
 const FIRESTORE_BATCH_LIMIT = 500;
 import { escapeHtml } from "/assets/js/utils/html.js";
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 import { adminXlsxFilename, writeAdminXlsx } from "/assets/js/utils/admin-xlsx.js";
 import { fetchExportDocuments, fetchScopedExportRows } from "/assets/js/utils/admin-export-scope.js";
 import { showAdminToast } from "/assets/js/utils/admin-toast.js";
@@ -2196,7 +2196,7 @@ function formatSessionDateDisplay(value) {
     return `${y}. ${Number(m)}. ${Number(d)}.`;
   }
   const t = parseSessionDateValue(value);
-  if (!t) return escapeHtml(raw);
+  if (!t) return raw;
   return new Date(t).toLocaleDateString("ko-KR");
 }
 
@@ -2362,7 +2362,7 @@ function renderSessionsTable() {
       return `
       <tr data-session-id="${escapeHtml(row.id)}">
         <td>${escapeHtml(String(row.sessionNo ?? "-"))}</td>
-        <td>${formatSessionDateDisplay(row.sessionDate)}</td>
+        <td>${escapeHtml(formatSessionDateDisplay(row.sessionDate))}</td>
         <td>${escapeHtml(String(row.title || "-"))}</td>
         <td>${sessionVideoCell(row)}</td>
         <td>${sessionStatusBadge(row.status)}</td>

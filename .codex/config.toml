@@ -1,0 +1,26 @@
+# Project-level Codex config (loaded only after this project is trusted).
+# Interactive default = read-only review. run-fix.ps1 overrides the sandbox for fixes.
+
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"      # low | medium | high | xhigh | max
+sandbox_mode = "read-only"
+approval_policy = "on-request"
+
+# codex -p audit   : independent audit / cross-verify
+[profiles.audit]
+model = "gpt-6.1-sol"
+model_reasoning_effort = "xhigh"
+sandbox_mode = "read-only"
+
+# codex -p verify  : cheaper second-pass verification
+[profiles.verify]
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+
+# codex -p fix     : implement one approved work package
+[profiles.fix]
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"

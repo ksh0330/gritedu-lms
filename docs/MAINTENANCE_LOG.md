@@ -1,6 +1,6 @@
 # Maintenance Log
 
-Last updated: 2026-10-22 (Asia/Seoul)
+Last updated: 2026-10-30 (Asia/Seoul)
 
 ## Purpose and maintenance rules
 
@@ -595,3 +595,95 @@ All required checks passed, so Phase 2A moved from `Deployed` to `Verified`. Thi
 - **Local evidence:** Focused export, administrator status, preview, instructor search, completion, and site-order tests passed 29/29. Existing and new SheetJS XLSX write/readback checks passed. `npm run ready:deploy` passed on final local build `20261022-173206`; `git diff --check` passed. No synthetic QA HTML was created. Details are in `docs/ROLE_TEST_PLAN.md` §24. Production verification of this patch and Cloudflare deployment are pending.
 - **Deployment:** `d6a82026` and `f959c791` were fast-forwarded onto `main` and pushed without force. Cloudflare production `/version.json` changed from `20261022-080637` to `20261022-083348` (`generatedAt: 2026-10-22T08:33:53.583Z`). The deployed `admin-toast.js`, course/class/site/story/popup/timetable scripts, and `main.css` matched the locally verified build byte-for-byte after normalizing only the generated build-version string in script import URLs. This confirms the scoped static assets are served; it does not prove authenticated UI behavior.
 - **Status:** Static change `Implemented` and `Deployed`. The new message timing, actual XLSX files, and modal wording still require an authenticated administrator production recheck; those paths are not marked `Verified` from local tests or HTTP alone. No Firebase or R2 deployment occurred.
+
+### 2026-10-30 — Administrator account list and shared HTML escaping (review G1: WP-01, WP-02)
+
+- **Date and timezone:** 2026-10-30, Asia/Seoul. Branch `fix/urgent-2026-10-30` on `dee6695`; no commit, push, deployment, Emulator run, or production read/write.
+- **Phase or task:** Multi-agent review RUN 20261030-1153, WP-01 (F-001, P0) and WP-02 (F-003, P1). Details and commit split: `.review/runs/20261030-1153/FIX_SUMMARY.md`.
+- **Original problem:** `admin-user-add.js` `renderUsers` inserted `name`, `email`, and `note` into the account table through `innerHTML` without escaping. Students can write their own `name`/`email` and set `note` at signup, and members can write `name` (`firestore.rules:287-293`, `:659-664`, `:678-682`), so a self-registered account could run script in an administrator session. Separately, `assets/js/utils/html.js` `escapeHtml` and six local copies used `textContent`→`innerHTML`, which leaves `"` and `'` unescaped inside quoted attributes.
+- **Decision:** Escape every interpolated account-row cell with the file's existing quote-safe `escapeHtml`. Render inline `onclick` arguments (`uid`, `instructorId`, `role`) only when they match `^[A-Za-z0-9_-]+$`; otherwise the same button renders `disabled`. Rules restrict these arguments to document IDs, Auth UIDs, `inst_<ms>` IDs, and fixed role strings, so this is defense in depth. Replace the quote-unsafe implementations with five-character replacement (`& < > " '`) while keeping each copy's empty-value contract (`!text` → `""` for `html.js`/`error-handler.js`; `== null` → `""` for the page copies). No consolidation refactor and no DOM, handler-name, URL, event, or data-contract change.
+- **Affected code or collections:** `assets/js/pages/admin-user-add.js`, `assets/js/utils/html.js`, `assets/js/utils/error-handler.js`, `assets/js/pages/course-detail.js`, `courses.js`, `member-dashboard.js`, `student-dashboard/context.js`, `instructors.js` (`escapeFilterHtml`); new `tests/admin-user-add-render.test.js`, `tests/html-escape.test.js`. No Firestore read, write, or Rules change.
+- **Tests:** New tests 20/20 pass: markup and quote injection render as text, normal rows keep the previous handler markup, out-of-charset IDs disable the button, and each escape copy decodes back to the original text and matches the prior text-node serialization. A one-off comparison of the HEAD and patched `renderUsers` on eight benign rows covering every role/status branch produced byte-identical HTML. `npm run lint`, `npm --prefix functions test` (29/29), `npm --prefix functions run lint`, `check:rules:strict`, `check:functions:strict`, `build:strict`, `verify:strict`, and `git diff --check` passed. Root `node --test "tests/*.test.js"`: 110 passed, 8 failed, 1 skipped; the 8 failures are the pre-existing baseline (7 Emulator `ECONNREFUSED 127.0.0.1:8080`, 1 `qa-admin-online-ui` fixture defect F-030). On Node 24, `node --test tests/` fails to start because the directory is resolved as a module; the glob form was used.
+- **Deployment type:** Static Cloudflare Pages deployment only; no Rules, Functions, indexes, or data change.
+- **Current status:** `Implemented`, not `Deployed` or production `Verified`.
+- **Owner verification:** Before deployment, run a count-only read of `students`/`members` profiles whose `name`, `email`, or `note` contain `<`, `>`, `"`, or `'`; if any exist, review `admins` document count and recent creation as an incident. After deployment, administrator smoke of the account list, search, paging, sort, and cleanup preview; role smoke of student, member, parent, instructor, and administrator screens with a title containing quotes.
+- **Rollback:** Revert the static commit. No data rollback applies.
+- **Remaining follow-up:** A student `name` stored as a number still throws in account search `filterUsers` (F-012, WP-22). Administrator-authored templates remain under F-017 (WP-13). Legacy document IDs outside `[A-Za-z0-9_-]`, if any exist, would now show a disabled cleanup button.
+
+### 2026-10-30 — Pinned SheetJS build for administrator exports (review G2: WP-03 pin only)
+
+- **Date and timezone:** 2026-10-30, Asia/Seoul. Same branch and base; no commit, push, or deployment.
+- **Phase or task:** RUN 20261030-1153, WP-03 (F-002, P1), version pin only.
+- **Original problem:** Six administrator page modules statically imported `https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs`, a floating third-party module evaluated in administrator sessions.
+- **Decision:** Pin the six imports to `https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs`. Evidence from 2026-10-30: `xlsx-latest/package/package.json` reported version `0.20.3`, and the `xlsx-latest` and `xlsx-0.20.3` `xlsx.mjs` files both returned HTTP 200 with identical SHA-256 `1a0fb062ee9781b13f6687371b202aaefc53b6ce55b530c027e01f9c087b77db` (1,008,308 bytes). Production therefore keeps the exact code it already loads. Lazy loading and vendoring were not done in this task.
+- **Affected code or collections:** `assets/js/pages/admin-courses.js`, `admin-instructors.js`, `admin-members.js`, `admin-offline-classes.js`, `admin-students.js`, `admin-user-add.js` (one import line each); `tests/admin-exports.test.js` gains a pin contract. No Firestore change.
+- **Tests:** `tests/admin-exports.test.js` 13/13 pass. Strict build output has 0 `xlsx-latest` references and 6 pinned references. Lint, Functions tests/lint, Rules/Functions strict checks, strict build/verify, and `git diff --check` passed. Root tests: 111 passed, with the same 8 baseline failures.
+- **Deployment type:** Static Cloudflare Pages deployment only.
+- **Current status:** `Implemented`, not `Deployed` or production `Verified`.
+- **Owner verification:** After deployment, an administrator opens the six pages and runs each XLSX export once.
+- **Rollback:** Revert the static commit.
+- **Remaining follow-up:** The third-party CDN remains a trust and availability dependency: a CDN outage still fails module evaluation for the six pages. WP-03 lazy `import()` and optional vendoring remain open. `docs/audits/VERSION_COVERAGE_AUDIT.md:64` ("Provider URL pinned") is now accurate for SheetJS.
+
+### 2026-10-30 — Signup send limiter: accepted-send event inside the verification transaction (review G3: WP-04, WP-24 read-only part)
+
+- **Date and timezone:** 2026-10-30, Asia/Seoul. Same branch and base; no commit, push, Functions deployment, Emulator run, or production read/write.
+- **Phase or task:** RUN 20261030-1153, WP-04 (F-004 signup part, F-005) and the read-only part of WP-24 (F-006).
+- **Original problem:** `sendVerificationCode` wrote a `signupAttempts` event in `enforceSignupSendRateLimit` before the 60-second cooldown transaction, so cooldown-rejected retries consumed the 5/hour email quota. The window count and the event write were separate operations, so concurrent requests at a threshold could all pass (the existing Conditional risk recorded on 2026-08-24). `assertSignupEmailAvailable` ran before any limiter evaluation.
+- **Decision:** `checkSignupSendRateLimit` now only evaluates and returns the accepted-send event. The handler runs it read-only before the availability check. Inside the existing verification transaction, the cooldown check runs first, then the window is re-evaluated through `transaction.get(query)`. The event is created with `transaction.create(db.collection("signupAttempts").doc(), …)` and commits together with the verification document.
+- **Concurrency scope:** Concurrent sends for the same email were already serialized by the `emailVerifications/{email}` document and the cooldown. The new in-transaction re-evaluation targets concurrent sends with different emails from one IP. That protection relies on Firestore's documented "serializable isolation of transactions"; query-range locking is not stated explicitly in the official pages checked on 2026-10-30, and the SDK documents locks on returned documents. Treat the IP dimension as best-effort and unverified.
+  - If range locks apply, simultaneous sends from one shared network contend: Firestore retries with backoff up to 5 attempts, which adds latency. Exhausted retries return the existing `internal` "인증번호 저장 중 오류가 발생했습니다." message.
+  - If range locks do not apply, the IP race is unchanged from before.
+  - Emulator locking differs from production, so the Emulator cannot settle this. Unchanged: email 5/hour, server-observed IP 30/hour, 60-second cooldown, event fields `email`/`ip`/`timestamp`/`cleanupAt`, one-day cleanupAt, Auto ID, user messages, error codes and details, mail-failure invalidation, and the four exports. Duplicate (`already-exists`) rejections are still not recorded. No new collection, counter, index, or Function.
+- **Behavior change:**
+  - Cooldown-rejected retries no longer create events.
+  - A registered email whose email or IP window is already full now receives `resource-exhausted` instead of `already-exists`.
+  - A Firestore read failure in the in-transaction limiter now returns `internal` "인증번호 저장 중 오류가 발생했습니다." instead of `internal` "이메일 인증번호 발송 실패".
+- **Read cost:**
+  - An accepted send reads the email/IP window queries twice: once in the pre-check, and once per transaction attempt.
+  - Cooldown rejections read the window only in the pre-check. Because they no longer consume quota, repeated same-email calls inside the cooldown each pass the Auth and canonical duplicate checks.
+  - Registered-email probes gain the pre-check window reads.
+- **Affected code or collections:** `functions/index.js` (`sendVerificationCode`, limiter helper); new `functions/test/send-verification-code-limiter.test.js` (handler-level regression with in-process mocks of `firebase-admin`, `nodemailer`, and `dotenv`); two source-contract assertions updated in `tests/firestore-crud-improvements.test.js`. Collections: `signupAttempts`, `emailVerifications`.
+- **Tests:**
+  - `npm --prefix functions test` 36/36 and `npm --prefix functions run lint` passed.
+  - The new 7 cases pass 7/7 after the change. Against HEAD `index.js` they fail 5/7: the three targeted defects (cooldown retries consuming quota, two concurrent sends at IP 29 both accepted, a registered-email probe with a full window), plus two transactional-read-count assertions that HEAD cannot satisfy.
+  - The fake transaction rejects reads after writes and counts transactional query reads. In-memory mutations are each caught: a non-transactional window read inside the transaction, the limiter placed before the cooldown, and removal of the re-evaluation.
+  - Root lint, Rules/Functions strict checks, strict build/verify, and `git diff --check` passed. Root tests: 111 passed with the same 8 baseline failures.
+  - An independent read-only subagent reviewed the diff: approve with changes. The cooldown-first order, test hardening, and these notes were applied.
+  - Firestore Emulator parallel verification was not run because only Java 1.8 is installed.
+- **Deployment type:** Firebase Functions-only deployment of `sendVerificationCode`; no static, Rules, index, or data change.
+- **Current status:** `Implemented`, not `Deployed` or production `Verified`.
+- **Owner verification:** After a separately approved deployment, use a test identity:
+  - The first send succeeds, a resend within 60 seconds is rejected, a resend after 61 seconds succeeds, and signup completes.
+  - A count-only check confirms that one event exists per accepted send and none for the rejected resend.
+  - An existing-account email still shows the existing "already registered" message.
+  - From one network, send 2–3 different test emails at the same moment and record latency and any errors (shared-IP contention check).
+  - Logs contain no personal values.
+- **Rollback:** Redeploy the prior approved `sendVerificationCode` revision. Do not edit transient documents.
+- **Remaining follow-up:** While the window has room, registered-email probes are still unbounded and unrecorded. Recording them changes the `signupAttempts` contract and needs an owner decision (WP-24 step 2). Limiter reads remain unbounded by time range (F-007), and the child-link limiter race (WP-25) remains open.
+
+
+### 2026-10-30 — Codex urgent-fix review follow-up (supersedes G1/G3 details above)
+
+- **Phase or task:** Independent review of Claude's uncommitted urgent changes, followed by authorized corrections. Branch `fix/urgent-2026-10-30`; existing kit and user changes preserved.
+- **Original problem:** G1 disabled valid legacy IDs outside `[A-Za-z0-9_-]`. G3 read the same unbounded email/IP attempt histories both before availability lookup and in the transaction; registered-email probes gained extra reads without a true attempt limit. The serialized fake cannot establish production concurrency guarantees.
+- **Decision:** Preserve the original handler markup for common IDs; serialize other nonempty string IDs with JSON.stringify and then HTML attribute escaping. Remove the extra attempt pre-check; keep the cooldown-first transactional accepted-send record and one limiter evaluation per transaction attempt. WP-24 enumeration mitigation remains open, including when the window is full. No quota, schema, retention, export, UI layout, or service added.
+- **Affected code:** `admin-user-add.js`, `functions/index.js`, renderer/limiter regression tests, and the corresponding CRUD source assertion.
+- **Read cost:** Let E and I be the returned retained histories (queries remain unbounded). Successful or window-rejected requests read E+I once per transaction attempt, plus the verification document and unchanged settings/availability reads. Unknown IP skips I. Cooldown rejects and registered-email rejects do not query signupAttempts. Transaction retries may repeat reads; no hard per-request bound is claimed. Child-link limiter is unchanged.
+- **Tests:** `npm run ready:deploy` passed (one pre-existing unused-variable lint warning); Functions tests 36/36 passed. Root suite has the same eight failing cases: seven unavailable Firestore Emulator cases and the pre-existing filteredStudents fixture defect. Focused renderer tests 4/4 passed, including quotes, markup, Unicode/dotted IDs and callback argument round trips. Fake serial transaction test renamed to state its limited scope.
+- **Browser evidence:** Actual in-app browser, isolated localhost harness using the current production renderer/helper functions and synthetic rows. No Firebase/auth/mail modules, CSP connect-src none. Payload text, note title, legacy ID button enabled, shared escape round trip all PASS. Clicking legacy and hostile-looking ID buttons delivered exact string arguments to a stub; no actual cleanup action. This is a functional DOM check, not full authenticated-page smoke or visual design approval.
+- **Deployment type:** Static changes and sendVerificationCode are separate deployables. No Rules/index/data changes.
+- **Current status:** Implemented locally; not Deployed or production Verified.
+- **Owner verification:** Full role/account and XLSX browser smoke remains pending; actual signup-mail and shared-network latency/concurrency checks need separately authorized environment/account access. Special characters in profile text alone are not evidence of compromise; do not trigger automatic incident escalation or an unapproved full-collection scan.
+- **Rollback:** Revert the approved scoped code revision and redeploy only its affected target if deployment has occurred. No data rollback.
+- **Remaining follow-up:** Unbounded retained-history queries, unrecorded duplicate probes, production concurrency/locking, CDN availability and full UI smoke remain open. Earlier G1 disabled-ID, G3 pre-check/read-cost and full-window duplicate-error descriptions are superseded by this entry.
+
+
+### 2026-10-30 — Regression gate and non-deploying remote checkpoint
+
+- **Phase or task:** Owner requested urgent stabilization, regression review and remote backup without affecting the live site.
+- **Decision:** Deployment remains on hold. Local passing tests do not establish production safety. Do not merge/push these changes to the production branch or deploy Functions until full role/browser checks and the signup concurrency/latency risk are resolved or explicitly accepted.
+- **Corrections:** Session date formatter now returns plain text; its HTML table caller escapes it, while the textContent caller keeps literal quotes. The existing administrator QA fixture now initializes filteredStudents; production student behavior is unchanged.
+- **Tests:** npm run ready:deploy passed; Functions 36/36 passed; root suite 113 passed, 7 failed (Emulator unavailable), 1 skipped, total 121. Administrator QA 5/5 includes the date regression. git diff --check passed. Emulator failures are not treated as passing. No production DB test or data mutation.
+- **Remote scope:** Backup only on a separate work branch in ksh0330/gritedu-lms; main is untouched. Use the documented [CF-Pages-Skip] commit prefix to suppress Cloudflare Pages Git builds. GitHub showed no workflows/deployments/status contexts on the baseline; this alone is not evidence of no Cloudflare integration. Detailed local run reports remain ignored under .review/runs/.
+- **Current status:** Implemented locally; deployment explicitly withheld. Remote checkpoint is source backup, not Deployed/Verified.
+- **Remaining gates:** Full authenticated administrator/role UI and XLSX smoke; sendVerificationCode shared-IP retries/read amplification; existing offline-session authorization defect and other audited Rules issues remain unresolved. No automatic migration or unrelated Rules change is included.

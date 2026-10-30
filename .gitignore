@@ -89,3 +89,10 @@ _r2-upload/
 
 # 개인 Secret - 절대 커밋 금지
 md/appPW.md
+
+# multi-agent review kit (generated / personal)
+.claude/settings.local.json
+.claude/skills/
+
+# Local audit outputs and temporary browser probes (never publish)
+/.review/runs/

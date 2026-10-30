@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .agents/hooks/session-context.mjs",
+            "commandWindows": "node .agents\\hooks\\session-context.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .agents/hooks/guard.mjs",
+            "commandWindows": "node .agents\\hooks\\guard.mjs",
+            "timeout": 15,
+            "statusMessage": "grit-guard"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -10,7 +10,7 @@ import {
   getAuth, createUserWithEmailAndPassword, deleteUser as deleteAuthUser, setPersistence, inMemoryPersistence
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
 import { initializeApp as initApp2 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 import { adminXlsxFilename, writeAdminXlsx } from "/assets/js/utils/admin-xlsx.js";
 import { showAdminToast } from "/assets/js/utils/admin-toast.js";
 import { formatGrade, normalizeGrade } from "/assets/js/utils/grade.js";
@@ -1143,6 +1143,18 @@ function updateUserStats(users) {
   if (statAdmins) statAdmins.textContent = admins;
 }
 
+const SAFE_ACTION_ARG_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+// 기존 ID도 보존한다. JS 문자열 직렬화 후 HTML 속성 이스케이프를 적용한다.
+function buildActionClickAttr(handlerName, args) {
+  const isSafe = args.every((arg) => typeof arg === "string" && SAFE_ACTION_ARG_PATTERN.test(arg));
+  if (!isSafe) {
+    if (!args.every((arg) => typeof arg === "string" && arg.length > 0)) return "disabled";
+    return `onclick="${escapeHtml(`${handlerName}(${args.map((arg) => JSON.stringify(arg)).join(", ")})`)}"`;
+  }
+  return `onclick="${handlerName}(${args.map((arg) => `'${arg}'`).join(", ")})"`;
+}
+
 // 사용자 목록 렌더링 (페이지네이션 포함)
 function renderUsers(users) {
   // tbody를 다시 찾기 (탭이 숨겨져 있을 때를 대비)
@@ -1213,14 +1225,14 @@ function renderUsers(users) {
       ? `<span class="manual-management-badge">수동 관리</span>`
       : isMember
         ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">
-            <button class="btn warning sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="사이트 데이터 정리" style="display:flex;align-items:center;gap:4px;">
+            <button class="btn warning sm" ${buildActionClickAttr("deleteUser", [user.uid, user.role])} title="사이트 데이터 정리" style="display:flex;align-items:center;gap:4px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
             </button>
           </div>`
         : isInstructor
           ? (instructorStatus === "profileOnly"
             ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">
-                <button class="btn warning sm" onclick="deleteUser('${user.instructorId}', '${user.role}')" title="미연동 강사 프로필과 배정 데이터 정리" style="display:flex;align-items:center;gap:4px;">
+                <button class="btn warning sm" ${buildActionClickAttr("deleteUser", [user.instructorId, user.role])} title="미연동 강사 프로필과 배정 데이터 정리" style="display:flex;align-items:center;gap:4px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
                 </button>
               </div>`
@@ -1229,24 +1241,24 @@ function renderUsers(users) {
                 <button class="btn warning sm" type="button" disabled title="먼저 강사 계정을 미연동해야 데이터 정리를 할 수 있습니다." style="display:flex;align-items:center;gap:4px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
                 </button>
-                <button class="btn sm" onclick="unlinkInstructorAccount('${user.uid}')" title="강사 계정 연동 해제">강사 계정 미연동</button>
+                <button class="btn sm" ${buildActionClickAttr("unlinkInstructorAccount", [user.uid])} title="강사 계정 연동 해제">강사 계정 미연동</button>
               </div>`
-              : `<button class="btn warning sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="미연동 강사 데이터 정리">데이터 정리</button>`)
+              : `<button class="btn warning sm" ${buildActionClickAttr("deleteUser", [user.uid, user.role])} title="미연동 강사 데이터 정리">데이터 정리</button>`)
         : `<div style="display:flex;gap:4px;flex-wrap:wrap;">
-            <button class="btn warning sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="사이트 데이터 정리" style="display:flex;align-items:center;gap:4px;">
+            <button class="btn warning sm" ${buildActionClickAttr("deleteUser", [user.uid, user.role])} title="사이트 데이터 정리" style="display:flex;align-items:center;gap:4px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
             </button>
           </div>`;
 
     return `
       <tr>
-        <td><span class="pill">${roleText}</span>${instructorStatusHtml}</td>
-        <td>${user.name || '-'}</td>
-        <td>${user.email || '-'}</td>
+        <td><span class="pill">${escapeHtml(roleText)}</span>${instructorStatusHtml}</td>
+        <td>${escapeHtml(user.name || '-')}</td>
+        <td>${escapeHtml(user.email || '-')}</td>
         <td>${escapeHtml(schoolOrSubject)}</td>
-        <td>${user.role === 'student' ? formatGrade(user.grade) : (user.role === 'member' ? '-' : (user.childGrade || '-'))}</td>
-        <td>${createdAt}</td>
-        <td class="muted" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${user.note || ''}">${user.note || '-'}</td>
+        <td>${escapeHtml(user.role === 'student' ? formatGrade(user.grade) : (user.role === 'member' ? '-' : (user.childGrade || '-')))}</td>
+        <td>${escapeHtml(createdAt)}</td>
+        <td class="muted" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(user.note || '')}">${escapeHtml(user.note || '-')}</td>
         <td>${actionHtml}</td>
       </tr>
     `;

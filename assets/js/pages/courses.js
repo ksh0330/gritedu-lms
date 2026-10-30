@@ -69,9 +69,12 @@ const filterState = {
 
 function escapeHtml(value) {
   if (value == null) return "";
-  const div = document.createElement("div");
-  div.textContent = String(value);
-  return div.innerHTML;
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function toDisplayValue(value) {

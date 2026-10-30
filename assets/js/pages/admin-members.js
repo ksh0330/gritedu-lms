@@ -1,5 +1,5 @@
 import { db, requireRole } from "/assets/js/firebase-init.js";
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 import { adminXlsxFilename, writeAdminXlsx } from "/assets/js/utils/admin-xlsx.js";
 import { fetchExportDocuments, fetchScopedExportRows } from "/assets/js/utils/admin-export-scope.js";
 import { showAdminToast } from "/assets/js/utils/admin-toast.js";

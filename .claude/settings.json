@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run lint)",
+      "Bash(npm --prefix functions test:*)",
+      "Bash(npm --prefix functions run lint:*)",
+      "Bash(node --test:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./functions/.env)",
+      "Read(./functions/.env.*)",
+      "Read(**/serviceAccountKey*.json)",
+      "Read(./md/appPW.md)",
+      "Bash(firebase deploy:*)",
+      "Bash(git push:*)",
+      "Bash(wrangler:*)",
+      "Bash(gcloud:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .agents/hooks/session-context.mjs", "timeout": 15 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Read|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "node .agents/hooks/guard.mjs", "timeout": 15 }
+        ]
+      }
+    ]
+  }
+}

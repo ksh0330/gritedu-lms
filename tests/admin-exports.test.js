@@ -19,6 +19,18 @@ function exportClickHandler(file, buttonId, context) {
   return vm.runInNewContext(`(${callback})`, context);
 }
 
+test("administrator pages import one pinned SheetJS build instead of xlsx-latest", () => {
+  const pages = ["admin-courses.js", "admin-instructors.js", "admin-members.js", "admin-offline-classes.js", "admin-students.js", "admin-user-add.js"];
+  for (const page of pages) {
+    const imports = source(page).match(/https:\/\/cdn\.sheetjs\.com\/[^"']+/g) || [];
+    assert.deepEqual(imports, ["https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs"], page);
+  }
+  const pageDir = path.join(root, "assets/js/pages");
+  for (const name of fs.readdirSync(pageDir).filter((file) => file.endsWith(".js"))) {
+    assert.doesNotMatch(source(name), /xlsx-latest/, name);
+  }
+});
+
 function fakeButton() {
   return {
     disabled: false, dataset: {}, textContent: "엑셀", attributes: {},

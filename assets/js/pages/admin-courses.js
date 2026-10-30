@@ -20,7 +20,7 @@ import {
   documentId
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
-import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 import { adminXlsxFilename, writeAdminXlsx } from "/assets/js/utils/admin-xlsx.js";
 import { showAdminToast } from "/assets/js/utils/admin-toast.js";
 import { accountUidByInstructorId } from "/assets/js/utils/instructor-privacy.js";

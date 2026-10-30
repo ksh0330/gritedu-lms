@@ -136,7 +136,8 @@ test("offline class UI formats grade codes and supports multi-term student searc
 test("signup attempts do not accept client IP or user-agent telemetry", () => {
   const functionsSource = readSource("functions/index.js");
   const signupSource = readSource("assets/js/pages/signup-step2.js");
-  assert.match(functionsSource, /ip: resolveRequestIp\(context\)/);
+  assert.match(functionsSource, /const requestIp = resolveRequestIp\(context\);/);
+  assert.equal(functionsSource.match(/ip: requestIp,/g)?.length, 1);
   assert.doesNotMatch(functionsSource, /data\?\.ip/);
   assert.doesNotMatch(functionsSource, /resolveUserAgent/);
   assert.doesNotMatch(signupSource, /userAgent:/);
@@ -454,9 +455,12 @@ test("student and member cleanup preserve relationship consistency and refresh t
 test("signup attempts keep Auto IDs and the local one-day minimal writer", () => {
   const functionsSource = readSource("functions/index.js");
   const policySource = readSource("functions/signup-rate-limit-policy.js");
-  assert.match(functionsSource, /await signupAttemptsRef\.add\(\{/);
-  assert.match(functionsSource, /cleanupAt:[\s\S]*?SIGNUP_RATE_LIMIT_POLICY\.attemptRetentionMs/);
+  assert.match(functionsSource, /transaction\.create\(\s*db\.collection\("signupAttempts"\)\.doc\(\),\s*acceptedAttempt\s*\)/);
+  assert.match(functionsSource, /readQuery: \(query\) => transaction\.get\(query\)/);
+  assert.match(functionsSource, /return \{\s*email: normalizedEmail,\s*ip: normalizedIp,\s*timestamp: now,\s*cleanupAt:[^;]*?SIGNUP_RATE_LIMIT_POLICY\.attemptRetentionMs/);
   assert.doesNotMatch(functionsSource, /signupAttemptsRef\.doc\([^)]*(timestamp|Date\.now)/);
+  assert.doesNotMatch(functionsSource, /collection\("signupAttempts"\)\.doc\([^)]+\)/);
+  assert.doesNotMatch(functionsSource, /signupAttemptsRef\.add\(/);
   assert.doesNotMatch(functionsSource, /userAgent:/);
   assert.match(policySource, /attemptRetentionMs:\s*DAY_MS/);
 });
