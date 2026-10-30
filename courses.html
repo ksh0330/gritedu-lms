@@ -3,23 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>모든 강좌 | 그릿에듀학원</title>
+  <title>온라인 강좌 | 그릿에듀학원</title>
 
-  <meta name="description" content="그릿에듀학원의 국어, 영어, 수학, 과학, 수리논술 온라인 강좌와 오프라인 수업을 확인하세요.">
-  <link rel="canonical" href="https://gritedu.kr/courses.html">
+  <meta name="description" content="그릿에듀학원의 국어, 영어, 수학, 과학, 수리논술 온라인 강좌를 확인하세요. 중고등 내신과 입시를 위한 강좌를 안내하며, 오프라인 수업 일정은 시간표에서 확인할 수 있습니다.">
+  <meta name="keywords" content="그릿에듀,그릿에듀학원,그릿에듀 학원,온라인 강좌,온라인 강의,중등 강좌,고등 강좌,중고등 내신,입시 강좌,국어,영어,수학,과학,수리논술">
+  <link rel="canonical" href="https://gritedu.kr/courses">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:site_name" content="그릿에듀학원">
-  <meta property="og:title" content="모든 강좌 | 그릿에듀학원">
-  <meta property="og:description" content="그릿에듀학원의 국어, 영어, 수학, 과학, 수리논술 온라인 강좌와 오프라인 수업을 확인하세요.">
-  <meta property="og:url" content="https://gritedu.kr/courses.html">
+  <meta property="og:title" content="온라인 강좌 | 그릿에듀학원">
+  <meta property="og:description" content="그릿에듀학원의 국어, 영어, 수학, 과학, 수리논술 온라인 강좌를 확인하세요. 중고등 내신과 입시를 위한 강좌를 안내합니다.">
+  <meta property="og:url" content="https://gritedu.kr/courses">
   <meta property="og:image" content="https://gritedu.kr/assets/main.png">
 
   <link rel="icon" href="/assets/favicon.png" type="image/png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#ff7a00" />
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -37,7 +39,6 @@
       }
       const theme = getCurrentTheme();
       document.documentElement.setAttribute("data-theme", theme);
-
       const link = document.createElement("link");
       link.rel = "preload";
       link.as = "image";
@@ -59,15 +60,15 @@
 
   <main class="grit-page-container courses">
     <header class="courses-page-header">
-      <h1 class="page-title">그릿에듀 모든 강좌</h1>
+      <h1 class="page-title">그릿에듀 온라인 강좌</h1>
       <p class="muted" style="text-align:center;line-height:1.7;">
-        그릿에듀학원의 온라인 강좌와 오프라인 수업을 통해 과목별 학습 흐름을 확인하세요.<br>
-        국어, 영어, 수학, 과학, 수리논술을 중심으로 중고등 내신과 입시를 위한 강좌를 안내합니다.
+        국어, 영어, 수학, 과학, 수리논술 등 중고등 내신과 입시를 위한 온라인 강좌를 확인하세요.<br>
+        오프라인 수업 일정은 시간표에서 확인하세요.
       </p>
     </header>
 
     <section class="grit-section courses-toolbar-section" aria-label="강좌 검색 및 필터">
-      <div class="course-toolbar admin-toolbar" role="search">
+      <div class="course-toolbar admin-toolbar admin-toolbar--primary-list" role="search">
         <div class="toolbar-filters">
           <select id="filterYear" class="admin-toolbar__select">
             <option value="all">연도</option>
@@ -82,7 +83,17 @@
         <div class="toolbar-search">
           <div class="admin-toolbar__search-wrap">
             <input type="text" id="courseSearch" class="admin-toolbar__search-input" placeholder="강좌명/내용 검색" autocomplete="off" enterkeyhint="search" />
+            <button type="button" id="publicCourseSearchButton" class="admin-toolbar__search-button" aria-label="강좌 검색 실행" title="검색">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.25"/><path d="M20 20l-3.5-3.5"/></svg>
+            </button>
           </div>
+          <label class="admin-list-page-size" for="coursePageSize">
+            <select id="coursePageSize" class="admin-toolbar__select" aria-label="강좌 목록 표시 개수">
+              <option value="10">10개</option>
+              <option value="20">20개</option>
+              <option value="50">50개</option>
+            </select>
+          </label>
         </div>
       </div>
     </section>
@@ -94,8 +105,7 @@
         <div class="muted" style="text-align:center;padding:40px;">로딩 중...</div>
       </div>
 
-      <nav id="contentPagination" class="courses-pagination" style="display:none;" aria-label="강좌 목록 페이지"></nav>
-
+      <nav id="contentPagination" class="courses-pagination" aria-label="강좌 목록 페이지"></nav>
       <p id="contentEmpty" class="muted" hidden>선택한 조건에 맞는 강좌가 아직 등록되지 않았습니다.</p>
     </section>
   </main>

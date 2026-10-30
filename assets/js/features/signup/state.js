@@ -27,6 +27,7 @@ export const signupState = {
     sentAt: null,        // 인증번호 발송 시각 (timestamp)
     expiresAt: null,     // 인증번호 만료 시각 (timestamp)
     targetEmail: null,   // 인증번호를 발송한 이메일 (변경 감지용)
+    sessionToken: null,  // 현재 페이지 메모리에만 유지하는 인증 세션 토큰
     verified: false,    // 인증 완료 여부
     isSending: false,    // 인증번호 발송 중 여부
     isVerifying: false,  // 인증번호 확인 중 여부
@@ -50,6 +51,7 @@ export const signupState = {
       sentAt: null,
       expiresAt: null,
       targetEmail: null,
+      sessionToken: null,
       verified: false,
       isSending: false,
       isVerifying: false,
@@ -58,11 +60,12 @@ export const signupState = {
     };
   },
   // 인증번호 발송 기록
-  setVerificationSent(email = null) {
+  setVerificationSent(email = null, sessionToken = null) {
     const now = Date.now();
     this.verification.sentAt = now;
     this.verification.expiresAt = now + (VERIFICATION_EXPIRES_SECONDS * 1000); // 5분
     this.verification.targetEmail = email ? String(email).trim().toLowerCase() : null;
+    this.verification.sessionToken = sessionToken ? String(sessionToken) : null;
     this.verification.verified = false;
     this.verification.isSending = false;
   },

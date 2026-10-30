@@ -2,7 +2,7 @@
 // 학생 강의 학습 페이지
 import { auth, db, requireRole } from "/assets/js/firebase-init.js";
 import {
-  doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs
+  doc, getDoc, runTransaction, serverTimestamp, collection, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
 import "/assets/js/utils/toast.js";
@@ -14,6 +14,13 @@ import {
 } from "/assets/js/utils/course-readonly.js";
 import { getSettingDoc } from "/assets/js/utils/settings-cache.js";
 import { bindUnenrollModal } from "/assets/js/pages/student-dashboard/courses.js";
+import { bindCommittedSearch } from "/assets/js/utils/list-controls.js";
+import { normalizeVideoUrl } from "/assets/js/utils/video-url.js";
+import { collectCourseVideoIds, completeVideoInTransaction, resolveCourseVideoId, summarizeCourseCompletion } from "/assets/js/utils/course-completion.js";
+import {
+  getSubjectColorStyle,
+  loadSharedSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 // URL에서 강의 ID 가져오기
 const urlParams = new URLSearchParams(window.location.search);
@@ -44,7 +51,9 @@ let courseData = null;
 let enrollmentData = null;
 let courseUnenrollControls = null;
 let watchedVideos = new Set(); // 시청한 영상 ID 목록
-let currentVideoId = null; // 현재 재생 중인 영상 ID
+let activeVideoId = null;
+let modalReturnFocus = null;
+let completionInProgress = false;
 
 function isActiveEnrollment(row) {
   return String(row?.status || "active").trim() === "active";
@@ -92,7 +101,7 @@ function setupCourseUnenrollAction() {
             window.toast.success("수강이 취소되었습니다. 강좌 상세에서 다시 수강신청할 수 있습니다.");
           }
           window.location.replace(
-            `/course-detail.html?courseId=${encodeURIComponent(redirectId)}`
+            `/course-detail?courseId=${encodeURIComponent(redirectId)}`
           );
         }
       }
@@ -110,68 +119,17 @@ function setupCourseUnenrollAction() {
 
 // HTML 페이지 구조
 
-// YouTube URL에서 ID 추출
-function extractYouTubeId(url) {
-  if (!url) return null;
-  
-  // YouTube ID 패턴 (11자리)
-  const youtubeIdPattern = /^[\w-]{11}$/;
-  if (youtubeIdPattern.test(url.trim())) {
-    return url.trim();
-  }
-  
-  // URL 패턴 확인
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /youtube\.com\/watch\?.*v=([^&\n?#]+)/
-  ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-// 영상 URL 정규화
-function normalizeVideoUrl(url) {
-  if (!url) return null;
-  
-  const youtubeId = extractYouTubeId(url);
-  if (youtubeId) {
-    return {
-      type: 'youtube',
-      id: youtubeId,
-      embedUrl: `https://www.youtube.com/embed/${youtubeId}`,
-      watchUrl: `https://www.youtube.com/watch?v=${youtubeId}`
-    };
-  }
-  
-  // MP4 URL
-  if (url.endsWith('.mp4') || url.includes('.mp4')) {
-    return {
-      type: 'mp4',
-      url: url
-    };
-  }
-  
-  return null;
-}
-
 function getWeekVideoArray(week) {
   if (!week || typeof week !== "object") return [];
 
   // Canonical shape: week.videos[].url
   if (Array.isArray(week.videos) && week.videos.length > 0) {
-    return week.videos
-      .map((video) => (typeof video === "string" ? video : (video?.url || video?.fullUrl || video?.videoUrl || "")))
-      .filter(Boolean);
+    return week.videos.filter((video) => getVideoUrlFromItem(video));
   }
 
   // Compatibility shape: week.lessons[].url
   if (Array.isArray(week.lessons) && week.lessons.length > 0) {
-    return week.lessons
-      .map((lesson) => (typeof lesson === "string" ? lesson : (lesson?.url || lesson?.fullUrl || lesson?.videoUrl || "")))
-      .filter(Boolean);
+    return week.lessons.filter((lesson) => getVideoUrlFromItem(lesson));
   }
 
   // Compatibility fallback for legacy week.video / week.videoUrl
@@ -186,19 +144,22 @@ function getVideoUrlFromItem(videoItem) {
     : (videoItem.url || videoItem.fullUrl || videoItem.videoUrl || "");
 }
 
-function buildVideoId(weekId, videoIndex) {
-  return `${courseId}_week_${weekId}_video_${videoIndex}`;
+function buildVideoId(weekId, videoIndex, videoItem) {
+  return resolveCourseVideoId(courseId, weekId, videoItem, videoIndex);
 }
 
 function countPlayableVideos(weeks) {
   let count = 0;
-  (weeks || []).forEach((week, index) => {
-    const weekId = week?.id || `week_${index}`;
-    getWeekVideoArray(week).forEach((videoItem, videoIndex) => {
+  (weeks || []).forEach((week) => {
+    getWeekVideoArray(week).forEach((videoItem) => {
       if (getVideoUrlFromItem(videoItem)) count += 1;
     });
   });
   return count;
+}
+
+function getCourseVideoIds() {
+  return collectCourseVideoIds(courseId, courseData?.weeks);
 }
 
 function getWeekWatchStats(week, weekIndex) {
@@ -211,7 +172,7 @@ function getWeekWatchStats(week, weekIndex) {
     const videoUrl = getVideoUrlFromItem(videoItem);
     if (!videoUrl) return;
     total += 1;
-    if (watchedVideos.has(buildVideoId(weekId, videoIndex))) watched += 1;
+    if (watchedVideos.has(buildVideoId(weekId, videoIndex, videoItem))) watched += 1;
   });
 
   return { total, watched, allWatched: total > 0 && watched === total };
@@ -258,7 +219,7 @@ function initLearningPageShell() {
   const page = document.getElementById("coursePage");
   if (!page) return;
   page.classList.add("student-learning-shell");
-  const backWrap = page.querySelector(":scope > div");
+  const backWrap = page.querySelector(":scope > .student-learning-toolbar .dash-back, :scope > .dash-back");
   if (backWrap) backWrap.classList.add("student-learning-back");
 }
 
@@ -340,367 +301,204 @@ function renderListEmpty(message, hint = "") {
   `;
 }
 
-// 진도 업데이트
-async function updateProgress() {
+// 강좌 전체 완료율은 현재 영상 목록과 저장된 완료 ID로 계산한다.
+function updateProgress() {
   if (!courseData || !enrollmentData) return;
-
-  const weeks = courseData.weeks || [];
-  let totalVideos = 0;
-  let watchedCount = 0;
-
-  weeks.forEach((week, weekIndex) => {
-    const videoArray = getWeekVideoArray(week);
-    const weekId = week.id || `week_${weekIndex}`;
-    
-    videoArray.forEach((videoItem, videoIndex) => {
-      const videoUrl = typeof videoItem === 'string' ? videoItem : (videoItem.url || videoItem.fullUrl || '');
-      if (videoUrl) {
-        totalVideos++;
-        const videoId = `${courseId}_week_${weekId}_video_${videoIndex}`;
-        if (watchedVideos.has(videoId)) {
-          watchedCount++;
-        }
-      }
-    });
-  });
-
-  const progress = totalVideos > 0 ? Math.round((watchedCount / totalVideos) * 100) : 0;
-
-  // UI 업데이트
-  const progressBar = document.getElementById('progressBar');
-  const progressBarGlow = document.getElementById('progressBarGlow');
-  const progressText = document.getElementById('progressText');
-  
+  const { completed, total, progress } = summarizeCourseCompletion(
+    getCourseVideoIds(), watchedVideos
+  );
+  const progressBar = document.getElementById("progressBar");
+  const progressText = document.getElementById("progressText");
+  const watchedCount = document.getElementById("watchedCount");
+  const totalVideos = document.getElementById("totalVideos");
   if (progressBar) {
-    // 애니메이션 지연 처리
-    requestAnimationFrame(() => {
-      progressBar.style.width = `${progress}%`;
-      if (progressBarGlow) {
-        progressBarGlow.style.width = `${progress}%`;
-      }
-    });
+    progressBar.style.width = `${progress}%`;
+    progressBar.setAttribute("aria-valuenow", String(progress));
   }
-  if (progressText) {
-    // 현재 진도 애니메이션
-    const currentProgress = parseInt(progressText.textContent) || 0;
-    animateNumber(currentProgress, progress, progressText);
-  }
-  
-  // 시청 횟수 업데이트
-  const watchedCountEl = document.getElementById('watchedCount');
-  const totalVideosEl = document.getElementById('totalVideos');
-  const progressMessageEl = document.getElementById('progressMessage');
-  
-  if (watchedCountEl) {
-    watchedCountEl.textContent = watchedCount;
-  }
-  if (totalVideosEl) {
-    totalVideosEl.textContent = totalVideos;
-  }
-  
-  // 진도 메시지 업데이트
-  if (progressMessageEl) {
-    if (progress >= 100) {
-      progressMessageEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>완료!';
-      progressMessageEl.style.color = '#4caf50';
-    } else if (progress >= 75) {
-      progressMessageEl.textContent = '거의 다 왔어요!';
-      progressMessageEl.style.color = 'var(--brand)';
-    } else if (progress >= 50) {
-      progressMessageEl.textContent = '절반 이상 완료!';
-      progressMessageEl.style.color = 'var(--brand)';
-    } else if (progress > 0) {
-      progressMessageEl.textContent = '화이팅!';
-      progressMessageEl.style.color = 'var(--muted)';
-    } else {
-      progressMessageEl.textContent = '';
-    }
-  }
-
-  // Firestore 업데이트: 진도 저장 (updateProgress UI 업데이트)
+  if (progressText) progressText.textContent = String(progress);
+  if (watchedCount) watchedCount.textContent = String(completed);
+  if (totalVideos) totalVideos.textContent = String(total);
 }
 
-// 클릭 시 영상 시청 완료 처리
-async function markVideoAsWatchedOnClick(videoId, weekId) {
-  if (!enrollmentData) {
-    return false;
+// 저장된 목록을 transaction 안에서 다시 읽어 다른 탭의 완료 ID도 보존한다.
+async function markVideoAsWatched(videoId) {
+  if (!enrollmentData?.id || !getCourseVideoIds().includes(videoId)) {
+    throw new Error("완료할 영상을 확인할 수 없습니다.");
   }
-
-  // 이미 시청한 영상인지 확인
-  if (watchedVideos.has(videoId)) {
-    return true;
-  }
-
-  // 영상 시청 완료 처리
-  return await markVideoAsWatched(videoId, weekId);
+  const enrollmentRef = doc(db, "enrollments", enrollmentData.id);
+  const videoIds = getCourseVideoIds();
+  const result = await completeVideoInTransaction(
+    (operation) => runTransaction(db, operation),
+    enrollmentRef,
+    videoIds,
+    videoId,
+    serverTimestamp
+  );
+  watchedVideos = new Set(result.watchedVideos);
+  enrollmentData.watchedVideos = result.watchedVideos;
+  enrollmentData.progress = result.progress;
+  renderWeeks();
+  updateProgress();
+  return result;
 }
 
-// 영상 시청 완료 처리
-async function markVideoAsWatched(videoId, weekId) {
-  console.log("[markVideoAsWatched] 영상 시청 완료 - videoId:", videoId);
-  
-  if (!enrollmentData) {
-    console.warn("[markVideoAsWatched] enrollmentData가 없습니다.");
-    return false;
-  }
+function setVideoModalStatus(message, state = "") {
+  const status = document.getElementById("videoModalStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = state;
+}
 
-  // 이미 시청한 영상인지 확인
-  if (watchedVideos.has(videoId)) {
-    console.log("[markVideoAsWatched] 이미 시청한 영상입니다:", videoId);
-    return true;
-  }
+function syncVideoModalActions() {
+  const completeButton = document.getElementById("markVideoComplete");
+  if (!completeButton) return;
+  const completed = Boolean(activeVideoId && watchedVideos.has(activeVideoId));
+  completeButton.disabled = completionInProgress || completed || !activeVideoId;
+  completeButton.textContent = completionInProgress ? "저장 중..." : completed ? "학습 완료됨" : "학습 완료";
+}
 
-  watchedVideos.add(videoId);
-  const watchedVideosArray = Array.from(watchedVideos);
-  let totalVideos = 0;
-  let watchedCount = 0;
-  (courseData?.weeks || []).forEach((week, weekIndex) => {
-    const videoArray = getWeekVideoArray(week);
-    const weekId = week.id || `week_${weekIndex}`;
-    videoArray.forEach((videoItem, videoIndex) => {
-      const videoUrl = typeof videoItem === 'string' ? videoItem : (videoItem?.url || videoItem?.fullUrl || '');
-      if (videoUrl) {
-        totalVideos++;
-        const vid = `${courseId}_week_${weekId}_video_${videoIndex}`;
-        if (watchedVideos.has(vid)) watchedCount++;
-      }
-    });
-  });
-  const progress = totalVideos > 0 ? Math.round((watchedCount / totalVideos) * 100) : 0;
-
+window.completeCurrentVideo = async function() {
+  const videoId = activeVideoId;
+  if (!videoId || completionInProgress || watchedVideos.has(videoId)) return;
+  completionInProgress = true;
+  syncVideoModalActions();
+  setVideoModalStatus("완료 기록을 저장하고 있습니다.", "saving");
+  let saved = false;
   try {
-    await updateDoc(doc(db, "enrollments", enrollmentData.id), {
-      watchedVideos: watchedVideosArray,
-      progress: progress,
-      updatedAt: serverTimestamp()
-    });
-    enrollmentData.watchedVideos = watchedVideosArray;
-    enrollmentData.progress = progress;
-
-    updateVideoItemUI(videoId);
-    updateProgress();
-    
-    // 영상 시청 완료 알림
-    if (window.toast && window.toast.success) {
-      window.toast.success('영상 시청 완료되었습니다!', 2000);
-    }
-    
-    console.log("[markVideoAsWatched] 완료!");
-    return true;
+    await markVideoAsWatched(videoId);
+    saved = true;
   } catch (error) {
-    console.error("[markVideoAsWatched] 영상 시청 완료 처리 중 오류:", error);
-    console.error("[markVideoAsWatched] 오류 코드:", error.code);
-    console.error("[markVideoAsWatched] 오류 메시지:", error.message);
-    // 영상 시청 취소 처리
-    watchedVideos.delete(videoId);
-    return false;
-  }
-}
-
-// 영상 아이템 UI 업데이트
-function updateVideoItemUI(videoId) {
-  const videoItem = document.querySelector(`[data-video-id="${videoId}"]`);
-  if (videoItem) {
-    const checkBox = videoItem.querySelector('.video-check');
-    if (checkBox) {
-      checkBox.classList.add('checked');
-      checkBox.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    console.error("[student-course] completion save failed:", error);
+    if (activeVideoId === videoId) {
+      setVideoModalStatus("저장하지 못했습니다. 다시 시도해 주세요.", "error");
     }
-    videoItem.classList.add('completed');
+  } finally {
+    completionInProgress = false;
+    syncVideoModalActions();
   }
-  
-  // 주차 카드 상태 업데이트
-  updateWeekCardStatus(videoId);
-}
-
-function updateWeekCardStatus(videoId) {
-  if (!courseData) return;
-
-  const videoItem = document.querySelector(`[data-video-id="${videoId}"]`);
-  if (!videoItem) return;
-
-  const weekIndex = Number.parseInt(videoItem.getAttribute("data-week-index"), 10);
-  if (Number.isNaN(weekIndex)) return;
-
-  const weeks = courseData.weeks || [];
-  if (weekIndex >= weeks.length) return;
-
-  const week = weeks[weekIndex];
-  const { total, watched, allWatched } = getWeekWatchStats(week, weekIndex);
-
-  const weekCard = document.querySelector(`.week-card[data-week-index="${weekIndex}"]`);
-  if (!weekCard) return;
-
-  const weekHeader = weekCard.querySelector(".week-header");
-  const weekNumber = weekCard.querySelector(".week-number");
-  const progressPill = weekCard.querySelector(".week-progress-pill");
-
-  if (progressPill && total > 0) {
-    progressPill.textContent = `${watched}/${total}`;
-    progressPill.setAttribute("aria-label", `${watched}개 중 ${total}개 시청 완료`);
+  if (saved) {
+    if (activeVideoId === videoId) window.closeVideoModal();
+    window.toast?.success?.("학습 완료로 기록했습니다.");
   }
-
-  if (allWatched) {
-    weekCard.classList.add("watched");
-    weekHeader?.classList.add("watched");
-    weekNumber?.classList.add("watched");
-  } else {
-    weekCard.classList.remove("watched");
-    weekHeader?.classList.remove("watched");
-    weekNumber?.classList.remove("watched");
-  }
-}
+};
 
 // 영상 모달 열기
-window.openVideoModal = function(videoUrl, videoTitle, videoId, weekId) {
+window.openVideoModal = function(videoUrl, videoTitle, videoId) {
   if (!isStudentCourseAvailable(courseData)) {
     showLearningGate("NOT_AVAILABLE");
     return;
   }
 
-  const modal = document.getElementById('videoModal');
-  const modalTitle = document.getElementById('videoModalTitle');
-  const videoPlayer = document.getElementById('videoPlayer');
-  
+  const modal = document.getElementById("videoModal");
+  const modalTitle = document.getElementById("videoModalTitle");
+  const videoPlayer = document.getElementById("videoPlayer");
+  const youtubeLink = document.getElementById("watchOnYouTube");
   if (!modal || !videoPlayer) return;
 
-  if (modalTitle) {
-    modalTitle.textContent = videoTitle || '영상 재생';
-  }
+  const opener = Array.from(document.querySelectorAll(".video-item"))
+    .find((item) => item.dataset.videoId === videoId);
+  modalReturnFocus = opener || document.activeElement;
+  activeVideoId = videoId;
+  if (modalTitle) modalTitle.textContent = videoTitle || "영상 재생";
+  setVideoModalStatus("");
+  syncVideoModalActions();
 
   const videoInfo = normalizeVideoUrl(videoUrl);
-  
-  if (!videoInfo) {
-    videoPlayer.innerHTML = '<p class="muted">영상 URL이 올바르지 않습니다.</p>';
-    modal.style.display = 'flex';
-    return;
+  if (youtubeLink) {
+    youtubeLink.hidden = videoInfo?.type !== "youtube" && videoInfo?.type !== "youtubePlaylist";
+    if (videoInfo?.type === "youtube" || videoInfo?.type === "youtubePlaylist") {
+      youtubeLink.href = videoInfo.watchUrl;
+    } else {
+      youtubeLink.removeAttribute("href");
+    }
   }
 
-  currentVideoId = videoId;
-  let playerHTML = '';
-  
-  if (videoInfo.type === 'youtube') {
-    // YouTube iframe (재생 시작 허용 및 API 활성화)
-    playerHTML = `
+  if (videoInfo?.type === "youtube" || videoInfo?.type === "youtubePlaylist") {
+    videoPlayer.innerHTML = `
       <div class="video-player-wrapper">
-        <iframe 
-          id="youtube-iframe-${videoId}"
-          src="${videoInfo.embedUrl}?autoplay=1&enablejsapi=1" 
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-          allowfullscreen
-          style="width:100%;height:100%;">
+        <iframe
+          title="${escapeHtml(videoTitle || "강의 영상")}"
+          src="${videoInfo.embedUrl}${videoInfo.type === "youtubePlaylist" ? "&" : "?"}autoplay=1"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
         </iframe>
       </div>
     `;
-  } else if (videoInfo.type === 'mp4') {
-    playerHTML = `
+  } else if (videoInfo?.type === "mp4") {
+    videoPlayer.innerHTML = `
       <div class="video-player-wrapper">
-        <video id="mp4-player-${videoId}" controls autoplay style="width:100%;height:100%;">
-          <source src="${videoInfo.url}" type="video/mp4">
+        <video controls autoplay>
+          <source src="${escapeHtml(videoInfo.url)}" type="video/mp4">
           브라우저가 비디오 태그를 지원하지 않습니다.
         </video>
       </div>
     `;
-  }
-
-  videoPlayer.innerHTML = playerHTML;
-  modal.style.display = 'flex';
-  
-  // 스크롤 위치 저장 및 바디 고정
-  const scrollY = window.scrollY || window.pageYOffset;
-  document.body.style.position = 'fixed';
-  document.body.style.top = `-${scrollY}px`;
-  document.body.style.width = '100%';
-  document.body.classList.add('modal-open');
-  
-  // iOS Safari 모바일 호환성 처리
-  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
   } else {
-    document.body.style.overflow = 'hidden';
+    videoPlayer.innerHTML = '<p class="muted">영상 URL이 올바르지 않습니다.</p>';
+    activeVideoId = null;
+    syncVideoModalActions();
   }
 
-  // 영상 시청 완료 처리
-  if (videoId && !watchedVideos.has(videoId)) {
-    // 영상 시청 완료 처리
-    setTimeout(async () => {
-      await markVideoAsWatchedOnClick(videoId, weekId);
-    }, 1000); // 1초 지연 후 처리
+  document.getElementById("videoModalHint").textContent = videoInfo?.type === "youtube" || videoInfo?.type === "youtubePlaylist"
+    ? "사이트 내 재생이 제한되면 YouTube에서 볼 수 있습니다. 재생목록은 한 항목으로 기록되며 학습 후 완료 버튼을 눌러야 합니다."
+    : "학습 후 완료 버튼을 눌러 기록하세요. 재생이나 모달 닫기로 자동 완료되지 않습니다.";
+  modal.style.display = "flex";
+  const scrollY = window.scrollY || window.pageYOffset;
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${scrollY}px`;
+  document.body.style.width = "100%";
+  document.body.classList.add("modal-open");
+  document.body.style.overflow = "hidden";
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    document.documentElement.style.overflow = "hidden";
   }
+  modal.querySelector(".video-modal-close")?.focus();
 };
-
-
 
 // 영상 모달 닫기
 window.closeVideoModal = function() {
-  const modal = document.getElementById('videoModal');
-  const videoPlayer = document.getElementById('videoPlayer');
-  
-  if (modal) {
-    modal.style.display = 'none';
-  }
-  
-  // 스크롤 위치 복원 및 바디 고정 해제
-  document.body.classList.remove('modal-open');
+  const modal = document.getElementById("videoModal");
+  const videoPlayer = document.getElementById("videoPlayer");
+  const closingVideoId = activeVideoId;
+  if (modal) modal.style.display = "none";
+  document.body.classList.remove("modal-open");
   const scrollY = document.body.style.top;
-  document.body.style.position = '';
-  document.body.style.top = '';
-  document.body.style.width = '';
-  document.body.style.overflow = '';
-  document.documentElement.style.overflow = '';
-  
-  // 스크롤 위치 복원
-  if (scrollY) {
-    window.scrollTo(0, parseInt(scrollY || '0') * -1);
-  }
-  
-  if (videoPlayer) {
-    videoPlayer.innerHTML = '';
-  }
-  
-  currentVideoId = null;
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.width = "";
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+  if (scrollY) window.scrollTo(0, parseInt(scrollY, 10) * -1);
+  if (videoPlayer) videoPlayer.innerHTML = "";
+  activeVideoId = null;
+  const replacement = Array.from(document.querySelectorAll(".video-item"))
+    .find((item) => item.dataset.videoId === closingVideoId);
+  const focusTarget = replacement || (modalReturnFocus?.isConnected ? modalReturnFocus : null);
+  focusTarget?.focus();
+  modalReturnFocus = null;
 };
 
 // 영상 모달 외부 클릭 시 닫기
 document.addEventListener('click', (e) => {
   const modal = document.getElementById('videoModal');
   if (e.target === modal) {
-    closeVideoModal();
+    window.closeVideoModal();
+    return;
   }
-});
-
-// 영상 아이템 키보드 이벤트 처리
-window.handleVideoItemKeydown = function(e, videoUrl, videoTitle, videoId, weekId) {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    openVideoModal(videoUrl, videoTitle, videoId, weekId);
-  }
-};
-
-// 영상 모달 키보드 이벤트 처리
-document.addEventListener('keydown', (e) => {
-  // Esc: 영상 모달 닫기
-  if (e.key === 'Escape') {
-    const modal = document.getElementById('videoModal');
-    if (modal && modal.style.display === 'flex') {
-      closeVideoModal();
-    }
-  }
-  
+  const item = e.target.closest?.('.video-item');
+  if (item) window.openVideoModal(item.dataset.videoUrl, item.dataset.videoTitle, item.dataset.videoId);
 });
 
 // 주차 검색 쿼리 처리
 let searchQuery = '';
 
-// 주차 검색 입력 이벤트 처리
+// 입력값과 적용 검색어를 분리해 Enter/검색 버튼에서만 이미 로드된 배열을 필터링한다.
 const searchInput = document.getElementById('searchInput');
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value.toLowerCase().trim();
-    renderWeeks();
-  });
-}
+const searchButton = document.getElementById('searchButton');
+bindCommittedSearch(searchInput, searchButton, (keyword) => {
+  searchQuery = keyword;
+  renderWeeks();
+});
 
 function weekMatchesSearch(week, weekIndex, query) {
   if (!query) return true;
@@ -713,9 +511,10 @@ function weekMatchesSearch(week, weekIndex, query) {
   return videoArray.some((videoItem, videoIndex) => {
     const videoUrl = getVideoUrlFromItem(videoItem);
     if (!videoUrl) return false;
-    const label = videoArray.length > 1
-      ? `${week.title || `${weekIndex + 1}주차`} ${videoIndex + 1}교시`
-      : (week.title || `${weekIndex + 1}주차`);
+    const label = (typeof videoItem === "object" && String(videoItem?.title || "").trim()) ||
+      (videoArray.length > 1
+        ? `${week.title || `${weekIndex + 1}주차`} ${videoIndex + 1}교시`
+        : (week.title || `${weekIndex + 1}주차`));
     return label.toLowerCase().includes(query);
   });
 }
@@ -725,35 +524,34 @@ function buildVideoItemHtml({
   videoId,
   videoTitle,
   weekIndex,
-  weekId,
   isWatched,
   videoInfo,
   indexLabel
 }) {
   const typeLabel = videoInfo?.type === "youtube"
     ? "유튜브 영상"
+    : videoInfo?.type === "youtubePlaylist"
+      ? "유튜브 재생목록"
     : videoInfo?.type === "mp4"
       ? "동영상 파일"
       : "영상";
 
   return `
     <div class="video-item ${isWatched ? "completed" : ""}"
-         data-video-id="${videoId}"
+         data-video-id="${escapeHtml(videoId)}"
          data-video-url="${escapeHtml(videoUrl)}"
          data-video-title="${escapeHtml(videoTitle)}"
          data-week-index="${weekIndex}"
          role="button"
          tabindex="0"
-         aria-label="${escapeHtml(videoTitle)}${isWatched ? ", 시청 완료" : ", 미시청"}"
-         onclick="openVideoModal('${escapeHtml(videoUrl)}', '${escapeHtml(videoTitle)}', '${videoId}', '${weekId}')"
-         onkeydown="handleVideoItemKeydown(event, '${escapeHtml(videoUrl)}', '${escapeHtml(videoTitle)}', '${videoId}', '${weekId}')">
+         aria-label="${escapeHtml(videoTitle)}${isWatched ? ", 학습 완료" : ", 학습 전"}">
       <span class="video-index" aria-hidden="true">${escapeHtml(indexLabel)}</span>
       <div class="video-icon" aria-hidden="true">▶</div>
       <div class="video-info">
         <div class="video-name">${escapeHtml(videoTitle)}</div>
         <div class="video-meta" aria-hidden="true">${typeLabel}</div>
       </div>
-      <div class="video-check ${isWatched ? "checked" : ""}" aria-label="${isWatched ? "시청 완료" : "미시청"}" role="status">${isWatched ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ""}</div>
+      <div class="video-check ${isWatched ? "checked" : ""}" aria-label="${isWatched ? "학습 완료" : "학습 전"}" role="status">${isWatched ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ""}</div>
     </div>
   `;
 }
@@ -775,6 +573,11 @@ function renderWeeks() {
     weeksList.innerHTML = renderListEmpty("강좌 ID가 없습니다.");
     return;
   }
+
+  const previousCards = Array.from(weeksList.querySelectorAll(".week-card"));
+  const expandedWeekIndexes = new Set(previousCards
+    .filter((card) => card.classList.contains("expanded"))
+    .map((card) => card.dataset.weekIndex));
 
   const allWeeks = courseData.weeks || [];
   const totalPlayable = countPlayableVideos(allWeeks);
@@ -799,7 +602,7 @@ function renderWeeks() {
     return indexA - indexB;
   });
   
-  const html = weeks.map((week, originalIndex) => {
+  const html = weeks.map((week) => {
     // 주차 인덱스 추출
     const index = allWeeks.findIndex((w) => w === week);
     const weekId = week.id || `week_${index}`;
@@ -818,9 +621,8 @@ function renderWeeks() {
       const videoUrl = getVideoUrlFromItem(videoItem);
       if (!videoUrl) return;
 
-      const videoTitle = videoArray.length > 1
-        ? `${weekTitle} ${videoIndex + 1}교시`
-        : weekTitle;
+      const videoTitle = (typeof videoItem === "object" && String(videoItem?.title || "").trim()) ||
+        (videoArray.length > 1 ? `${weekTitle} ${videoIndex + 1}교시` : weekTitle);
 
       if (searchQuery && !videoTitle.toLowerCase().includes(searchQuery)) {
         const weekTitleMatch = weekTitle.toLowerCase().includes(searchQuery);
@@ -829,13 +631,12 @@ function renderWeeks() {
       }
 
       visibleVideoCount += 1;
-      const videoId = buildVideoId(weekId, videoIndex);
+      const videoId = buildVideoId(weekId, videoIndex, videoItem);
       videosHTML += buildVideoItemHtml({
         videoUrl,
         videoId,
         videoTitle,
         weekIndex: index,
-        weekId,
         isWatched: watchedVideos.has(videoId),
         videoInfo: normalizeVideoUrl(videoUrl),
         indexLabel: `${index + 1}-${videoIndex + 1}`
@@ -845,7 +646,7 @@ function renderWeeks() {
     if (searchQuery && visibleVideoCount === 0) return null;
 
     const progressPill = total > 0
-      ? `<span class="week-progress-pill" aria-label="${watched}개 중 ${total}개 시청 완료">${watched}/${total}</span>`
+      ? `<span class="week-progress-pill" aria-label="${total}강 중 ${watched}강 학습 완료">${watched}/${total}</span>`
       : "";
 
     const videosBlock = videosHTML || (
@@ -881,51 +682,14 @@ function renderWeeks() {
 
   weeksList.innerHTML = html.join("");
 
-  const firstCard = weeksList.querySelector(".week-card");
-  if (firstCard) {
-    firstCard.classList.add("expanded");
-    const headerBtn = firstCard.querySelector(".week-header");
-    if (headerBtn) headerBtn.setAttribute("aria-expanded", "true");
-  }
-}
-
-// 숫자 애니메이션 함수
-function animateNumber(from, to, element, duration = 600) {
-  // requestAnimationFrame fallback
-  const raf = window.requestAnimationFrame || 
-               window.webkitRequestAnimationFrame || 
-               window.mozRequestAnimationFrame || 
-               window.msRequestAnimationFrame ||
-               function(callback) { return setTimeout(callback, 16); };
-  
-  const startTime = (window.performance && window.performance.now) ? 
-                    window.performance.now() : Date.now();
-  const difference = to - from;
-  
-  function update(currentTime) {
-    const now = (window.performance && window.performance.now) ? 
-                window.performance.now() : Date.now();
-    const elapsed = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    
-    // easing 함수 (ease-out)
-    const easeOut = 1 - Math.pow(1 - progress, 3);
-    const current = Math.round(from + difference * easeOut);
-    
-    if (element && element.textContent !== undefined) {
-      element.textContent = `${current}%`;
-    }
-    
-    if (progress < 1) {
-      raf(update);
-    } else {
-      if (element && element.textContent !== undefined) {
-        element.textContent = `${to}%`;
-      }
-    }
-  }
-  
-  raf(update);
+  const cards = Array.from(weeksList.querySelectorAll(".week-card"));
+  cards.forEach((card, index) => {
+    const expanded = previousCards.length
+      ? expandedWeekIndexes.has(card.dataset.weekIndex)
+      : index === 0;
+    card.classList.toggle("expanded", expanded);
+    card.querySelector(".week-header")?.setAttribute("aria-expanded", String(expanded));
+  });
 }
 
 // 주차 토글 함수
@@ -983,6 +747,8 @@ async function loadCourse() {
       console.warn("[student-course] coursesMenu settings unavailable, using defaults", error);
     }
 
+    const subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc);
+
     if (!courseDoc.exists()) {
       showLearningGate("NOT_FOUND");
       return;
@@ -1007,7 +773,7 @@ async function loadCourse() {
 
     const accessType = normalizeAccessType(courseData.accessType);
     if (accessType === "public") {
-      window.location.replace(`/course-detail.html?courseId=${encodeURIComponent(normalizedCourseId)}`);
+      window.location.replace(`/course-detail?courseId=${encodeURIComponent(normalizedCourseId)}`);
       return;
     }
 
@@ -1029,6 +795,19 @@ async function loadCourse() {
     }
 
     enrollmentData = { id: enrollmentDoc.id, ...enrollmentDoc.data() };
+    if (accessType === "approvalRequired") {
+      const protectedSnap = await getDoc(doc(db, "coursePrivateContent", normalizedCourseId));
+      if (!protectedSnap.exists()) {
+        showLearningGate("NOT_AVAILABLE");
+        return;
+      }
+      const protectedData = protectedSnap.data() || {};
+      courseData = {
+        ...courseData,
+        weeks: Array.isArray(protectedData.weeks) ? protectedData.weeks : [],
+        curriculumWeeks: Array.isArray(protectedData.weeks) ? protectedData.weeks : []
+      };
+    }
 
     // 강의 ID 설정
     window.courseId = courseId;
@@ -1061,6 +840,9 @@ async function loadCourse() {
       const subjectLabel = courseData.subjectLabel || courseData.subject || '과목';
       courseSubject.textContent = subjectLabel;
       courseSubject.setAttribute('data-subject', subjectLabel);
+      const subjectColorStyle = getSubjectColorStyle(subjectLabel, subjectColorMap);
+      courseSubject.classList.toggle("has-subject-color", Boolean(subjectColorStyle));
+      if (subjectColorStyle) courseSubject.style.cssText += subjectColorStyle;
     }
     
     if (courseTitle) {
@@ -1111,10 +893,23 @@ function setupKeyboardNavigation() {
   document.addEventListener('keydown', (e) => {
     // 영상 모달 처리
     const modal = document.getElementById('videoModal');
-    if (modal && modal.style.display !== 'none') {
-      // ESC 키 이벤트 처리
+    if (modal && modal.style.display === 'flex') {
       if (e.key === 'Escape') {
-        closeVideoModal();
+        e.preventDefault();
+        window.closeVideoModal();
+      } else if (e.key === 'Tab') {
+        const focusable = Array.from(modal.querySelectorAll('button:not([disabled]), a[href]:not([hidden])'));
+        if (focusable.length) {
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
       return;
     }
@@ -1133,7 +928,7 @@ function setupKeyboardNavigation() {
         if (weekCard) {
           const weekIndex = parseInt(weekCard.getAttribute('data-week-index'));
           if (!isNaN(weekIndex)) {
-            toggleWeek(weekIndex);
+            window.toggleWeek(weekIndex);
           }
         }
       }

@@ -9,7 +9,12 @@ import {
   where,
   getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-import { getPublicSettingDoc } from "/assets/js/utils/settings-cache.js";
+import { getPublicSettingDoc, getSettingDoc } from "/assets/js/utils/settings-cache.js";
+import {
+  bindCommittedSearch,
+  normalizeListPageSize,
+  renderListPagination,
+} from "/assets/js/utils/list-controls.js";
 import {
   createCourseLabelMaps,
   normalizeCourseForReadOnly
@@ -20,6 +25,11 @@ import {
   getCourseYearLabels,
   mergeCourseCatalog
 } from "/assets/js/utils/course-catalog.js";
+import {
+  getSubjectColorStyle,
+  loadSharedSubjectColorMap,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 const db = getFirestore(app);
 const COURSES_COLLECTION = "courses";
@@ -31,40 +41,31 @@ const searchMeta = document.getElementById("coursesSearchMeta");
 const yearFilterEl = document.getElementById("filterYear");
 const gradeFilterEl = document.getElementById("filterGrade");
 const subjectFilterEl = document.getElementById("filterSubject");
+const pageSizeEl = document.getElementById("coursePageSize");
+const searchButton = document.getElementById("publicCourseSearchButton");
 
-const ITEMS_PER_PAGE_DESKTOP = 18;
-const ITEMS_PER_PAGE_MOBILE = 9;
 const EXCERPT_MAX = 140;
 
 const TEXT_FALLBACK_TITLE = "\uC81C\uBAA9 \uC5C6\uB294 \uAC15\uC88C";
 const TEXT_FALLBACK_DESC = "\uAC15\uC88C \uC18C\uAC1C\uAC00 \uC900\uBE44 \uC911\uC785\uB2C8\uB2E4. \uC790\uC138\uD55C \uC218\uC5C5 \uC548\uB0B4\uB294 \uC0C1\uB2F4\uC744 \uD1B5\uD574 \uD655\uC778\uD574 \uC8FC\uC138\uC694.";
 const TEXT_META_ARIA = "\uAC15\uC88C \uBA54\uD0C0 \uC815\uBCF4";
-const TEXT_RESULT_FOUND = "\uC870\uAC74\uC5D0 \uB9DE\uB294 \uAC15\uC88C";
 const TEXT_RESULT_NOT_FOUND = "\uC870\uAC74\uC5D0 \uB9DE\uB294 \uAC15\uC88C\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.";
 const TEXT_EMPTY = "\uD574\uB2F9 \uC870\uAC74\uC758 \uAC15\uC88C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.";
 
 let currentPage = 1;
+let itemsPerPage = 10;
 let searchKeyword = "";
 let allCourses = [];
 let filteredCourses = [];
 let labelMaps = createCourseLabelMaps({});
 let mergedCourseCatalog = mergeCourseCatalog({});
+let subjectColorMap = mergeSubjectColorMap({});
 let instructorsByUid = {};
 const filterState = {
   year: "all",
   grade: "all",
   subject: "all"
 };
-
-function getItemsPerPage() {
-  try {
-    return window.matchMedia("(max-width: 640px)").matches
-      ? ITEMS_PER_PAGE_MOBILE
-      : ITEMS_PER_PAGE_DESKTOP;
-  } catch {
-    return ITEMS_PER_PAGE_DESKTOP;
-  }
-}
 
 function escapeHtml(value) {
   if (value == null) return "";
@@ -98,19 +99,6 @@ function normalizeYearFilterValue(course) {
   return toDisplayValue(course.year);
 }
 
-function getSubjectAccentClass(course) {
-  const rawCode = String(course.subjectCode || course.subject || "").trim().toUpperCase();
-  const rawLabel = String(course.subjectLabel || course.subject || "").trim();
-
-  if (rawCode === "KOR" || rawLabel === "\uAD6D\uC5B4") return "subject-ko";
-  if (rawCode === "ENG" || rawLabel === "\uC601\uC5B4") return "subject-en";
-  if (rawCode === "MATH" || rawLabel === "\uC218\uD559") return "subject-ma";
-  if (rawCode === "SCI" || rawLabel === "\uACFC\uD559") return "subject-sc";
-  if (rawCode === "ESSAY" || rawLabel === "\uC218\uB9AC\uB17C\uC220") return "subject-etc";
-  if (rawCode === "ETC" || rawLabel === "\uAE30\uD0C0" || rawLabel === "\uC77C\uBC18") return "subject-etc";
-  return "subject-etc";
-}
-
 function toSearchBlob(course) {
   return [
     course.title,
@@ -136,7 +124,8 @@ function matchesSearch(blob, keyword) {
 
 function showSkeleton() {
   if (!grid) return;
-  const count = getItemsPerPage();
+  grid.classList.remove("is-empty");
+  const count = itemsPerPage;
   grid.innerHTML = Array(count)
     .fill(0)
     .map(
@@ -159,12 +148,13 @@ function renderCard(course) {
 
   const year = escapeHtml(toDisplayValue(course._filterYear));
   const grade = escapeHtml(toDisplayValue(course._filterGrade));
-  const subject = escapeHtml(toDisplayValue(course._displaySubject));
+  const subjectRaw = toDisplayValue(course._displaySubject);
+  const subject = escapeHtml(subjectRaw);
   const instructor = escapeHtml(course._displayInstructor || "");
-  const subjectClass = getSubjectAccentClass(course);
+  const subjectColorStyle = getSubjectColorStyle(subjectRaw, subjectColorMap);
 
   return `
-    <article class="course-card course-card--public ${subjectClass}" data-course-id="${escapeHtml(course.id)}" role="link" tabindex="0" aria-label="${title}">
+    <article class="course-card course-card--public${subjectColorStyle ? " has-subject-color" : ""}" data-course-id="${escapeHtml(course.id)}" data-subject="${subject}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""} role="link" tabindex="0" aria-label="${title}">
       <div class="course-card__meta-band" aria-label="${TEXT_META_ARIA}">
         <span class="course-card__meta-item">${year}</span>
         <span class="course-card__meta-sep" aria-hidden="true">|</span>
@@ -197,12 +187,8 @@ function updateSearchMeta(totalCount) {
     return;
   }
 
-  searchMeta.hidden = false;
-  if (totalCount > 0) {
-    searchMeta.textContent = `${TEXT_RESULT_FOUND} ${totalCount}\uAC1C`;
-  } else {
-    searchMeta.textContent = TEXT_RESULT_NOT_FOUND;
-  }
+  searchMeta.hidden = totalCount > 0;
+  searchMeta.textContent = totalCount > 0 ? "" : TEXT_RESULT_NOT_FOUND;
 }
 
 function itemSortKey(course) {
@@ -211,111 +197,41 @@ function itemSortKey(course) {
   return 0;
 }
 
-function hidePagination() {
+function renderContentPaginationBar(totalItems) {
   const pagination = document.getElementById("contentPagination");
   if (!pagination) return;
-  pagination.onclick = null;
-  pagination.style.display = "none";
-  pagination.innerHTML = "";
-}
-
-function renderContentPaginationBar(totalPages, itemsPerPage, totalItems) {
-  const pagination = document.getElementById("contentPagination");
-  if (!pagination) return;
-
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
-  const rangeText = totalItems === 0 ? "" : `${startItem}-${endItem} / ${totalItems}`;
-
-  if (totalPages <= 1) {
-    pagination.onclick = null;
-    pagination.style.display = "flex";
-    pagination.className = "courses-pagination";
-    pagination.innerHTML = `
-      <div class="courses-pagination-inner">
-        <p class="courses-pagination-info" aria-live="polite">${rangeText}</p>
-      </div>
-    `;
-    return;
-  }
-
-  const current = currentPage;
-  const firstDisabled = current <= 1;
-  const lastDisabled = current >= totalPages;
-
-  const groupSize = 5;
-  let start = Math.max(1, current - Math.floor(groupSize / 2));
-  let end = Math.min(totalPages, start + groupSize - 1);
-  if (end - start < groupSize - 1) start = Math.max(1, end - groupSize + 1);
-
-  let pages = "";
-  for (let index = start; index <= end; index += 1) {
-    const active = index === current
-      ? ' style="background:var(--brand);color:#fff;border-color:var(--brand)"'
-      : "";
-    pages += `<button type="button" class="pagination-btn pagination-num courses-pagination-num" data-content-p="${index}"${active}>${index}</button>`;
-  }
-
-  pagination.style.display = "flex";
-  pagination.className = "courses-pagination";
-  pagination.innerHTML = `
-    <div class="courses-pagination-inner">
-      <div class="courses-pagination-controls">
-        <button type="button" class="pagination-btn courses-pagination-arrow" data-content-p="first" ${firstDisabled ? "disabled" : ""}>&lt;&lt;</button>
-        <button type="button" class="pagination-btn courses-pagination-arrow" data-content-p="prev" ${firstDisabled ? "disabled" : ""}>&lt;</button>
-        <div class="courses-pagination-pages">${pages}</div>
-        <button type="button" class="pagination-btn courses-pagination-arrow" data-content-p="next" ${lastDisabled ? "disabled" : ""}>&gt;</button>
-        <button type="button" class="pagination-btn courses-pagination-arrow" data-content-p="last" ${lastDisabled ? "disabled" : ""}>&gt;&gt;</button>
-      </div>
-      <p class="courses-pagination-info" aria-live="polite">${rangeText}</p>
-    </div>
-  `;
-
-  pagination.onclick = (event) => {
-    const button = event.target.closest("button[data-content-p]");
-    if (!button || button.disabled) return;
-
-    const action = button.getAttribute("data-content-p");
-    const pageCount = Math.max(1, Math.ceil(filteredCourses.length / getItemsPerPage()));
-
-    let nextPage = current;
-    if (action === "first") nextPage = 1;
-    else if (action === "prev") nextPage = current - 1;
-    else if (action === "next") nextPage = current + 1;
-    else if (action === "last") nextPage = pageCount;
-    else nextPage = Number.parseInt(action, 10);
-
-    if (!Number.isInteger(nextPage) || nextPage < 1 || nextPage > pageCount) return;
-
-    currentPage = nextPage;
-    render();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const state = renderListPagination(pagination, {
+    currentPage,
+    onPageChange: (nextPage) => {
+      currentPage = nextPage;
+      render();
+    },
+    pageSize: itemsPerPage,
+    totalItems,
+  });
+  currentPage = state.currentPage;
 }
 
 function render() {
   if (!grid) return;
 
   if (filteredCourses.length === 0) {
-    grid.innerHTML = "";
-    if (empty) {
-      empty.hidden = false;
-      empty.textContent = TEXT_EMPTY;
-    }
-    hidePagination();
+    grid.classList.add("is-empty");
+    grid.innerHTML = `<p class="muted courses-grid-empty">${TEXT_EMPTY}</p>`;
+    if (empty) empty.hidden = true;
+    renderContentPaginationBar(0);
     return;
   }
 
+  grid.classList.remove("is-empty");
   if (empty) empty.hidden = true;
 
-  const itemsPerPage = getItemsPerPage();
   const total = filteredCourses.length;
-  const totalPages = Math.ceil(total / itemsPerPage);
   const start = itemsPerPage * (currentPage - 1);
   const pageItems = filteredCourses.slice(start, start + itemsPerPage);
 
   grid.innerHTML = pageItems.map(renderCard).join("");
-  renderContentPaginationBar(totalPages, itemsPerPage, total);
+  renderContentPaginationBar(total);
 }
 
 function matchesFilter(course) {
@@ -394,6 +310,15 @@ async function loadCatalogSettings() {
   populateFilterOptions();
 }
 
+async function loadSubjectColors() {
+  try {
+    subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc);
+  } catch (error) {
+    console.warn("[courses] failed to load subject colors, using defaults", error);
+    subjectColorMap = mergeSubjectColorMap({});
+  }
+}
+
 async function loadInstructorMap() {
   instructorsByUid = {};
 }
@@ -465,16 +390,14 @@ async function loadCourses() {
 function openCourseDetailFromCard(cardElement) {
   const courseIdValue = cardElement.getAttribute("data-course-id");
   if (!courseIdValue) return;
-  window.location.href = `/course-detail.html?courseId=${encodeURIComponent(courseIdValue)}`;
+  window.location.href = `/course-detail?courseId=${encodeURIComponent(courseIdValue)}`;
 }
 
 function setupInteractions() {
-  if (searchInput) {
-    searchInput.addEventListener("input", () => {
-      searchKeyword = searchInput.value || "";
-      applyFilters();
-    });
-  }
+  bindCommittedSearch(searchInput, searchButton, (keyword) => {
+    searchKeyword = keyword;
+    applyFilters();
+  });
 
   if (yearFilterEl) {
     yearFilterEl.addEventListener("change", () => {
@@ -497,18 +420,10 @@ function setupInteractions() {
     });
   }
 
-  let resizeTimer = null;
-  let lastItemsPerPage = getItemsPerPage();
-  window.addEventListener("resize", () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      const nextItemsPerPage = getItemsPerPage();
-      if (nextItemsPerPage === lastItemsPerPage) return;
-      lastItemsPerPage = nextItemsPerPage;
-      const totalPages = Math.max(1, Math.ceil(filteredCourses.length / nextItemsPerPage));
-      if (currentPage > totalPages) currentPage = totalPages;
-      render();
-    }, 150);
+  pageSizeEl?.addEventListener("change", () => {
+    itemsPerPage = normalizeListPageSize(pageSizeEl.value);
+    currentPage = 1;
+    render();
   });
 
   if (!grid) return;
@@ -534,6 +449,7 @@ async function bootstrap() {
 
   await Promise.all([
     loadCatalogSettings(),
+    loadSubjectColors(),
     loadInstructorMap()
   ]);
 

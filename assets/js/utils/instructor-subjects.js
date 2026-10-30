@@ -1,4 +1,7 @@
 import { normalizeCatalogList } from "/assets/js/utils/catalog-select-helpers.js";
+import {
+  getSubjectColorStyle,
+} from "/assets/js/utils/subject-colors.js";
 
 export function normalizeSubjectList(values) {
   const source = Array.isArray(values) ? values : [values];
@@ -42,12 +45,14 @@ export function formatInstructorSubjectsLabel(instructor = {}, options = {}) {
   return getInstructorSubjectDisplayList(instructor, activeSubject).join(separator);
 }
 
-export function renderInstructorSubjectBadgesHtml(instructor, activeSubject, escapeHtml) {
+export function renderInstructorSubjectBadgesHtml(instructor, activeSubject, escapeHtml, subjectColorMap = {}) {
   const subjects = getInstructorSubjectDisplayList(instructor, activeSubject);
   if (!subjects.length) return "";
 
-  const renderBadge = (subject) =>
-    `<span class="inst-subject-badge" data-subject="${escapeHtml(subject)}">${escapeHtml(subject)}</span>`;
+  const renderBadge = (subject) => {
+    const colorStyle = getSubjectColorStyle(subject, subjectColorMap);
+    return `<span class="inst-subject-badge${colorStyle ? " has-subject-color" : ""}" data-subject="${escapeHtml(subject)}"${colorStyle ? ` style="${colorStyle}"` : ""}>${escapeHtml(subject)}</span>`;
+  };
 
   if (subjects.length === 1) return renderBadge(subjects[0]);
 
@@ -98,6 +103,5 @@ export function buildInstructorMenuSubjectsPayload(subjects) {
   const list = normalizeCatalogList(subjects);
   return {
     subjects: list,
-    subjectOptions: list
   };
 }

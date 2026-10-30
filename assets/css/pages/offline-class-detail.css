@@ -1,0 +1,174 @@
+/* Shared student/instructor offline class summary */
+
+.offline-class-summary {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+}
+
+.offline-class-summary__header {
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid var(--border);
+  background-color: color-mix(in srgb, var(--brand) 7%, var(--card));
+}
+
+.offline-class-summary__badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.offline-class-summary .offline-class-summary__subject {
+  margin: 0;
+}
+
+.offline-class-summary__subject {
+  background: var(--brand);
+}
+
+.offline-class-summary__subject.has-subject-color {
+  background: var(--subject-color);
+  color: var(--subject-contrast, #fff);
+}
+
+.offline-class-summary__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--success-color, #22c55e) 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success-color, #22c55e) 12%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.offline-class-summary__status::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--success-color, #22c55e);
+  content: "";
+}
+
+.offline-class-summary__status--archived {
+  border-color: color-mix(in srgb, var(--muted) 28%, transparent);
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
+}
+
+.offline-class-summary__status--archived::before {
+  background: var(--muted);
+}
+
+.offline-class-summary .page-title {
+  margin: 0;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.offline-class-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 20px 24px 24px;
+}
+
+.offline-class-summary__item {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 72%, var(--card));
+}
+
+.offline-class-summary__item dt {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.offline-class-summary__item dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.offline-class-summary__item--schedule dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.offline-class-summary .offline-class-summary__description {
+  margin: -4px 24px 24px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.offline-class-summary .offline-class-summary__notice {
+  margin: -4px 24px 24px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning-color, #f59e0b) 12%, transparent);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.offline-class-summary__description + .offline-class-summary__notice {
+  margin-top: -12px;
+}
+
+@media (max-width: 640px) {
+  .offline-class-summary {
+    border-radius: 14px;
+  }
+
+  .offline-class-summary__header {
+    padding: 20px 18px 17px;
+  }
+
+  .offline-class-summary .page-title {
+    font-size: 1.5rem;
+  }
+
+  .offline-class-summary__grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 14px;
+  }
+
+  .offline-class-summary__item {
+    padding: 12px 14px;
+  }
+
+  .offline-class-summary .offline-class-summary__description,
+  .offline-class-summary .offline-class-summary__notice {
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+
+  .offline-class-summary .offline-class-summary__description {
+    margin-top: 0;
+  }
+}

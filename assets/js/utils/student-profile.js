@@ -64,7 +64,7 @@ export async function loadStudentProfile(uid) {
 
 /**
  * @param {string} uid
- * @param {{ name?: string, phone?: string, grade?: string, email?: string, gradeManualOverride?: boolean }} profile
+ * @param {{ name?: string, phone?: string, grade?: string, email?: string, gradeManualOverride?: boolean, lastAutoPromotionYear?: number }} profile
  */
 export async function saveStudentProfile(uid, profile) {
   if (!uid || !profile) {
@@ -83,7 +83,12 @@ export async function saveStudentProfile(uid, profile) {
     updatedAt: serverTimestamp()
   };
   if (email) canonicalPayload.email = email;
-  if (profile.gradeManualOverride) canonicalPayload.gradeManualOverride = true;
+  if (typeof profile.gradeManualOverride === "boolean") {
+    canonicalPayload.gradeManualOverride = profile.gradeManualOverride;
+  }
+  if (Number.isInteger(profile.lastAutoPromotionYear)) {
+    canonicalPayload.lastAutoPromotionYear = profile.lastAutoPromotionYear;
+  }
 
   await setDoc(doc(db, "students", uid), canonicalPayload, { merge: true });
 

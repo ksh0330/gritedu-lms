@@ -12,7 +12,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
-import { getPublicSettingDoc } from "/assets/js/utils/settings-cache.js";
+import { getPublicSettingDoc, getSettingDoc } from "/assets/js/utils/settings-cache.js";
 import { getUserRole } from "/assets/js/utils/auth.js";
 import {
   createCourseLabelMaps,
@@ -22,11 +22,19 @@ import {
   normalizeCourseFormat
 } from "/assets/js/utils/course-readonly.js";
 import { normalizeGrade } from "/assets/js/utils/grade.js";
+import { canRequestApprovalCourse } from "/assets/js/utils/approval-course.js";
+import { normalizeVideoUrl } from "/assets/js/utils/video-url.js";
 import {
   PUBLIC_IMAGE_FIELD,
   sanitizePublicImageSrc,
 } from "/assets/js/utils/public-image-url.js";
 import { getInstructorSubjects } from "/assets/js/utils/instructor-subjects.js";
+import {
+  getSubjectColor,
+  getSubjectContrastColor,
+  loadSharedSubjectColorMap,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 const db = getFirestore(app);
 const params = new URLSearchParams(window.location.search);
@@ -38,8 +46,10 @@ let currentMemberPurpose = null;
 let currentCourse = null;
 let enrollmentsLoaded = false;
 let enrollRequestInFlight = false;
+let approvalRequestStatus;
 let enrolledCourseIds = new Set();
 let labelMaps = createCourseLabelMaps({});
+let subjectColorMap = mergeSubjectColorMap({});
 let activeTabKey = "introduction";
 
 const TAB_KEYS = ["introduction", "instructor", "lecture"];
@@ -74,17 +84,6 @@ function formatSubjectsLabel(values, maps = labelMaps, fallback = "") {
     .filter(Boolean);
   if (!list.length) return fallback;
   return list.map((value) => getSubjectLabel(value, maps) || value).join(" | ");
-}
-
-function getSubjectAccentClass(subjectCode, subjectLabel = "") {
-  const code = String(subjectCode || "").trim().toUpperCase();
-  const label = String(subjectLabel || "").trim();
-  if (code === "KOR" || label === "국어") return "subject-ko";
-  if (code === "ENG" || label === "영어") return "subject-en";
-  if (code === "MATH" || label === "수학") return "subject-ma";
-  if (code === "SCI" || label === "과학") return "subject-sc";
-  if (code === "ESSAY" || label === "수리논술") return "subject-etc";
-  return "subject-etc";
 }
 
 function isPublicCourse(course) {
@@ -168,17 +167,28 @@ function getSectionByTypes(sectionMap, types) {
 }
 
 async function loadContext() {
-  try {
-    const catalogResult = await getPublicSettingDoc("courseCatalog");
-    labelMaps = createCourseLabelMaps(catalogResult.exists ? catalogResult.data : {});
-  } catch (_) {
-    labelMaps = createCourseLabelMaps({});
-  }
+  await Promise.all([
+    (async () => {
+      try {
+        const catalogResult = await getPublicSettingDoc("courseCatalog");
+        labelMaps = createCourseLabelMaps(catalogResult.exists ? catalogResult.data : {});
+      } catch (_) {
+        labelMaps = createCourseLabelMaps({});
+      }
+    })(),
+    (async () => {
+      try {
+        subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc);
+      } catch (_) {
+        subjectColorMap = mergeSubjectColorMap({});
+      }
+    })(),
+  ]);
 }
 
 function getInstructorDetailUrl(course) {
   const docId = String(course?.instructorId || course?.instructorDocId || "").trim();
-  return docId ? `/instructor-details.html?doc=${encodeURIComponent(docId)}` : "";
+  return docId ? `/instructor-details?doc=${encodeURIComponent(docId)}` : "";
 }
 
 const INSTRUCTOR_IMAGE_FIELDS = [
@@ -308,12 +318,8 @@ function renderInstructorAvatar(avatarEl, name, imageUrl) {
 }
 
 function toYouTubeEmbed(url) {
-  const raw = String(url || "").trim();
-  if (!raw) return "";
-  const idMatch = raw.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
-  if (idMatch?.[1]) return `https://www.youtube.com/embed/${idMatch[1]}`;
-  if (/^[\w-]{11}$/.test(raw)) return `https://www.youtube.com/embed/${raw}`;
-  return "";
+  const video = normalizeVideoUrl(url);
+  return video?.type === "youtube" || video?.type === "youtubePlaylist" ? video.embedUrl : "";
 }
 
 function getWeekVideoUrl(video) {
@@ -418,11 +424,17 @@ function renderCourseOverview(course, sectionMap) {
   const gradeText = toDisplayText(course.gradeLabel || course.grade);
   const yearText = toDisplayText(course.year);
   const instructorNameText = formatInstructorDisplayName(course.instructorName);
-  const subjectAccentClass = getSubjectAccentClass(course.subjectCode || course.subject, course.subjectLabel);
+  const subjectColor = getSubjectColor(subjectText, subjectColorMap);
 
   if (metaRowEl) {
-    metaRowEl.classList.remove("subject-ko", "subject-en", "subject-ma", "subject-sc", "subject-etc");
-    metaRowEl.classList.add(subjectAccentClass);
+    metaRowEl.classList.toggle("has-subject-color", Boolean(subjectColor));
+    if (subjectColor) {
+      metaRowEl.style.setProperty("--subject-color", subjectColor);
+      metaRowEl.style.setProperty("--subject-contrast", getSubjectContrastColor(subjectColor));
+    } else {
+      metaRowEl.style.removeProperty("--subject-color");
+      metaRowEl.style.removeProperty("--subject-contrast");
+    }
   }
 
   if (subjectEl) subjectEl.textContent = subjectText;
@@ -486,8 +498,17 @@ function renderCourseOverview(course, sectionMap) {
     const badgeSubject = course._instructorPrimarySubject || subjectText;
     if (badgeSubject && badgeSubject !== "-") {
       instructorSubjectTextEl.dataset.subject = badgeSubject;
+      const badgeColor = getSubjectColor(badgeSubject, subjectColorMap);
+      instructorSubjectTextEl.classList.toggle("has-subject-color", Boolean(badgeColor));
+      if (badgeColor) {
+        instructorSubjectTextEl.style.setProperty("--subject-color", badgeColor);
+      } else {
+        instructorSubjectTextEl.style.removeProperty("--subject-color");
+      }
     } else {
       instructorSubjectTextEl.removeAttribute("data-subject");
+      instructorSubjectTextEl.classList.remove("has-subject-color");
+      instructorSubjectTextEl.style.removeProperty("--subject-color");
     }
   }
 
@@ -847,6 +868,30 @@ async function updateEnrollButton() {
     return renderEnrollCta({ label: "수강신청", disabled: true, hint: "결제 기능 준비중입니다." });
   }
 
+  if (accessType === "approvalRequired") {
+    if (!currentUser) return renderEnrollCta({ label: "승인 후 수강", onClick: promptLoginRequired });
+    if (!currentUserRole) {
+      try { currentUserRole = await getUserRole(currentUser); } catch (_) { currentUserRole = null; }
+    }
+    if (!canRequestApprovalCourse(currentUserRole, currentUserRole === "member" ? await getCurrentMemberPurpose() : null)) {
+      return renderEnrollCta({ label: "수강신청 불가", disabled: true, hint: currentUserRole === "member" ? PARENT_MEMBER_ENROLL_MESSAGE : LEARNER_ONLY_ENROLL_MESSAGE });
+    }
+    if (!enrollmentsLoaded) return renderEnrollCta({ label: "수강 상태 확인 중", disabled: true });
+    if (enrolled) return renderEnrollCta({ label: "학습하기", onClick: () => { window.location.href = learnerCourseUrl(courseId); }, hint: "승인이 완료되었습니다." });
+    if (approvalRequestStatus === undefined) {
+      try {
+        const snap = await getDoc(doc(db, "courses", courseId, "enrollmentRequests", currentUser.uid));
+        approvalRequestStatus = snap.exists() ? String(snap.data()?.status || "") : "";
+      } catch (_) {
+        return renderEnrollCta({ label: "수강 상태 확인 실패", disabled: true, hint: "잠시 후 새로고침해 주세요." });
+      }
+    }
+    if (approvalRequestStatus === "pending") return renderEnrollCta({ label: "승인 대기", disabled: true, hint: "관리자가 신청을 확인하고 있습니다." });
+    if (approvalRequestStatus === "rejected") return renderEnrollCta({ label: "신청 거절", disabled: true, hint: "자세한 사항은 학원에 문의해 주세요." });
+    if (approvalRequestStatus === "approved") return renderEnrollCta({ label: "수강 상태 확인 필요", disabled: true, hint: "학원에 문의해 주세요." });
+    return renderEnrollCta({ label: "승인 후 수강", disabled: enrollRequestInFlight, onClick: requestApprovalEnrollment, hint: "신청 후 관리자 승인이 필요합니다." });
+  }
+
   if (!isMemberOnlyCourse(course)) {
     return renderEnrollCta({ label: "수강신청", disabled: true, hint: "현재 온라인 수강 신청 준비 중인 강좌입니다. 상담을 통해 안내받아 주세요." });
   }
@@ -893,10 +938,35 @@ async function updateEnrollButton() {
   }
 
   return renderEnrollCta({
-    label: "수강신청",
+    label: "바로 수강",
     disabled: enrollRequestInFlight,
     onClick: () => { window.enrollCourse(courseId); }
   });
+}
+
+async function requestApprovalEnrollment() {
+  if (enrollRequestInFlight || !currentUser || !currentCourse || normalizeAccessType(currentCourse.accessType) !== "approvalRequired") return;
+  if (!canRequestApprovalCourse(currentUserRole, currentUserRole === "member" ? await getCurrentMemberPurpose() : null)) return;
+  enrollRequestInFlight = true;
+  await updateEnrollButton();
+  try {
+    await setDoc(doc(db, "courses", courseId, "enrollmentRequests", currentUser.uid), {
+      courseId,
+      userId: currentUser.uid,
+      learnerType: currentUserRole,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    approvalRequestStatus = "pending";
+    window.toast?.success?.("수강신청 요청을 보냈습니다.");
+  } catch (_) {
+    window.toast?.error?.("수강신청 요청을 보내지 못했습니다. 상태를 새로고침해 확인해 주세요.");
+    approvalRequestStatus = undefined;
+  } finally {
+    enrollRequestInFlight = false;
+    await updateEnrollButton();
+  }
 }
 
 async function buildStudentSnapshot(uid) {
@@ -1093,6 +1163,7 @@ setupTabInteraction();
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
+  approvalRequestStatus = undefined;
   currentUserRole = null;
   currentMemberPurpose = null;
   try {

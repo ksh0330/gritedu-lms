@@ -2,25 +2,51 @@ import {
   loadStudentProfile,
   saveStudentMarketingConsent,
   saveStudentProfile
-} from "/assets/js/utils/student-profile.js";
+} from "/assets/js/utils/student-profile.js?v=20260913-grade-tracking";
 import { dom, state, toast } from "/assets/js/pages/student-dashboard/context.js";
-import { setWelcomeMessage } from "/assets/js/pages/student-dashboard/settings.js";
+import { setWelcomeMessage } from "/assets/js/pages/student-dashboard/settings.js?v=20260913-grade-tracking";
 import { normalizeGrade } from "/assets/js/utils/grade.js";
 
+function lockDashboardScroll() {
+  document.documentElement.classList.add("modal-open");
+  document.body.classList.add("modal-open");
+}
+
+function unlockDashboardScroll() {
+  document.documentElement.classList.remove("modal-open");
+  document.body.classList.remove("modal-open");
+}
+
 export function setupProfileModalHandlers() {
+  let loadedProfileGrade = "";
+
+  const closeProfileModal = () => {
+    if (dom.editProfileModal) dom.editProfileModal.style.display = "none";
+    if (dom.editProfileForm) dom.editProfileForm.reset();
+    loadedProfileGrade = "";
+    if (dom.editProfileStatus) dom.editProfileStatus.textContent = "";
+    unlockDashboardScroll();
+    dom.editProfileBtn?.focus({ preventScroll: true });
+  };
+
   if (dom.editProfileBtn) {
     dom.editProfileBtn.addEventListener("click", async () => {
       try {
         const userData = await loadStudentProfile(state.user?.uid);
         if (userData) {
+          loadedProfileGrade = normalizeGrade(userData.grade);
           const editName = document.getElementById("editName");
           const editPhone = document.getElementById("editPhone");
           const editGrade = document.getElementById("editGrade");
           if (editName) editName.value = userData.name || "";
           if (editPhone) editPhone.value = userData.phone || "";
-          if (editGrade) editGrade.value = normalizeGrade(userData.grade);
+          if (editGrade) editGrade.value = loadedProfileGrade;
         }
-        if (dom.editProfileModal) dom.editProfileModal.style.display = "flex";
+        if (dom.editProfileModal) {
+          dom.editProfileModal.style.display = "flex";
+          lockDashboardScroll();
+          dom.closeEditProfileModal?.focus({ preventScroll: true });
+        }
       } catch (error) {
         console.error("사용자 정보 로드 실패:", error);
         if (dom.editProfileStatus) {
@@ -31,15 +57,8 @@ export function setupProfileModalHandlers() {
     });
   }
 
-  if (dom.closeEditProfileModal) {
-    const closeProfileModal = () => {
-      if (dom.editProfileModal) dom.editProfileModal.style.display = "none";
-      if (dom.editProfileForm) dom.editProfileForm.reset();
-      if (dom.editProfileStatus) dom.editProfileStatus.textContent = "";
-    };
-    dom.closeEditProfileModal.addEventListener("click", closeProfileModal);
-    document.getElementById("cancelEditProfileBtn")?.addEventListener("click", closeProfileModal);
-  }
+  dom.closeEditProfileModal?.addEventListener("click", closeProfileModal);
+  document.getElementById("cancelEditProfileBtn")?.addEventListener("click", closeProfileModal);
 
   if (dom.editProfileForm) {
     dom.editProfileForm.addEventListener("submit", async (e) => {
@@ -62,17 +81,19 @@ export function setupProfileModalHandlers() {
       }
 
       try {
+        const gradeChanged = grade !== loadedProfileGrade;
         await saveStudentProfile(state.user.uid, {
           name,
           phone,
           grade,
           email: state.user?.email || "",
-          gradeManualOverride: true
+          ...(gradeChanged ? {
+            gradeManualOverride: false,
+            lastAutoPromotionYear: new Date().getFullYear()
+          } : {})
         });
 
-        if (dom.editProfileModal) dom.editProfileModal.style.display = "none";
-        dom.editProfileForm.reset();
-        if (dom.editProfileStatus) dom.editProfileStatus.textContent = "";
+        closeProfileModal();
         toast("정보가 저장되었습니다.", false);
         await setWelcomeMessage();
       } catch (error) {
@@ -84,11 +105,15 @@ export function setupProfileModalHandlers() {
 
   if (dom.editProfileModal) {
     dom.editProfileModal.addEventListener("click", (e) => {
-      if (e.target === dom.editProfileModal) {
-        dom.editProfileModal.style.display = "none";
-      }
+      if (e.target === dom.editProfileModal) closeProfileModal();
     });
   }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && dom.editProfileModal?.style.display !== "none") {
+      closeProfileModal();
+    }
+  });
 
   setupMarketingConsentModalHandlers();
   setupAccountDeletionModalHandlers();
@@ -102,13 +127,14 @@ function setupAccountDeletionModalHandlers() {
 
   const close = () => {
     modal.style.display = "none";
-    document.body.classList.remove("modal-open");
+    unlockDashboardScroll();
+    openButton.focus({ preventScroll: true });
   };
 
   openButton.addEventListener("click", () => {
     modal.style.display = "flex";
-    document.body.classList.add("modal-open");
-    closeButton?.focus();
+    lockDashboardScroll();
+    closeButton?.focus({ preventScroll: true });
   });
   closeButton?.addEventListener("click", close);
   modal.addEventListener("click", (event) => {
@@ -135,7 +161,9 @@ function setupMarketingConsentModalHandlers() {
 
   const close = () => {
     modal.style.display = "none";
+    unlockDashboardScroll();
     if (saveButton) saveButton.disabled = false;
+    openButton.focus({ preventScroll: true });
   };
 
   openButton.addEventListener("click", async () => {
@@ -143,6 +171,8 @@ function setupMarketingConsentModalHandlers() {
       const profile = await loadStudentProfile(state.user?.uid);
       input.checked = isMarketingConsentEnabled(profile?.marketingConsent || {});
       modal.style.display = "flex";
+      lockDashboardScroll();
+      closeButton?.focus({ preventScroll: true });
     } catch (error) {
       console.error("광고성 정보 수신 설정 로드 실패:", error);
       toast("저장 중 문제가 발생했습니다. 다시 시도하거나 학원으로 문의해 주세요.", true);
@@ -153,6 +183,9 @@ function setupMarketingConsentModalHandlers() {
   cancelButton?.addEventListener("click", close);
   modal.addEventListener("click", (event) => {
     if (event.target === modal) close();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal.style.display !== "none") close();
   });
 
   form.addEventListener("submit", async (event) => {

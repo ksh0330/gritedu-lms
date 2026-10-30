@@ -1,8 +1,9 @@
 import { db } from "/assets/js/firebase-init.js";
 import { doc, getDoc, getDocFromServer } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
-const VALID_KEYS = ["coursesMenu", "instructorsMenu", "signup", "popups", "courseCatalog", "timetableCatalog", "offlineClassCatalog"];
-const SESSION_CACHE_KEYS = new Set(["coursesMenu", "instructorsMenu", "courseCatalog", "timetableCatalog", "offlineClassCatalog"]);
+const VALID_KEYS = ["coursesMenu", "instructorsMenu", "signup", "popups", "courseCatalog", "timetableCatalog", "offlineClassCatalog", "subjectColors", "footer"];
+const SESSION_CACHE_KEYS = new Set(["coursesMenu", "instructorsMenu", "courseCatalog", "timetableCatalog", "offlineClassCatalog", "subjectColors", "footer"]);
+const PUBLIC_SESSION_CACHE_KEYS = new Set(["footer"]);
 const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
 const SESSION_CACHE_PREFIX = "grit-settings-cache:";
 const cache = new Map();
@@ -73,15 +74,29 @@ export async function getSettingDoc(key) {
 }
 
 /**
- * Public pages: always read latest CMS settings from Firestore server (no session/in-memory cache).
+ * Public pages normally read the latest server value. Small, non-sensitive
+ * settings in PUBLIC_SESSION_CACHE_KEYS use the same short session cache.
  * @param {string} key
  * @returns {Promise<{ exists: boolean, data: Record<string, unknown> }>}
  */
 export async function getPublicSettingDoc(key) {
   if (!VALID_KEYS.includes(key)) throw new Error(`Invalid settings key: ${key}`);
+  if (PUBLIC_SESSION_CACHE_KEYS.has(key)) {
+    if (cache.has(key)) return cache.get(key);
+    const sessionCached = readSessionCachedSetting(key);
+    if (sessionCached) {
+      cache.set(key, sessionCached);
+      return sessionCached;
+    }
+  }
   const snap = await getDocFromServer(doc(db, "settings", key));
   const exists = snapExists(snap);
-  return { exists, data: exists ? snapData(snap) : {} };
+  const result = { exists, data: exists ? snapData(snap) : {} };
+  if (PUBLIC_SESSION_CACHE_KEYS.has(key)) {
+    cache.set(key, result);
+    writeSessionCachedSetting(key, result);
+  }
+  return result;
 }
 
 /**

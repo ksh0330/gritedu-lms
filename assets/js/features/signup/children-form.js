@@ -406,7 +406,7 @@ export function selectSchool(schoolName) {
 /**
  * 자녀 추가
  */
-export function addChild(showStatusCallback) {
+export function addChild() {
   const container = document.getElementById("childrenContainer");
   if (!container) return;
 
@@ -497,7 +497,7 @@ export function serializeChildren() {
   const childItems = document.querySelectorAll(".child-item");
   const children = [];
 
-  childItems.forEach((item, index) => {
+  childItems.forEach((item) => {
     const name = item.querySelector(".child-name-input")?.value.trim() || "";
     const school = item.querySelector(".child-school-input")?.value.trim() || "";
     const grade = item.querySelector(".child-grade-select")?.value || "";

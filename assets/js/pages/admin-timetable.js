@@ -10,7 +10,8 @@ import {
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
-import { ensureAdminToastHost } from "/assets/js/utils/admin-modal-alert.js";
+import { showAdminToast } from "/assets/js/utils/admin-toast.js";
+import { setAdminRefreshButtonState } from "/assets/js/utils/admin-refresh.js";
 import { getAdminSettingDoc, invalidateSetting } from "/assets/js/utils/settings-cache.js";
 import {
   applyLegacyTimetableCatalogFieldRemovals,
@@ -48,14 +49,7 @@ let scheduleImagesDraft = [];
 let scheduleDivisionsDraft = [];
 
 function toast(message, isError = false) {
-  const host = $("#statusMsg");
-  if (!host) return;
-  ensureAdminToastHost(host);
-  host.textContent = message;
-  host.classList.toggle("is-error", isError);
-  host.classList.add("is-visible");
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => host.classList.remove("is-visible"), 3200);
+  showAdminToast(message, isError);
 }
 
 function setImageAlert(message = "", isError = false) {
@@ -287,10 +281,10 @@ function renderImages() {
         </label>
         <p class="muted admin-schedule-image-item__url">${escapeHtml(item.url)}</p>
         <div class="admin-schedule-image-item__actions">
-          <button type="button" class="btn sm" data-image-move="up"${index === 0 ? " disabled" : ""}>위로</button>
-          <button type="button" class="btn sm" data-image-move="down"${index === scheduleImagesDraft.length - 1 ? " disabled" : ""}>아래로</button>
+          <button type="button" class="btn sm admin-schedule-group-order-btn" data-image-move="up"${index === 0 ? " disabled" : ""} aria-label="위로" title="위로">↑</button>
+          <button type="button" class="btn sm admin-schedule-group-order-btn" data-image-move="down"${index === scheduleImagesDraft.length - 1 ? " disabled" : ""} aria-label="아래로" title="아래로">↓</button>
           <button type="button" class="btn sm" data-image-edit>수정</button>
-          <button type="button" class="btn sm" data-image-remove>삭제</button>
+          <button type="button" class="btn sm danger" data-image-remove>삭제</button>
         </div>
       </div>
     </article>`).join("");
@@ -324,14 +318,12 @@ async function saveImages() {
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser?.uid || "",
       };
-      if (imageGroupId === REGULAR_SCHEDULE_GROUP_ID) updates.scheduleImages = payload;
       applyLegacyTimetableCatalogFieldRemovals(updates, deleteField);
       await updateDoc(ref, updates);
     } else {
       await setDoc(ref, {
         ...serializeScheduleGroupsPayload(scheduleGroupsDraft),
         groupCatalogs: { [imageGroupId]: { scheduleImages: payload } },
-        ...(imageGroupId === REGULAR_SCHEDULE_GROUP_ID ? { scheduleImages: payload } : {}),
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser?.uid || "",
       });
@@ -351,9 +343,16 @@ async function saveImages() {
 }
 
 function bindEvents() {
-  $("#btnRefresh")?.addEventListener("click", async () => {
-    await loadCatalog();
-    toast("최신 설정을 불러왔습니다.");
+  $("#refreshBtn")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    setAdminRefreshButtonState(button, true);
+    try {
+      await loadCatalog();
+      toast("최신 설정을 불러왔습니다.");
+    } finally {
+      setAdminRefreshButtonState(button, false);
+    }
   });
   $("#scheduleGroupsSaveBtn")?.addEventListener("click", saveGroups);
   $("#scheduleImageSaveBtn")?.addEventListener("click", saveImages);

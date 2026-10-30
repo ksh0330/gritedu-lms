@@ -2,16 +2,53 @@
 import { collection, getDoc, getDocs, doc, query, where } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { getSettingDoc } from "/assets/js/utils/settings-cache.js";
 import { createCourseLabelMaps } from "/assets/js/utils/course-readonly.js";
+import {
+  getSubjectColorMapFromSettings,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 import { dom, state } from "/assets/js/pages/instructor-dashboard/context.js";
+
+const instructorAccountReads = new Map();
+const instructorProfileByUidReads = new Map();
+
+function loadInstructorAccount(uid) {
+  const key = String(uid || "").trim();
+  if (!key) return Promise.resolve(null);
+  if (!instructorAccountReads.has(key)) {
+    instructorAccountReads.set(key, getDoc(doc(db, "instructorAccounts", key)));
+  }
+  return instructorAccountReads.get(key);
+}
+
+function findInstructorProfileByUid(uid) {
+  const key = String(uid || "").trim();
+  if (!key) return Promise.resolve(null);
+  if (!instructorProfileByUidReads.has(key)) {
+    instructorProfileByUidReads.set(
+      key,
+      getDocs(query(collection(db, "instructors"), where("uid", "==", key)))
+        .then((snapshot) => snapshot.docs[0] || null)
+    );
+  }
+  return instructorProfileByUidReads.get(key);
+}
 
 export async function loadDashboardSettings() {
   try {
-    const [catalogResult, coursesMenuResult, instructorAccountResult] = await Promise.all([
+    const [catalogResult, coursesMenuResult, instructorsMenuResult, subjectColorsResult, instructorAccountResult] = await Promise.all([
       getSettingDoc("courseCatalog"),
       getSettingDoc("coursesMenu"),
-      state.user?.uid ? getDoc(doc(db, "instructorAccounts", state.user.uid)) : Promise.resolve(null)
+      getSettingDoc("instructorsMenu"),
+      getSettingDoc("subjectColors"),
+      loadInstructorAccount(state.user?.uid)
     ]);
     state.labelMaps = createCourseLabelMaps(catalogResult.exists ? catalogResult.data : {});
+    state.subjectColorMap = mergeSubjectColorMap(
+      {
+        ...getSubjectColorMapFromSettings(instructorsMenuResult.exists ? instructorsMenuResult.data : {}),
+        ...getSubjectColorMapFromSettings(subjectColorsResult.exists ? subjectColorsResult.data : {}),
+      }
+    );
     const hiddenList = coursesMenuResult.exists ? coursesMenuResult.data?.hidden : [];
     state.hiddenCourseIds = new Set(Array.isArray(hiddenList) ? hiddenList : []);
     state.instructorsByUid = {};
@@ -19,9 +56,8 @@ export async function loadDashboardSettings() {
     state.instructorProfileId = String(accountData.instructorId || "").trim();
 
     if (!state.instructorProfileId && state.user?.uid) {
-      const byUidSnap = await getDocs(query(collection(db, "instructors"), where("uid", "==", state.user.uid)));
-      if (!byUidSnap.empty) {
-        const profile = byUidSnap.docs[0];
+      const profile = await findInstructorProfileByUid(state.user.uid);
+      if (profile) {
         state.instructorProfileId = String(profile.data()?.instructorId || profile.id || "").trim();
       }
     }
@@ -29,6 +65,7 @@ export async function loadDashboardSettings() {
     state.labelMaps = createCourseLabelMaps({});
     state.hiddenCourseIds = new Set();
     state.instructorsByUid = {};
+    state.subjectColorMap = mergeSubjectColorMap({});
     state.instructorProfileId = "";
   }
 }
@@ -49,7 +86,7 @@ export async function setInstructorInfo() {
 
   let resolvedName = "";
   try {
-    const accountDoc = await getDoc(doc(db, "instructorAccounts", currentUser.uid));
+    const accountDoc = await loadInstructorAccount(currentUser.uid);
     let instructorId = "";
     if (accountDoc.exists()) {
       const accountData = accountDoc.data() || {};
@@ -63,9 +100,9 @@ export async function setInstructorInfo() {
       }
     }
     if (!resolvedName) {
-      const byUidSnap = await getDocs(query(collection(db, "instructors"), where("uid", "==", currentUser.uid)));
-      if (!byUidSnap.empty) {
-        resolvedName = byUidSnap.docs[0].data()?.name || "";
+      const byUidProfile = await findInstructorProfileByUid(currentUser.uid);
+      if (byUidProfile) {
+        resolvedName = byUidProfile.data()?.name || "";
       }
     }
   } catch (_error) {

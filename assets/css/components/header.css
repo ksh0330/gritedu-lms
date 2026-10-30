@@ -186,7 +186,7 @@
 .theme-toggle-btn:hover img {
   opacity:1
 }
-@media (min-width:1441px) {
+@media (min-width:1441px) and (hover:hover) and (pointer:fine) {
   :root {
     --header-h:72px
   }
@@ -245,7 +245,7 @@ html[data-theme=dark] .grit-nav a.is-active,html[data-theme=dark] .grit-nav a:ho
 .only-mobile {
   display:none
 }
-@media (max-width:1440px) {
+@media (max-width:1440px), (hover:none) and (pointer:coarse) {
   .only-mobile {
     display:block
   }
@@ -267,8 +267,11 @@ html[data-theme=dark] .grit-nav a.is-active,html[data-theme=dark] .grit-nav a:ho
     grid-template-columns:40px 1fr 40px;
     grid-template-rows:1fr;
     height:100%;
-    padding:0 12px;
-    min-width:0
+    max-width:none;
+    min-width:0;
+    padding-left:max(clamp(12px,2.5vw,32px),env(safe-area-inset-left));
+    padding-right:max(clamp(12px,2.5vw,32px),env(safe-area-inset-right));
+    width:100%
   }
   #themeToggle {
     display:flex!important;
@@ -509,11 +512,6 @@ html[data-theme=dark] .grit-nav a.is-active,html[data-theme=dark] .grit-nav a:ho
   html[data-theme=dark] .grit-nav>ul.open .submenu li a:focus-visible {
     background:var(--hover);
     color:#e8e9ee
-  }
-  @media (min-width:1441px) {
-    #mobile-auth-row {
-      display:none
-    }
   }
   @media (max-width:480px) {
     .grit-logo {

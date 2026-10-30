@@ -4,12 +4,14 @@ import {
   collection, query, where, getDocs, getDoc, doc
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
+import { isActiveCourseEnrollment } from "/assets/js/utils/instructor-course-access.js";
+import { getCurrentCourseCompletion } from "/assets/js/utils/course-completion.js";
+import { bindCommittedSearch } from "/assets/js/utils/list-controls.js";
 import "/assets/js/utils/toast.js";
 import { handleError, createErrorUI } from "/assets/js/utils/error-handler.js";
 import {
   normalizeCourseForReadOnly,
   normalizeAccessType,
-  getAccessTypeBadgeLabel,
   getCourseFormatBadgeLabel
 } from "/assets/js/utils/course-readonly.js";
 import {
@@ -19,7 +21,9 @@ import {
   formatLastActivity,
   buildVideoPlayerHtml,
   getWeekVideoArray,
-  normalizeCourseFormat
+  normalizeCourseFormat,
+  isEnrollmentManagedCourse,
+  getInstructorCourseAccessLabel
 } from "/assets/js/pages/instructor-dashboard/context.js";
 let user;
 let instructorProfileId = "";
@@ -36,15 +40,14 @@ let courseData = null;
 let allEnrollments = [];
 let filteredEnrollments = [];
 let enrollmentsPage = 1;
-let searchDebounceTimer = null;
-
-const PUBLIC_ENROLLMENT_MESSAGE = "공개 강좌는 수강신청 없이 제공되는 강좌입니다.";
+let appliedEnrollmentKeyword = "";
 
 function getAssignedInstructorIds(course) {
   const ids = [
     course?.instructorUid,
     course?.instructorId,
-    ...(Array.isArray(course?.instructorUids) ? course.instructorUids : [])
+    ...(Array.isArray(course?.instructorUids) ? course.instructorUids : []),
+    ...(Array.isArray(course?.instructorIds) ? course.instructorIds : [])
   ];
   return ids.map((id) => String(id || "").trim()).filter(Boolean);
 }
@@ -54,10 +57,6 @@ function canCurrentInstructorAccessCourse(course, currentUser) {
   if (!uid) return false;
   const allowedIds = new Set(getAssignedInstructorIds(course));
   return allowedIds.has(uid) || (instructorProfileId && allowedIds.has(instructorProfileId));
-}
-
-function isMemberOnlyCourse(course) {
-  return normalizeAccessType(course?.accessType) === "memberOnly";
 }
 
 function formatEnrollmentDate(enrollment) {
@@ -77,7 +76,8 @@ function resolveStudentRow(enrollment) {
   return {
     ...base,
     enrolledAt: formatEnrollmentDate(enrollment),
-    lastActivity: formatLastActivity(enrollment)
+    lastActivity: formatLastActivity(enrollment),
+    progress: getCurrentCourseCompletion(courseId, courseData?.weeks, enrollment.watchedVideos).progress
   };
 }
 
@@ -231,51 +231,15 @@ function setupEnrollmentSearch() {
   const searchInput = document.getElementById("courseDetailEnrollmentSearch");
   if (!searchInput || searchInput.dataset.bound === "1") return;
   searchInput.dataset.bound = "1";
-  searchInput.addEventListener("input", () => {
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(() => {
-      enrollmentsPage = 1;
-      renderEnrollmentsTable();
-    }, 250);
+  bindCommittedSearch(searchInput, document.getElementById("courseDetailEnrollmentSearchButton"), (keyword) => {
+    appliedEnrollmentKeyword = keyword;
+    enrollmentsPage = 1;
+    renderEnrollmentsTable();
   });
 }
 
 function getEnrollmentsSection() {
   return document.querySelector(".instructor-enrollments-section");
-}
-
-function ensureEnrollmentToolbar() {
-  const section = getEnrollmentsSection();
-  if (!section || section.querySelector("#courseDetailEnrollmentSearch")) return;
-
-  const heading = section.querySelector("h2");
-  const toolbar = document.createElement("div");
-  toolbar.className = "instructor-section-toolbar instructor-course-detail-toolbar";
-  toolbar.innerHTML = `
-    <h2 class="instructor-section-title" style="margin:0;">수강생</h2>
-    <input type="search" id="courseDetailEnrollmentSearch" class="instructor-search-input" placeholder="이름, 학교, 학년, 전화번호 검색" aria-label="수강생 검색">
-  `;
-  if (heading) heading.replaceWith(toolbar);
-  else section.insertBefore(toolbar, section.firstChild);
-
-  const searchInput = document.getElementById("courseDetailEnrollmentSearch");
-  if (searchInput) {
-    searchInput.addEventListener("input", () => {
-      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-      searchDebounceTimer = setTimeout(() => {
-        enrollmentsPage = 1;
-        renderEnrollmentsTable();
-      }, 250);
-    });
-  }
-
-  let paginationEl = document.getElementById("courseDetailEnrollmentsPagination");
-  if (!paginationEl) {
-    paginationEl = document.createElement("div");
-    paginationEl.id = "courseDetailEnrollmentsPagination";
-    paginationEl.className = "instructor-pagination";
-    section.appendChild(paginationEl);
-  }
 }
 
 function setupEnrollmentsTableHeader() {
@@ -287,6 +251,7 @@ function setupEnrollmentsTableHeader() {
       <th>학교</th>
       <th>학년</th>
       <th>전화번호</th>
+      <th>학습 완료율</th>
       <th>수강신청일</th>
     </tr>
   `;
@@ -300,7 +265,7 @@ function renderEnrollmentsBody(html) {
 
 function renderEnrollmentsMessage(message) {
   renderEnrollmentsBody(
-    `<tr><td colspan="5" class="instructor-enrollments-message">${escapeHtml(message)}</td></tr>`
+    `<tr><td colspan="6" class="instructor-enrollments-message">${escapeHtml(message)}</td></tr>`
   );
   const paginationEl = document.getElementById("courseDetailEnrollmentsPagination");
   if (paginationEl) {
@@ -310,7 +275,7 @@ function renderEnrollmentsMessage(message) {
 }
 
 function applyEnrollmentSearch() {
-  const keyword = document.getElementById("courseDetailEnrollmentSearch")?.value.trim().toLowerCase() || "";
+  const keyword = appliedEnrollmentKeyword;
   filteredEnrollments = allEnrollments.filter((row) => {
     if (!keyword) return true;
     const haystack = [row.name, row.school, row.grade, row.phone, row.enrolledAt]
@@ -344,6 +309,7 @@ function renderEnrollmentsTable() {
       <td>${escapeHtml(row.school)}</td>
       <td>${escapeHtml(row.grade)}</td>
       <td>${escapeHtml(row.phone)}</td>
+      <td>${row.progress}%</td>
       <td>${escapeHtml(row.enrolledAt)}</td>
     </tr>
   `).join("");
@@ -356,7 +322,6 @@ function renderEnrollmentsTable() {
     onPageChange: (nextPage) => {
       enrollmentsPage = nextPage;
       renderEnrollmentsTable();
-      paginationEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }) || enrollmentsPage;
 }
@@ -375,9 +340,9 @@ function renderCourseHeaderBadges() {
   }
 
   const accessKey = normalizeAccessType(courseData.accessType);
-  const accessClass = accessKey === "memberOnly" ? "member" : "public";
+  const accessClass = accessKey === "public" ? "public" : "member";
   badgeWrap.innerHTML = `
-    <span class="instructor-course-badge instructor-course-badge--${accessClass}">${escapeHtml(getAccessTypeBadgeLabel(accessKey))}</span>
+    <span class="instructor-course-badge instructor-course-badge--${accessClass}">${escapeHtml(getInstructorCourseAccessLabel(accessKey))}</span>
     <span class="instructor-course-badge instructor-course-badge--format">${escapeHtml(getCourseFormatBadgeLabel(courseData.courseFormat))}</span>
   `;
 }
@@ -452,12 +417,25 @@ async function loadCourseData() {
       return "not_found";
     }
 
-    courseData = normalizeCourseForReadOnly({ id: courseDoc.id, ...courseDoc.data() });
+    const rawCourse = { id: courseDoc.id, ...courseDoc.data() };
+    courseData = normalizeCourseForReadOnly(rawCourse);
 
     if (!canCurrentInstructorAccessCourse(courseData, currentUser)) {
       courseData = null;
       renderPageState("접근 권한 없음", "이 강좌에 대한 접근 권한이 없습니다.");
       return "denied";
+    }
+
+    if (normalizeAccessType(rawCourse.accessType) === "approvalRequired") {
+      const protectedSnap = await getDoc(doc(db, "coursePrivateContent", courseId));
+      if (!protectedSnap.exists()) {
+        renderPageState("강좌 영상을 불러올 수 없습니다", "보호된 강좌 영상이 없습니다. 관리자에게 문의해 주세요.");
+        return "missing_content";
+      }
+      courseData = normalizeCourseForReadOnly({
+        ...rawCourse,
+        weeks: protectedSnap.data()?.weeks || []
+      });
     }
 
     document.getElementById("courseTitle").textContent = courseData.title || "제목 없는 강좌";
@@ -488,7 +466,7 @@ async function loadEnrollments() {
 
   if (!courseData) return;
 
-  if (!isMemberOnlyCourse(courseData)) {
+  if (!isEnrollmentManagedCourse(courseData)) {
     setEnrollmentsSectionVisible(false);
     return;
   }
@@ -507,6 +485,7 @@ async function loadEnrollments() {
 
     enrollmentsSnap.docs.forEach((enrollDoc) => {
       const enrollment = enrollDoc.data() || {};
+      if (!isActiveCourseEnrollment(enrollment)) return;
       allEnrollments.push(resolveStudentRow(enrollment));
     });
 
@@ -527,7 +506,7 @@ async function loadEnrollments() {
       : "수강생 정보를 불러오는 중 오류가 발생했습니다.";
 
     renderEnrollmentsBody(
-      `<tr><td colspan="5" class="instructor-enrollments-error">${escapeHtml(message)}</td></tr>`
+      `<tr><td colspan="6" class="instructor-enrollments-error">${escapeHtml(message)}</td></tr>`
     );
   }
 }

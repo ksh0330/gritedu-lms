@@ -56,7 +56,7 @@ function formatTargetDate(dateString) {
 }
 
 function formatDdayDisplay(days) {
-  if (days > 0) return `D-Day ${days}`;
+  if (days > 0) return `D-${days}`;
   if (days === 0) return "D-Day";
   return `D+${Math.abs(days)}`;
 }

@@ -3,6 +3,49 @@
   margin-bottom: 16px;
 }
 
+.student-learning-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0 auto 16px;
+  max-width: 920px;
+}
+
+.student-learning-toolbar .student-learning-back {
+  margin-bottom: 0;
+}
+
+.course-enrollment-actions:not([hidden]) {
+  display: flex;
+}
+
+.course-enrollment-actions .btn {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.learning-list-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.learning-list-head h2 {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 800;
+  margin: 0;
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
+
+.learning-list-search {
+  flex: 1 1 360px;
+  max-width: 480px;
+}
+
 .student-learning-gate {
   margin: 24px 0 48px;
 }
@@ -156,11 +199,12 @@
 }
 
 .course-header {
-  background: linear-gradient(135deg, var(--card) 0%, var(--hover) 100%);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 32px;
-  margin-bottom: 32px;
+  padding: 24px;
+  margin: 0 auto 32px;
+  max-width: 920px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
@@ -181,7 +225,7 @@
 .course-title {
   font-size: clamp(1.5rem, 4vw, 2rem);
   font-weight: 900;
-  margin: 12px 0 16px;
+  margin: 8px 0 10px;
   color: var(--text);
   word-break: keep-all;
   overflow-wrap: break-word;
@@ -196,7 +240,7 @@
 
 .course-instructor {
   padding: 6px 12px;
-  background: var(--hover);
+  background: color-mix(in srgb, var(--brand) 7%, var(--card));
   border-radius: 6px;
   font-size: clamp(12px, 1.8vw, 14px);
   font-weight: 600;
@@ -207,20 +251,52 @@
   box-sizing: border-box;
 }
 
+.course-header .progress-section {
+  background: color-mix(in srgb, var(--brand) 4%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--brand) 16%, var(--border));
+  border-radius: 14px;
+  box-sizing: border-box;
+  margin-top: 18px;
+  padding: 18px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .student-learning-toolbar {
+    gap: 8px;
+  }
+
+  .student-learning-toolbar .btn {
+    font-size: 12px;
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .learning-list-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .learning-list-search {
+    flex-basis: auto;
+    max-width: none;
+    width: 100%;
+  }
+
+  .course-header {
+    border-radius: 14px;
+    padding: 18px;
+  }
+
+  .course-header .progress-section {
+    margin-top: 14px;
+    padding: 14px;
+  }
+}
+
 .progress-bar {
   position: relative;
   overflow: hidden;
-}
-
-.progress-bar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: progress-shine 2s infinite;
 }
 
 .weeks-list {
@@ -497,9 +573,17 @@
 
 body.modal-open {
   overflow: hidden;
-  position: fixed;
-  width: 100%;
-  height: 100%;
+  overscroll-behavior: none;
+}
+
+.student-learning-page .course-label {
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--border));
+  border-radius: 8px;
+  color: color-mix(in srgb, var(--brand) 82%, var(--text));
+  font-weight: 800;
+  margin-bottom: 0;
+  padding: 5px 10px;
 }
 
 .video-modal-content {
@@ -538,8 +622,15 @@ body.modal-open {
   font-size: 32px;
   color: var(--muted);
   cursor: pointer;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.video-modal-close:focus-visible,
+.video-modal-actions .btn:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .video-modal-body {
@@ -547,6 +638,39 @@ body.modal-open {
   flex: 1;
   overflow-y: auto;
 }
+
+.video-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.video-modal-actions .btn {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.video-modal-actions [hidden] {
+  display: none;
+}
+
+.video-modal-hint,
+.video-modal-status {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 10px 0 0;
+  overflow-wrap: break-word;
+  text-align: right;
+}
+
+.video-modal-hint { color: var(--muted); }
+.video-modal-status:empty { display: none; }
+.video-modal-status[data-state="error"] { color: #b42318; }
+.video-modal-status[data-state="success"] { color: #24713b; }
 
 .video-player-wrapper {
   position: relative;
@@ -716,15 +840,6 @@ body.completion-modal-open {
   border-width: 0;
 }
 
-@keyframes progress-shine {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
 @keyframes badge-rotate {
   0%,
   100% {
@@ -881,19 +996,18 @@ body.completion-modal-open {
   .video-info {
     display: flex;
     flex: 1 1 auto;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
     min-width: 0;
-    white-space: nowrap;
   }
 
   .video-name {
     flex: 0 1 auto;
     min-width: 0;
     margin-bottom: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    white-space: normal;
     font-size: 13px;
   }
 
@@ -916,8 +1030,8 @@ body.completion-modal-open {
   }
 
   .video-modal-content {
-    max-height: 100vh;
-    border-radius: 0;
+    max-height: calc(100dvh - 24px);
+    border-radius: 8px;
   }
 
   .video-modal-header {
@@ -931,4 +1045,29 @@ body.completion-modal-open {
   .video-player-wrapper {
     border-radius: 0;
   }
+
+  .video-modal-actions .btn {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-learning-page .progress-bar,
+  .student-learning-page #progressBar,
+  .student-learning-page .video-item,
+  .student-learning-page .video-check,
+  .student-learning-page .completion-badge,
+  .student-learning-page .completion-icon,
+  .student-learning-page .loading-skeleton,
+  .student-learning-page .skeleton-week-card,
+  .student-learning-page .skeleton-circle,
+  .student-learning-page .skeleton-line {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.student-course-page .course-label.has-subject-color,
+.course-label.has-subject-color {
+  background: var(--subject-color);
+  color: var(--subject-contrast);
 }

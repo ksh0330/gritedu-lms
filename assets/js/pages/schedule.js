@@ -22,7 +22,7 @@ function renderGroupNav(groups, selectedId) {
   active.forEach((group) => {
     const link = document.createElement("a");
     link.className = `schedule-images-nav__link${group.id === selectedId ? " on" : ""}`;
-    link.href = `/schedule.html?group=${encodeURIComponent(group.id)}`;
+    link.href = `/schedule?group=${encodeURIComponent(group.id)}`;
     link.textContent = group.label;
     if (group.id === selectedId) link.setAttribute("aria-current", "page");
     list.appendChild(link);
@@ -91,7 +91,6 @@ function renderImages(images) {
   images.forEach((item, index) => {
     const details = document.createElement("details");
     details.className = "schedule-images-item schedule-images-accordion";
-    if (index === 0) details.open = true;
     const summary = document.createElement("summary");
     summary.className = "schedule-images-accordion__summary";
     const name = document.createElement("span");

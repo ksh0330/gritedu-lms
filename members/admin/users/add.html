@@ -15,16 +15,15 @@
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/pages/admin-user-add.css">
 </head>
-<body>
+<body class="admin-user-add-page">
   <div data-include="header"></div>
 
   <main class="grit-page-container">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        관리자 CMS로 돌아가기
       </a>
     </div>
     
@@ -34,7 +33,7 @@
         <p class="desc">학생, 강사, 일반/학부모 회원 계정과 사이트 데이터를 관리합니다.</p>
       </div>
       <div class="page-header-actions">
-        <button class="btn sm" id="dlUsers" style="display:none;">
+        <button type="button" class="btn sm admin-export-btn" id="dlUsers" style="display:none;" title="사용자 목록을 불러온 뒤 다운로드할 수 있습니다" disabled>
           엑셀
         </button>
       </div>
@@ -54,7 +53,7 @@
     <div id="tab-users" class="tab-main-content">
     <section class="grit-section">
       <div style="margin-bottom:24px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div class="account-user-list-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <h2 style="margin:0;font-size:18px;">학생, 강사, 회원 계정 생성</h2>
         </div>
 
@@ -86,7 +85,13 @@
 
         <div class="form-group form-full">
           <label>초기 비밀번호 <span class="required">*</span></label>
-          <input type="password" name="password" id="userPassword" required minlength="8">
+          <div class="password-input-group" style="position:relative;display:flex;align-items:center;">
+            <input type="password" name="password" id="userPassword" required minlength="8" style="padding-right:48px;">
+            <button type="button" class="password-visibility-toggle" data-password-toggle aria-controls="userPassword" aria-label="비밀번호 보기" style="position:absolute;z-index:1;top:50%;right:6px;width:38px;min-width:38px;height:38px;margin:0;padding:0;transform:translateY(-50%);background:transparent;">
+              <svg data-password-hidden-icon width="20" height="20" style="display:block;width:20px;height:20px;" aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l22,24.21a8,8,0,1,0,11.84-10.76Zm47.33,75.84,41.67,45.85a32,32,0,0,1-41.67-45.85ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.16,133.16,0,0,1,25,128c4.69-8.79,19.66-33.39,47.35-49.38l18,19.75a48,48,0,0,0,63.66,70l14.73,16.2A112,112,0,0,1,128,192Zm6-95.43a8,8,0,0,1,3-15.72,48.16,48.16,0,0,1,38.77,42.64,8,8,0,0,1-7.22,8.71,6.39,6.39,0,0,1-.75,0,8,8,0,0,1-8-7.26A32.09,32.09,0,0,0,134,96.57Zm113.28,34.69c-.42.94-10.55,23.37-33.36,43.8a8,8,0,1,1-10.67-11.92A132.77,132.77,0,0,0,231.05,128a133.15,133.15,0,0,0-23.12-30.77C185.67,75.19,158.78,64,128,64a118.37,118.37,0,0,0-19.36,1.57A8,8,0,1,1,106,49.79,134,134,0,0,1,128,48c34.88,0,66.57,13.26,91.66,38.35,18.83,18.83,27.3,37.62,27.65,38.41A8,8,0,0,1,247.31,131.26Z"/></svg>
+              <svg data-password-visible-icon hidden width="20" height="20" style="display:none;width:20px;height:20px;" aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.48c.35.79,8.82,19.58,27.65,38.41C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.35c18.83-18.83,27.3-37.62,27.65-38.41A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.47,133.47,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.47,133.47,0,0,1,231,128C223.07,142.48,189.8,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
+            </button>
+          </div>
           <small class="note">영문·숫자·특수문자 포함 8자 이상</small>
         </div>
 
@@ -167,10 +172,10 @@
         <div id="instructorFields" style="display:none;">
           <div class="form-group form-full">
             <label>과목 <span class="required">*</span></label>
-            <select name="subject" id="userSubject">
-              <option value="">불러오는 중...</option>
-            </select>
-            <small class="note">담당 과목을 선택하세요.</small>
+            <div id="userSubjectChoices" class="subject-choice-list" role="group" aria-label="담당 과목 복수 선택">
+              <span class="note">불러오는 중...</span>
+            </div>
+            <small class="note">담당 과목을 모두 선택하세요. 이름과 선택 과목 중 하나가 같은 기존 강사 프로필이 있으면 계정과 자동 연동됩니다.</small>
           </div>
         </div>
 
@@ -194,16 +199,16 @@
         </div>
 
       <!-- Toast 메시지 (항상 고정 위치) -->
-      <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:10000;min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
+      <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
       </div>
 
       <div style="margin-top:32px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <h2 style="margin:0;font-size:18px;">사용자 목록</h2>
-            <button class="btn primary sm" id="refreshUsers" style="display:none;">현황 불러오기</button>
+            <button type="button" class="btn sm secondary admin-refresh-btn" id="refreshBtn" title="데이터 새로고침" style="display:none;">새로고침</button>
           </div>
-          <div id="userStats" style="display:flex;gap:12px;font-size:13px;">
+          <div id="userStats" class="account-user-list-stats" style="display:flex;gap:12px;font-size:13px;">
             <div style="padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;">
               <span style="color:var(--muted);">전체:</span> <strong id="statTotal">0</strong>
             </div>
@@ -227,18 +232,30 @@
         <div style="padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.6;">
           사이트 데이터만 관리합니다. 인증 계정·관리자 권한은 Firebase에서 처리하세요.
         </div>
-        <div class="toolbar account-user-toolbar">
-          <input type="text" id="searchUsers" placeholder="이름, 이메일, 연락처 검색" aria-label="사용자 검색">
-          <select id="roleFilterUsers" aria-label="역할 필터">
+        <div class="admin-toolbar admin-toolbar--primary-list account-user-toolbar">
+          <div class="admin-toolbar__search-wrap">
+            <input type="text" id="searchUsers" class="admin-toolbar__search-input" placeholder="이름, 이메일, 연락처 검색" aria-label="사용자 검색">
+            <button type="button" id="accountSearchButton" class="admin-toolbar__search-button" aria-label="사용자 검색 실행" title="검색">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.25"/><path d="M20 20l-3.5-3.5"/></svg>
+            </button>
+          </div>
+          <select id="roleFilterUsers" class="admin-toolbar__select" aria-label="역할 필터">
             <option value="">전체</option>
             <option value="student">학생</option>
             <option value="instructor">강사</option>
             <option value="member">일반/학부모</option>
             <option value="admin">관리자</option>
           </select>
+          <label class="admin-list-page-size" for="accountsPageSize">
+            <select id="accountsPageSize" class="admin-toolbar__select" aria-label="계정 목록 표시 개수">
+              <option value="10">10개</option>
+              <option value="20">20개</option>
+              <option value="50">50개</option>
+            </select>
+          </label>
         </div>
 
-        <div class="admin-table-wrap admin-user-add-table-wrap">
+        <div class="admin-table-wrap admin-user-add-table-wrap admin-list-viewport">
           <table class="admin-table" id="tblUsers">
           <thead>
             <tr>
@@ -253,7 +270,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="8" class="muted">현황 불러오기를 눌러 사용자 목록을 확인하세요.</td></tr>
+              <tr><td colspan="8" class="muted">새로고침을 눌러 사용자 목록을 확인하세요.</td></tr>
           </tbody>
           </table>
         </div>

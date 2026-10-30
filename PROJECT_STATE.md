@@ -1,6 +1,6 @@
 # Project State
 
-최종 갱신: 2026-07-06
+최종 갱신: 2026-10-20 (강사 영상·수강생 조회 수정은 `docs/MAINTENANCE_LOG.md` 최신 기록 참고)
 
 ## 1. 프로젝트 목적
 
@@ -16,7 +16,7 @@ Grit Edu LMS/CMS는 학원 운영자가 온라인 강의, 오프라인 수업, �
 | 정적 Hosting | Cloudflare Pages, 연결된 production branch Git push 기반 자동 배포, `dist/` 산출물 배포 |
 | 백엔드 | Firebase Authentication, Cloud Firestore, Firebase Functions 유지 |
 | Firebase Hosting | disable 완료; `gritedu-lms.web.app`/`gritedu-lms.firebaseapp.com`은 404 유지, fallback/redirect 용도로 미사용 |
-| Functions | 이메일 인증, 일반 회원-자녀 연결 보조 로직, 월간 운영 기록 자동 정리 |
+| Functions | Email verification, member-child linking, and daily 03:00 cleanup of three transient collections only. Phase 2A is `Verified`; the 2026-08-24 signup/child-link policy correction is locally `Implemented` and not yet deployed. |
 | 이미지/파일 계층 | Firebase Storage 미사용; 고정 자산은 로컬 `/assets`, 자주 바뀌는 공개 이미지(popup/instructor/story)는 Cloudflare R2 public URL 공식 지원 |
 | 빌드 | `npm run prebuild`가 `dist/` 생성 및 이미지/WebP 검증 수행 |
 | 캐시/버전 | `prebuild`가 HTML에 build version meta와 JS/CSS query version을 적용하고, `version.json` 기반 새 버전 안내를 제공; Cloudflare Pages용 `_headers`도 산출물에 생성 |
@@ -58,7 +58,7 @@ Grit Edu LMS/CMS는 학원 운영자가 온라인 강의, 오프라인 수업, �
 - `terms.html`의 이용약관과 회원가입 약관/개인정보 동의 요약에서 기술스택 노출과 내부 로드맵처럼 보이는 문구를 줄였습니다.
 - 개인정보처리방침 전문은 실제 코드/스키마 기준의 처리 목적, 처리 항목, 보유/정리 기간, 위탁/국외이전, 자동수집, 14세 미만 안내, 안전성 조치 항목을 유지하되 내부 메모형 표현을 제거했습니다.
 - 개인정보보호위원회 공식 게시판의 `2026 개인정보 처리방침 작성지침` 및 `알기쉬운 개인정보 처리 동의 안내서` 게시 사실을 확인했습니다.
-- `LEGAL_POLICY_VERSION`은 `firestore.rules`의 `legalPolicyVersion()`과 함께 `2026-06-12`로 고정되어 있습니다. rules 변경/배포가 이번 범위에서 금지되어 약관/방침의 시행일 및 동의 저장 버전은 유지했습니다.
+- 현재 코드의 `LEGAL_POLICY_VERSION`과 `firestore.rules`의 `legalPolicyVersion()`은 `2026-07-18`입니다. 다음 정책 버전 갱신은 rules 변경, 테스트, 배포 계획과 함께 별도 진행합니다.
 - Cloudflare/Google의 국외이전 세부 국가, 연락처, 보유기간, 14세 미만 온라인 가입 운영 정책, 개인정보 보호책임자 표기, 기존 가입자 재동의 필요 여부는 운영자 확인 후 다음 정책 버전/rules 배포와 함께 확정해야 합니다.
 
 로컬 `localhost:5000`은 개발/화면 테스트용이며 production Firestore에 연결될 수 있습니다. 운영 데이터 변경은 배포된 관리자 CMS에서 수행합니다.
@@ -83,10 +83,14 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 
 - `courses` 컬렉션이 공개 읽기 가능하도록 구성되어 있습니다.
 - 강의 공개 상태는 `status`, `accessType`, `published`, `archived` 계열 값을 함께 고려합니다.
-- 일반 공개 강의와 회원 전용 강의를 구분합니다.
+- 운영 중인 공개·회원전용 강좌를 구분합니다. 2026-10-17 배포에서 승인형 강좌를 세 번째 운영 유형으로 추가했습니다. 과거 4유형 초안은 `docs/ROLE_TEST_PLAN.md` §11의 기획 기록이며 지정학생·비공개 유형은 이번 구현 범위가 아닙니다.
 - 학생과 일반 회원 모두 `enrollments`를 통해 수강 연결을 가질 수 있습니다.
+- 학생 대시보드는 온라인 강좌와 오프라인 반을 카드 그리드로 표시합니다. 배포된 변경은 카드의 별도 스크롤을 제거해 페이지 스크롤로 탐색합니다. 온라인 강좌 카드는 과목·학년·연도 배지와 학습 완료율을 표시합니다.
+- 공개 강좌 목록/상세, 학생·일반 회원·강사 대시보드와 강좌 입장 화면의 과목 배지·카드 강조색은 공용 `settings/subjectColors.subjectColorMap`을 사용합니다.
+- 학생 온라인 강의 입장 화면은 강좌 요약과 진도율을 간결한 상단 카드로 표시하며, 회원 전용 강좌의 수강 취소 동작은 상단 탐색 행에서 제공합니다.
 - 강의 삭제 시 관련 수강 신청 정리 동작이 관리자 UI에 포함되어 있습니다.
-- 결제, DRM, 비공개 projection 모델은 아직 구현하지 않았습니다.
+- 결제와 DRM은 구현하지 않았습니다. 배포된 승인형 강좌는 공개 소개와 별도 Rules 보호 영상 문서를 사용하며, 기존 강좌 자료는 이전하지 않습니다.
+- 로컬 수정 기준 강사 강좌 상세는 승인형의 보호 영상을 담당 강사 권한으로 단일 조회하고, 강사 수강생 현황은 즉시 수강·승인형·legacy 유료 강좌의 활성 enrollment를 반영합니다. Cloudflare Pages와 Rules 배포 및 운영 강사 smoke는 `docs/MAINTENANCE_LOG.md`에서 별도로 추적합니다.
 
 ### 오프라인 수업/세션
 
@@ -94,20 +98,29 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 - `offlineClassMembers`가 반-학생 연결을 저장합니다.
 - `offlineClassSessions`가 회차/세션을 저장합니다.
 - `offlineSessionAccess`가 학생별 세션 접근 상태를 저장합니다.
+- 학생·강사 반 보기 화면은 같은 반 요약 카드와 수업별 영상 UI를 사용합니다. 학생 화면은 운영/보관 상태를 숨기고, 강사 화면은 운영 상태와 학생 목록을 함께 표시합니다.
+- 반 보기와 학생·강사 대시보드의 과목 배지는 `settings/subjectColors.subjectColorMap`을 읽어 온라인 강좌·강사 화면과 동일한 과목 색상을 사용합니다. 레거시 `논술` 표기는 `수리논술` 색상으로 해석합니다.
+- 반 학생 관리와 회차 예외 권한 관리는 실제 연결 문서 ID를 기준으로 제거·갱신하며, 같은 학생·회차의 legacy/중복 접근 문서도 함께 정리합니다.
+- 관리자 학생 정보 저장은 같은 UID의 변경된 `offlineClassMembers` 표시 스냅샷을 함께 갱신합니다. 오프라인 반 관리 UI는 숫자 학년 코드를 학년명으로 표시합니다. 학생 추가 검색은 이름·학교·학년·전화번호 뒷자리 4자리와 그 공백 조합을 지원합니다. 한 자리 `1`~`3`은 중·고 공통 학년 차수이며 학교명을 함께 쓰면 중학교/고등학교가 좁혀지고, 학교+차수를 붙인 `문일고2` 형식도 지원합니다.
+- 반 보관/다시 활성화, 학생 입반/제거, 접근 허용/차단 작업은 저장 후 현재 목록을 다시 읽습니다. 작업 실패 시 해당 관리 modal의 안내 문구 아래에 원인과 오류 코드를 표시합니다.
 - `scheduleVisible`이 공개 시간표 노출 여부를 제어합니다.
 - `groupId`로 정규/기간 시간표·오프라인 반을 구분합니다(`settings/timetableCatalog.scheduleGroups`). `groupId` 없는 기존 문서는 `regular`로 처리합니다.
-- 과목/학년/학교/강의실/시간표 이미지 기준값은 `settings/timetableCatalog.groupCatalogs[groupId]`에 그룹별로 저장합니다. `regular` 저장 시 legacy top-level 필드도 동기화하며, 그룹별 데이터가 없으면 `regular` → legacy top-level 순으로 fallback합니다.
-- 시간표/오프라인 반 `기준값 저장`은 `updateDoc`으로 `groupCatalogs.{groupId}`에 직접 반영합니다(정규는 top-level sync). 저장 직후 UI는 draft를 유지합니다.
+- 오프라인 반 과목/학년/학교 기준값은 `settings/offlineClassCatalog.groupCatalogs[groupId]`, 시간표 그룹별 이미지는 `settings/timetableCatalog.groupCatalogs[groupId].scheduleImages`에 저장합니다.
+- 두 catalog 모두 legacy top-level 필드를 더 이상 쓰지 않습니다. 오프라인 반 목록 저장은 기존 잘못된 `groupCatalogs.*` 문자 필드와 최상위 중복 배열도 정리합니다.
 - 공개 `/schedule-images/?group=` 페이지는 Cloudflare `_redirects`(또는 `dist/schedule-images/index.html`)로 `schedule-images.html`을 제공합니다.
 - `scheduleItems` 빈 배열 저장을 허용합니다(수업 일정 선택 입력).
-- 공개 시간표는 `publicTimetableEntries`에 복사된 데이터로 운영되며, 오프라인 반과 실시간 동기화되는 live view가 아닙니다.
+- 현재 공개 시간표와 관리자 시간표 CMS의 source-of-truth는 `settings/timetableCatalog.groupCatalogs.{groupId}.scheduleImages`입니다. `publicTimetableEntries`는 deprecated cleanup-only 데이터이며 공개 read/write 대상이 아닙니다.
 
 ### 공개 사이트/CMS
 
 - 공개 사이트는 Cloudflare Pages의 정적 페이지로 서비스됩니다.
 - `pages`와 `settings`가 사이트 문구, 팝업, 시간표, 온라인 강좌/강사/오프라인 반 기준값 설정을 관리합니다.
 - 중앙 `settings/operationCatalog` 모델은 폐기되었고, 기준값은 `courseCatalog`, `timetableCatalog`, `instructorsMenu`처럼 각 관리 페이지 책임에 맞는 settings 문서에서 관리합니다.
-- 온라인 강좌 기준값은 `settings/courseCatalog.chipGroups.subject/grade/year`, 공개 강사진 필터는 `settings/instructorsMenu.subjects`, 오프라인 반/시간표 기준값은 `settings/timetableCatalog`를 사용합니다. `전체`와 직접 입력 관련 예약값은 settings 기준값이 아니라 UI/개별 문서 처리 대상입니다.
+- 온라인 강좌 기준값은 `settings/courseCatalog.chipGroups.subject/grade/year`, 공개 강사진 필터는 `settings/instructorsMenu.subjects`, 오프라인 반 기준값은 `settings/offlineClassCatalog`, 시간표 그룹·이미지는 `settings/timetableCatalog`를 사용합니다. `전체`와 직접 입력 관련 예약값은 settings 기준값이 아니라 UI/개별 문서 처리 대상입니다.
+- 과목명 목록은 각 관리 페이지가 소유하지만 과목 색상만 `settings/subjectColors.subjectColorMap`에서 공용 관리합니다. 최초 migration이 세 기준값 목록을 한 번 통합하고, 이후에는 현재 페이지에서 새로 저장되는 과목명만 공용 맵에 보충합니다. 같은 이름에는 기존 색상을 유지하고 신규 이름에는 아직 쓰지 않은 Bootstrap 5.3 팔레트 색상을 우선 배정합니다. 직접 입력값은 기준값 목록에 저장되지 않는 한 색상 맵을 생성하지 않습니다.
+- 과목 색상 기능은 Cloud Functions, 스케줄러, 외부 API를 사용하지 않습니다. 공개/회원 화면은 카드별로 Firestore를 조회하지 않고 세션 캐시된 공용 설정 문서 1건을 재사용합니다.
+- 관리자 기준값 저장은 현재 페이지의 settings 문서 1건만 항상 쓰고, 신규 과목으로 색상 맵이 달라진 경우에만 `settings/subjectColors` 1건을 같은 batch에 추가합니다. 다른 카탈로그 문서를 매 저장마다 교차 read/write하지 않습니다.
+- 이전 문서의 `subjectColorMap`/`subjectMeta`와 `courseCatalog.instructorSubjectChips`는 각 기준값 저장 시 정리됩니다. 최초 전환은 새 코드와 Firestore rules 배포 후 `npm run migrate:subject-colors`, `npm run migrate:subject-colors:write` 순서로 수행합니다.
 - 팝업 CMS는 `settings/popups`를 사용합니다.
 - Story/사이트 콘텐츠는 `pages/{slug}` 계열을 사용합니다.
 - Story 학원 안내 페이지(`story.html`)는 정적 shell/fallback이고, 실제 운영 콘텐츠는 관리자 `사이트 관리 -> 학원 안내`에서 Firestore `pages/story` v2 구조로 관리합니다.
@@ -130,6 +143,10 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 - R2 public image 운영은 popup, instructor profile, instructor 참고 자료, story hero/CEO image 범위에 적용되어 있으며, `assets.gritedu.kr` 기준 이미지 로딩 QA는 완료되었습니다.
 - Popup main/content image, instructor profile/참고 자료 image, story hero/CEO image는 허용된 R2 public URL 운영이 가능하며, contact image attach와 `data:image`/base64 저장은 차단합니다.
 - 관리자 CMS modal 작업 중 URL 검증/저장 오류는 modal 내부 alert에 우선 표시합니다(강사 프로필 이미지는 입력칸 바로 아래). modal이 열려 있을 때는 상단 toast로 오류를 띄우지 않습니다.
+- 전역 toast/status 레이어는 공통 component에서 관리하며 modal보다 높은 순서로 표시합니다. 페이지별 `z-index` 중복과 toast용 `!important`는 사용하지 않습니다.
+- 관리자 반·강좌·강사·학생·일반/학부모·계정 정리·시간표·팝업의 긴 modal은 본문을 내부 스크롤하고 헤더와 닫기(X) 버튼은 상단에 유지합니다. 오프라인 반 modal은 열고 닫을 때 사용자가 보던 문서 스크롤 위치도 유지합니다.
+- 관리자 관리 화면과 학생·강사 강의실 상세 화면의 대시보드 복귀 링크는 공통 `dash-back` component와 `dash-back__link` class를 사용합니다. 화면에는 새로고침 버튼과 비슷한 36px 둥근 사각형 버튼과 18px 왼쪽 화살표만 렌더링하고, 목적 문구는 `aria-label`과 `title`로 제공합니다.
+- 2026-07-31 관리자 CRUD 경량 점검에서 버튼 handler, Firestore collection/Rules 대응, 기본 HTML 구조를 확인했고, Rules가 차단하는 legacy `users/*` mirror 수정 경로를 제거했습니다. 상세 범위는 `docs/audits/ADMIN_CMS_CRUD_LIGHT_AUDIT.md`를 따릅니다.
 - R2 public image 1차 완료 후 Hosting download/cache 감사와 cache/version 운영 master plan 정리가 진행되었습니다.
 - Version coverage 정밀 감사 이후 Phase D-1/D-2로 local ES module/dynamic import와 공통 partial fetch versioning이 보강되었습니다. 2026-06-23 Phase D-3으로 `school.csv` fetch/cache, public image cache-buster, root `/` cache header를 정리했습니다.
 - 로컬 소스 및 prebuild/verify 기준 구현 완료 상태이며, 운영 URL 기준 `_headers`, forbidden URL, 관리자 CMS, 모바일/iPhone/KakaoTalk QA는 별도 확인이 필요합니다.
@@ -138,14 +155,13 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 
 - 관리자 운영 기록 정리 화면은 `members/admin/operation-tasks.html`입니다.
 - 운영 기록 정리 대상은 `emailVerifications`, `signupAttempts`, `memberChildLinkAttempts` 3개 컬렉션입니다.
-- 오프라인 회차 정리 정책은 같은 화면에서 `settings/retentionPolicy`로 관리합니다. 기본값: enabled true, 실제 삭제 실행, 180일, `published`/`archived`, perRunLimit 200, skipActiveAccess true.
-- CMS 정리 대상 확인은 최대 50건만 조회(버튼 클릭 시).
-- `functions/record-cleanup.js`가 운영 기록 정리 기준이며, `functions/offline-session-cleanup.js`가 오프라인 회차 정리 기준입니다. `assets/js/pages/admin-operation-tasks.js`와 기본값을 동기화합니다.
-- `scheduledRecordCleanup` Cloud Function은 매일 03:00 Asia/Seoul에 운영 기록 정리 후 오프라인 회차 정리를 실행합니다. 운영 기록은 `cleanupAt <= now` 쿼리로 컬렉션당 최대 500건을 처리하며, `cleanupAt`이 없는 legacy 문서는 매월 1일 호환 정리합니다. 단일 scheduler job을 유지합니다.
-- 수동 UI(운영 기록): localStorage 30일 쿨다운, 컬렉션 3개 각 1회 조회, 컬렉션당 최대 300건 삭제.
-- 오프라인 회차: CMS 설정 저장 + 미리보기만. 수동 삭제/callable 없음. `offlineSessionAccess`는 session cascade.
-- Functions 배포 후 retention·실제 삭제 여부·status·limit은 CMS만 변경. rules/hosting 재배포 불필요.
-- `operationTasks` 신규 생성은 중단되었습니다. 기존 문서는 legacy로 보며 자동/수동 정리 대상에서 제외하고, 필요 시 Firebase Console에서 1회 수동 정리합니다.
+- Historical offline-retention fields may remain in `settings/retentionPolicy` as compatibility data, but the administrator screen no longer reads, displays, or writes them.
+- `functions/record-cleanup.js` is the only scheduled cleanup policy implementation. `assets/js/pages/admin-operation-tasks.js` is a read-only last-run status view.
+- `scheduledRecordCleanup` remains fixed at 03:00 Asia/Seoul. It preflights three bounded `cleanupAt <= now` queries, each limited to 500, and never scans legacy documents without `cleanupAt`. Deletes carry the scanned snapshot `updateTime` as a precondition, so a canonical verification document changed by resend after preflight aborts the batch instead of deleting the new active state.
+- Within those three allowlisted transient collections, stored `cleanupAt` is the deletion source-of-truth. Due documents are not delayed by legacy 30/90/180-day age conditions.
+- The operation page performs one administrator-only summary-document read. It has no offline session/access query, client write, manual delete, polling, or realtime listener.
+- Sessions and access records remain protected learning/authorization history and are not automatic Function targets. Rules and Functions are unchanged by the UI correction.
+- `operationTasks` 신규 생성은 중단되었습니다. 기존 문서는 legacy/orphan candidate로 보며 자동/수동 정리 대상에서 제외합니다. owner read-only inventory와 dependency proof, backup/dry-run/승인 전에는 Console에서도 삭제하지 않습니다.
 - 위험 작업은 UI 확인, rules 권한, Functions 정리 정책을 함께 전제로 해야 합니다.
 
 ### 계정/데이터 정리
@@ -171,13 +187,15 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 
 자세한 문서 map은 `PROJECT_DOCS_INDEX.md`를 기준으로 봅니다.
 
+Material task, deployment, verification, rollback, and unresolved maintenance status is tracked in `docs/MAINTENANCE_LOG.md`.
+
 ## 6. 보안/권한 기준
 
 - Firestore rules가 클라이언트 권한의 최종 경계입니다.
 - 관리자만 쓸 수 있는 컬렉션과 공개 읽기 가능한 컬렉션을 문서/코드에서 분리해야 합니다.
-- `courses`는 공개 읽기 가능하므로 민감한 비공개 영상 URL, 결제 권한, DRM 토큰을 직접 저장하지 않습니다.
+- `courses`는 상태와 관계없이 공개 읽기 가능하고 기존 강좌의 `weeks[].videos[].url`을 같은 문서에 저장할 수 있습니다. 2026-10-20 공개 문서 제한 조회에서 16건(공개 12, 회원전용 3, 승인형 1)을 확인했고, 일반 강좌 영상에는 YouTube watch 17개와 Live 6개가 있었습니다. 보호 URL의 운영 존재·내용 및 비공개/초안 문서 전반의 보안 검토는 이 공개 필드 점검만으로 검증되지 않습니다. 신규 승인형 강좌는 보호 URL을 `coursePrivateContent`로 분리하고 기존 강좌의 유형 전환을 차단합니다.
 - 이메일 인증/가입 보조 데이터는 Functions와 rules로 제한합니다.
-- 운영 기록 수동 정리는 관리자 권한 UI에서만 노출되어야 하며, 월 1회 쿨다운과 컬렉션당 300건 상한을 유지해야 합니다.
+- 운영 기록 화면은 관리자에게 최근 scheduler count summary만 1회 읽어 표시합니다. 현재 수동 scan/delete handler나 오프라인 보관기간 form은 없으며, 자동 정리는 매일 03:00 `cleanupAt` 기반 transient 3종에만 적용합니다.
 
 ## 7. 의도적으로 미구현/보류된 기능
 
@@ -190,18 +208,32 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 | PWA Lite | 제한 구현 | 홈 화면 추가와 네트워크 장애 안내 fallback만 제공. Push/FCM/offline-first LMS는 미구현 |
 | Firebase Storage 업로드 CMS | 보류 | 현재 비용/운영 단순성을 위해 로컬 `/assets` 정책 유지 |
 
-## 8. 남은 위험
+## 8. 현재 production 상태와 남은 위험
 
-- 이미지 경로가 Firestore/CMS에 저장되므로 파일 누락 시 런타임 이미지가 깨질 수 있습니다.
-- 공개 읽기 가능한 `courses`에 민감한 영상 정보를 넣으면 보안 모델이 깨집니다.
-- 오프라인 반과 공개 시간표는 복사 기반이라 운영자가 시간표 반영 상태를 확인해야 합니다.
-- Legacy collection이 다시 사용되지 않도록 신규 기능에서 canonical collection만 사용해야 합니다.
-- 결제/DRM/Push/완전한 offline-first PWA 같은 확장 기능은 현재 모델에 덧붙이는 것이 아니라 데이터/권한 모델 재설계가 필요합니다.
+### 8.1 Production rollout과 검증 상태
+
+- Coordinated rollout commit `4d1a83d1`에서 정적 signup/admin UI, 기존 4개 Functions, Firestore Rules가 production에 배포됐습니다. Auth email·가입 유형·최근 server verification proof가 profile self-create Rules에 결합됐고 owner의 정상 signup smoke가 완료됐습니다.
+- Production Functions는 정확히 `linkMemberChild`, `sendVerificationCode`, `verifyEmailCode`, `scheduledRecordCleanup` 4개입니다. policy/helper/test module은 Function export가 아닙니다. OTP는 CSPRNG를 사용하고 raw verification-session token은 페이지 메모리에만 두며 Firestore에는 hash만 저장합니다. resend/verify는 transaction과 single-use/replay guard를 사용합니다.
+- Signup limiting은 email 5/rolling hour와 server-observed IP 30/rolling hour이며, 장기 `blockedUntil`과 `userAgent` 저장은 없습니다. 새 `signupAttempts`는 1일 후 정리됩니다. Child limiting은 5/10분과 15/24시간이고 rateLimited/serverError 응답은 새 attempt spam을 만들지 않습니다.
+- `memberChildLinkAttempts`의 입력 의존 실패는 normalized 이름·학교·학년·digits-only 전체 전화번호·관계와 mismatch를 7일 보관합니다. Owner가 production notFound 문서와 약 +7일 `cleanupAt`을 확인했습니다. `linked`/`alreadyLinked`는 같은 submitted input을 mismatch 없이 1일 보관하도록 commit `810941f3`와 `linkMemberChild` 단독 재배포로 `Deployed`됐지만, 새 성공 문서의 5개 필드와 약 +1일 `cleanupAt`은 아직 owner 확인 전입니다.
+- Member list child column은 visible member UID를 최대 10개씩 query하고 `studentSnapshot.name`과 page-memory cache를 사용합니다. 기본 10/20/50 rows에서 uncached relation query는 최대 1/2/5회이고 cached revisit은 0회입니다. Parent attempt UI는 버튼 전 0회, 클릭 후 `memberUid == selectedUid`, limit 30 query 1회이며 실패 3/전체 5 전환은 local memory만 사용합니다. Signup request UI도 explicit button 전 0회, exact email limit 20입니다.
+- 관리자 primary table sticky header, header/cell 정렬, 주요 desktop/mobile table UX, 회원 자녀 열, manual link/revoke lifecycle, automatic child link, parent LMS child/course display는 owner production smoke로 `Verified`입니다. 일반 회원 상세에는 parent-only 세 section DOM이 없고 parent 상세에만 연결 자녀·관리자 연결·자녀 기록이 있습니다.
+- Phase 2A scheduled cleanup은 매일 03:00 Asia/Seoul에 transient 3종의 stored due `cleanupAt`만 처리합니다. Owner의 production invocation이 완료됐고 business/relationship/learning/history/CMS data는 자동 삭제 대상이 아닙니다.
+
+### 8.2 미해결·의도적 보류
+
+- 일부 legacy/test member는 Console에서 relation만 직접 삭제한 이력 등으로 `linkedChildrenCount`/`hasLinkedChildren`와 실제 active relation 수가 다를 수 있습니다. 신규 정상 흐름은 Verified이며 자동 repair/migration은 구현하지 않았습니다. 관계 해제는 Console delete가 아니라 관리자 revoke를 사용합니다.
+- Signup/child limiter의 count와 event write는 극단적인 동시 threshold 요청에서 경합할 수 있습니다. 현재 규모에서는 새 counter/service/Function을 추가하지 않습니다.
+- Student 데이터 정리는 active/불명확 parent link가 있으면 정상 관리자 revoke를 먼저 요구하고, 실행 직전 scoped dependency를 재조회해 revoked links·student-matched attempts·email transient records를 profile-last 순서로 정리합니다. 일반/학부모 정리도 실행 직전 재조회와 profile-last 순서를 사용합니다. 자동 진급은 transaction의 `lastAutoPromotionYear`로 연 1회이며 marker가 없는 학생은 첫 진입에서 저장 학년을 유지한 채 현재 연도 marker만 초기화합니다. 학생 또는 관리자가 실제 학년을 수정하면 같은 저장에 현재 연도 marker를 기록해 올해 값은 유지하고 다음 연도부터 다시 자동 진급합니다. 기존 `gradeManualOverride`는 더 이상 영구 차단 조건이 아니며, 추가 Read·Function·migration은 없습니다. 관련 Rules와 `66132e67` 정적 client는 배포됐고 production 코드 제공도 확인했으며 역할 계정 동작 확인만 남았습니다. 오프라인 회차의 `joinedAt`/manual revoke Rules 미강제는 owner 결정으로 현재 UI 필터 운영을 유지합니다.
+- Rules unused helper/parameter warning은 기능 오류가 아니며 별도 maintenance 대상입니다. Firebase deploy의 `firebase-functions` dependency warning도 현재 배포를 막지 않았고 이번 rollout에서는 upgrade하지 않습니다.
+- 공개 `courses`/`instructors`의 보호·내부 field 실제 존재는 owner read-only inventory 전까지 `Needs live-data check`입니다. 이미지 경로 누락, legacy collection 재사용, 결제/DRM/Push/offline-first 확장은 각각 별도 운영·권한 설계가 필요합니다.
+- 현재 기능과 UI를 기준선으로 보존하면서 상세 근거와 후속 순서는 `docs/audits/FIRESTORE_SECURITY_CRUD_MASTER_AUDIT.md`를 따릅니다.
 - Firebase Hosting은 disable 완료 상태이므로 운영 fallback으로 보지 않습니다. old Firebase Hosting URL은 404 유지, Search Console 임시 삭제 요청, 잔여 색인 제거 상태를 추적합니다.
 - 정적 사이트 배포는 Cloudflare Pages 자동 배포 기준입니다. `npm run deploy` 또는 `firebase deploy --only hosting`으로 Hosting을 되살리는 작업은 일반 운영 금지입니다.
 - JS/CSS는 top-level URL에 build version query가 붙고, 2026-06-23 Phase D-1 이후 generated `dist/assets/js/**/*.js`의 local ES module import/export/dynamic/side-effect import에도 build version query가 적용됩니다. Phase D-2 이후 공통 partial HTML fetch도 build version query를 사용합니다. Phase D-3 이후 `school.csv` fetch는 build version query + `force-cache` + 페이지 생명주기 메모리 캐시를 사용하고, public instructor image cache-buster와 root `/` cache header 불일치는 정리되었습니다.
 - public instructor image는 R2/local URL을 query cache-buster 없이 사용하며, 이미지 변경은 새 R2 key 또는 새 local 파일명으로 처리합니다.
 - CMS 데이터 변경은 Hosting 정적 파일 cache와 별개이므로 Firestore 저장/읽기/local cache 기준으로 먼저 판단해야 합니다.
+- 온라인 강좌 학습 완료율은 각 역할의 강좌·수강 상세를 다시 열 때 현재 주차 영상과 `watchedVideos`로 계산합니다. `enrollment.progress`는 마지막 완료 저장 시점의 기록이며, 강좌 영상 추가·삭제 후 현재 표시율의 기준이 아닙니다. 신규 영상에는 고유 `completionId`를 사용하고 편집 중 기존 영상 완료 ID를 보존합니다. 자세한 권한·학부모 승인형 표시 한계는 `ONLINE_COURSE_SYSTEM_STATE.md`를 참조합니다.
 - `/` root cache normalization은 소스에 반영되었지만, Cloudflare Pages 운영 URL에서 `/`, `/index.html`, `/version.json`, `/assets/school.csv`, `_headers` 적용 여부와 browser Network는 남은 live QA 항목입니다.
 - R2 custom domain 완료 후에도 legacy `r2.dev` 기반 URL과 `assets.gritedu.kr` URL이 과도기적으로 섞일 수 있습니다. 신규 운영 입력은 `assets.gritedu.kr` 기준을 우선합니다.
 - 강사 기본 placeholder는 R2 public URL 기준으로 운영되며, 기존 local placeholder 참조가 남아 있으면 `prebuild`/`verify` 경고와 실제 화면 fallback을 함께 확인해야 합니다.
@@ -216,7 +248,7 @@ Firebase Storage는 의도적으로 사용하지 않습니다. CMS에는 로컬 
 5. Naver Search Advisor old 도메인 검색 제외 요청 상태와 `gritedu.online` 검색 제외 후 재확인을 추적합니다.
 6. Cloudflare Pages `_headers` live QA와 forbidden URL live QA를 마무리합니다.
 7. 관리자 CMS 주요 화면과 모바일/iPhone/KakaoTalk 환경을 운영자 기준으로 QA합니다.
-8. `courses` 공개 읽기 전제에 맞춰 영상/권한 필드 사용을 재검토합니다.
-9. 공개 시간표 운영 절차를 실제 운영자와 리허설합니다.
+8. 학생 자동 진급 멱등 guard, 계정 정리 보강, 수동 학년 수정 marker 연계는 Rules와 정적 client에 배포됐습니다. production 역할 계정으로 marker 초기화·수동 수정·재로그인을 확인합니다. 기존 학년 또는 legacy link/counter의 자동 repair/migration은 별도 inventory와 owner 승인 없이는 하지 않습니다.
+9. 공개 시간표 운영 절차를 `settings/timetableCatalog` 기준으로 실제 운영자와 리허설합니다.
 10. 결제/DRM을 도입할 경우 별도 설계 문서를 먼저 작성합니다.
 11. 큰 asset/CSS/JS 중복과 `main.css` 크기를 별도 감사합니다.

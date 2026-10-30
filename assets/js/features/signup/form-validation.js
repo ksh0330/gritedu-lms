@@ -3,7 +3,7 @@
  * 이름, 전화번호, 비밀번호 필드에 실시간 검증 추가
  */
 
-import { validateName, validatePhone, formatKoreanPhone, validatePassword, validatePasswordConfirm } from "/assets/js/utils/validation.js";
+import { validateName, validatePhone, validatePassword, validatePasswordConfirm } from "/assets/js/utils/validation.js";
 
 /**
  * 필드 에러 표시

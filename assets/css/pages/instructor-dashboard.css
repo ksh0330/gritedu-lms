@@ -232,98 +232,6 @@
   }
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  display: none;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  align-items: center;
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  justify-content: center;
-  background: rgba(0,0,0,.85);
-  z-index: 2000;
-  /* iOS Safari 호환성 */
-  -webkit-overflow-scrolling: touch;
-  overflow-y: auto;
-}
-
-/* iOS Safari에서 모달 열릴 때 body 스크롤 잠금 */
-body.modal-open {
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-  height: 100%;
-}
-
-@supports (-webkit-touch-callout: none) {
-  /* iOS Safari 전용 */
-  body.modal-open {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-  }
-}
-
-.modal.active {
-  display: flex;
-}
-
-.modal-content {
-  position: relative;
-  max-width: 700px;
-  width: 90vw;
-  background: var(--card);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 10px 40px rgba(0,0,0,.3);
-  border: 1px solid var(--border);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 28px;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-
 .form-group {
   margin-bottom: 20px;
 }
@@ -527,6 +435,33 @@ body.modal-open {
   word-break: keep-all;
 }
 
+.instructor-table-title__content {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.instructor-subject-badge {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand) 10%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--border));
+  border-radius: 7px;
+  color: color-mix(in srgb, var(--text) 90%, var(--muted));
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.instructor-subject-badge.has-subject-color {
+  background: color-mix(in srgb, var(--subject-color) 15%, var(--card));
+  border-color: color-mix(in srgb, var(--subject-color) 38%, var(--border));
+  box-shadow: inset 3px 0 0 var(--subject-color);
+}
+
 .instructor-table-actions {
   white-space: nowrap;
 }
@@ -536,6 +471,11 @@ body.modal-open {
   padding: 24px !important;
 }
 
+.instructor-error-code {
+  color: var(--error-color);
+  font-weight: 400;
+}
+
 .instructor-section-meta {
   margin: 0 0 12px;
   font-size: 14px;
@@ -543,39 +483,6 @@ body.modal-open {
 
 .instructor-pagination {
   margin-top: 16px;
-}
-
-.instructor-pagination-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.instructor-pagination-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.instructor-pagination-pages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.instructor-pagination-num.is-active {
-  background: var(--brand);
-  color: #fff;
-  border-color: var(--brand);
-}
-
-.instructor-pagination-info {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
 }
 
 .instructor-section-toolbar--row {
@@ -597,6 +504,34 @@ body.modal-open {
 .instructor-section-toolbar--row .instructor-search-input {
   flex: 1 1 200px;
   max-width: 280px;
+}
+
+.instructor-committed-search {
+  align-items: center;
+  display: flex;
+  flex: 1 1 260px;
+  gap: 8px;
+  max-width: 340px;
+  min-width: 0;
+}
+
+.instructor-committed-search .instructor-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.instructor-committed-search .btn {
+  align-self: center;
+  flex: 0 0 auto;
+  height: 44px;
+}
+
+@media (max-width: 620px) {
+  .instructor-section-toolbar--row .instructor-committed-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }
 
 .instructor-section-toolbar--row .instructor-select {
@@ -642,6 +577,83 @@ body.modal-open {
 .instructor-student-detail-list strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.instructor-dashboard-page .instructor-stats-grid {
+  gap: 14px;
+}
+
+.instructor-dashboard-page .stat-card {
+  gap: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.instructor-dashboard-page .stat-card::before {
+  display: none;
+}
+
+.instructor-dashboard-page .stat-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 25%, var(--border));
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.07);
+  transform: none;
+}
+
+.instructor-dashboard-page .stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--brand) 9%, var(--card));
+}
+
+.instructor-dashboard-page .stat-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.instructor-dashboard-page .stat-card:hover .stat-icon {
+  background: color-mix(in srgb, var(--brand) 13%, var(--card));
+  color: var(--brand);
+  transform: none;
+}
+
+.instructor-dashboard-page .stat-label {
+  font-weight: 600;
+}
+
+.instructor-dashboard-page .stat-value {
+  font-weight: 800;
+}
+
+.instructor-dashboard-page .instructor-table-wrap,
+.instructor-offline-class-page .instructor-table-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.instructor-dashboard-page .instructor-data-table,
+.instructor-offline-class-page .instructor-data-table {
+  border: 0;
+  border-radius: 0;
+}
+
+.instructor-dashboard-page .instructor-data-table thead,
+.instructor-offline-class-page .instructor-data-table thead {
+  background: color-mix(in srgb, var(--brand) 5%, var(--card));
+}
+
+.instructor-dashboard-page .instructor-data-table th,
+.instructor-offline-class-page .instructor-data-table th {
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 18%, var(--border));
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.instructor-dashboard-page .instructor-data-table tbody tr:hover,
+.instructor-offline-class-page .instructor-data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--brand) 3%, var(--card));
 }
 
 @media (max-width: 960px) {

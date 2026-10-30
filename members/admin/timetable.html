@@ -19,7 +19,11 @@
 
   <main class="grit-page-container">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">관리자 CMS로 돌아가기</a>
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </a>
     </div>
 
     <div class="admin-timetable-head">
@@ -28,11 +32,11 @@
         <p class="muted admin-timetable-desc">공개 시간표의 그룹과 그룹별 이미지를 관리합니다.</p>
       </div>
       <div class="admin-timetable-head__actions">
-        <button type="button" class="btn sm" id="btnRefresh">새로고침</button>
+        <button type="button" class="btn sm secondary admin-refresh-btn" id="refreshBtn" title="데이터 새로고침">새로고침</button>
       </div>
     </div>
 
-    <details class="admin-catalog-panel grit-section" id="scheduleGroupsPanel" open>
+    <details class="admin-catalog-panel grit-section" id="scheduleGroupsPanel">
       <summary class="admin-catalog-panel__summary">시간표 기준값 관리</summary>
       <p class="muted admin-catalog-panel__lead">
         정규·윈터·썸머 등 공개 시간표 구분을 관리합니다. 그룹을 숨기면 공개 페이지에서 선택할 수 없습니다.
@@ -97,7 +101,7 @@
   <div data-include="footer"></div>
   <div id="scheduleImageEditModal" class="modal admin-schedule-image-modal" hidden>
     <div class="modal-content admin-schedule-image-modal__content">
-      <div class="modal-header"><h2>시간표 이미지 수정</h2><button type="button" class="modal-close" data-image-edit-close aria-label="닫기">&times;</button></div>
+      <div class="modal-header"><h2>시간표 이미지 수정</h2><button type="button" class="modal-close admin-modal-close" data-image-edit-close aria-label="닫기">&times;</button></div>
       <form id="scheduleImageEditForm" class="admin-schedule-image-form">
         <input type="hidden" id="scheduleImageEditOriginalUrl">
         <div class="admin-schedule-image-form__row"><label class="admin-schedule-image-form__label" for="scheduleImageEditName">이미지 이름</label><input id="scheduleImageEditName" class="admin-catalog-field__input" required></div>

@@ -2,6 +2,7 @@ import { db } from "/assets/js/firebase-init.js";
 import { collection, doc, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { dom, state, escapeHtml } from "/assets/js/pages/student-dashboard/context.js";
 import { setOfflineClassStatCount } from "/assets/js/pages/student-dashboard/stats.js";
+import { getSubjectColorStyle } from "/assets/js/utils/subject-colors.js";
 
 const SCHEDULE_DAYS = [
   { id: "mon", label: "월" },
@@ -20,9 +21,9 @@ function formatTimeDisplay(value) {
   return t.length >= 5 ? t.slice(0, 5) : t;
 }
 
-function normalizeScheduleItems(classRow) {
-  if (Array.isArray(classRow?.scheduleItems) && classRow.scheduleItems.length) {
-    return classRow.scheduleItems
+function normalizeScheduleItems(classRow, fieldName = "scheduleItems") {
+  if (Array.isArray(classRow?.[fieldName]) && classRow[fieldName].length) {
+    return classRow[fieldName]
       .map((item) => ({
         day: String(item?.day || "").trim(),
         startTime: formatTimeDisplay(item?.startTime),
@@ -31,6 +32,7 @@ function normalizeScheduleItems(classRow) {
       }))
       .filter((item) => item.day);
   }
+  if (fieldName !== "scheduleItems") return [];
   const days = Array.isArray(classRow?.scheduleDays) ? classRow.scheduleDays : [];
   if (!days.length) return [];
   const start = formatTimeDisplay(classRow?.startTime);
@@ -49,16 +51,8 @@ function formatScheduleLine(item) {
   return parts.join(" ");
 }
 
-function formatSchedule(classRow) {
-  const items = normalizeScheduleItems(classRow)
-    .slice()
-    .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-  if (!items.length) return "-";
-  return items.map((item) => formatScheduleLine(item)).join(" / ");
-}
-
-function formatScheduleHtml(classRow) {
-  const items = normalizeScheduleItems(classRow)
+function formatScheduleHtml(classRow, fieldName = "scheduleItems") {
+  const items = normalizeScheduleItems(classRow, fieldName)
     .slice()
     .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
   if (!items.length) return '<span class="muted">-</span>';
@@ -66,19 +60,26 @@ function formatScheduleHtml(classRow) {
 }
 
 function formatSchoolGrade(classRow) {
-  const school = String(classRow?.school || "").trim();
+  const school = (Array.isArray(classRow?.schools) && classRow.schools.length
+    ? classRow.schools
+    : [classRow?.school])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
   const grade = String(classRow?.grade || "").trim();
   if (school && grade) return `${school} / ${grade}`;
   return school || grade || "-";
 }
 
-function isScheduleVisible(classRow) {
-  return classRow?.scheduleVisible !== false;
+function formatInstructorNames(classRow) {
+  const names = Array.isArray(classRow?.instructorNames) ? classRow.instructorNames : [];
+  return names.map((value) => String(value || "").trim()).filter(Boolean).join(", ") ||
+    String(classRow?.instructorName || "").trim() ||
+    "미배정";
 }
 
-function setOfflineMeta(text) {
-  if (!dom.myOfflineClassesMeta) return;
-  dom.myOfflineClassesMeta.textContent = text;
+function isScheduleVisible(classRow) {
+  return classRow?.scheduleVisible !== false;
 }
 
 function renderOfflineEmpty(message) {
@@ -98,23 +99,35 @@ function renderOfflineList(rows) {
       const safeLinkClassId = escapeHtml(linkClassId);
       const path = `/members/students/offline-class.html?classId=${encodeURIComponent(linkClassId)}`;
       const className = escapeHtml(classRow.className || "반명 없음");
-      const subject = escapeHtml(classRow.subject || "-");
+      const subjectValue = classRow.subject || "-";
+      const subject = escapeHtml(subjectValue);
+      const subjectColorStyle = getSubjectColorStyle(subjectValue, state.subjectColorMap);
       const schoolGrade = escapeHtml(formatSchoolGrade(classRow));
-      const instructor = escapeHtml(classRow.instructorName || "미배정");
+      const instructor = escapeHtml(formatInstructorNames(classRow));
       const scheduleHtml = formatScheduleHtml(classRow);
+      const clinicScheduleHtml = formatScheduleHtml(classRow, "clinicScheduleItems");
       const scheduleBlock = isScheduleVisible(classRow)
         ? `
         <div class="student-offline-list-row__schedule">
-          <span class="student-offline-list-row__schedule-label">시간표<br> </span>
-          <span class="student-offline-list-row__schedule-value">${scheduleHtml}</span>
+          <div class="student-offline-list-row__schedule-item">
+            <span class="student-offline-list-row__schedule-label">수업 일정</span>
+            <span class="student-offline-list-row__schedule-value">${scheduleHtml}</span>
+          </div>
+          <div class="student-offline-list-row__schedule-item">
+            <span class="student-offline-list-row__schedule-label">클리닉</span>
+            <span class="student-offline-list-row__schedule-value">${clinicScheduleHtml}</span>
+          </div>
         </div>`
         : "";
       return `
-      <article class="student-offline-list-row" data-class-id="${safeLinkClassId}">
+      <article class="student-offline-list-row${subjectColorStyle ? " has-subject-color" : ""}" data-class-id="${safeLinkClassId}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>
         <div class="student-offline-list-row__main">
+          <div class="student-dashboard-card-badges">
+            <span class="student-dashboard-card-badge${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${subject}</span>
+            <span class="student-dashboard-card-badge student-dashboard-card-badge--wide">${schoolGrade}</span>
+          </div>
           <h3 class="student-offline-list-row__title">${className}</h3>
-          <p class="student-offline-list-row__meta">${subject} / ${schoolGrade}</p>
-          <p class="student-offline-list-row__meta">담당: ${instructor}T</p>
+          <p class="student-offline-list-row__meta">${instructor}T</p>
         </div>
         ${scheduleBlock}
         <div class="student-offline-list-row__action">
@@ -130,7 +143,6 @@ function renderOfflineList(rows) {
 export async function loadMyOfflineClasses() {
   if (!state.user?.uid || !dom.myOfflineClassesGrid) return;
 
-  setOfflineMeta("오프라인 반을 불러오는 중입니다.");
   dom.myOfflineClassesGrid.innerHTML =
     '<p class="student-offline-empty">오프라인 반을 불러오는 중입니다.</p>';
 
@@ -146,7 +158,6 @@ export async function loadMyOfflineClasses() {
     if (!activeMemberships.length) {
       setOfflineClassStatCount(0);
       renderOfflineEmpty("배정된 오프라인 반이 없습니다.");
-      setOfflineMeta("");
       return;
     }
 
@@ -199,11 +210,9 @@ export async function loadMyOfflineClasses() {
 
     setOfflineClassStatCount(rows.length);
     renderOfflineList(rows);
-    setOfflineMeta(rows.length ? `배정된 오프라인 반 ${rows.length}개` : "");
   } catch (error) {
     console.error("[student-dashboard] offline classes load failed", error);
     setOfflineClassStatCount(0);
     renderOfflineEmpty("오프라인 반을 불러오는 중 오류가 발생했습니다.");
-    setOfflineMeta("오프라인 반을 불러오지 못했습니다.");
   }
 }

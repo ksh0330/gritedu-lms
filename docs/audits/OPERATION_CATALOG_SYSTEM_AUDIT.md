@@ -2,7 +2,7 @@
 
 작성일: 2026-06-29
 
-> 현재 상태 안내 (2026-07-02): 이 문서는 중앙 `settings/operationCatalog` 설계 검토 당시의 과거 감사 기록입니다. 현재 구현에서는 중앙 운영 기준값 탭, `settings/operationCatalog`, `assets/js/utils/operation-catalog.js`, `assets/js/pages/admin-operation-catalog-ui.js`가 폐기되었습니다. 최신 기준값 소유권과 운영 방식은 `docs/audits/SETTINGS_VALUE_OWNERSHIP_AUDIT.md`, `ADMIN_CMS_STATE.md`, `md/DATABASE_SCHEMA.md`, `docs/OPERATION_MANUAL.md`를 기준으로 봅니다.
+> 현재 상태 안내 (2026-07-27): 이 문서는 중앙 `settings/operationCatalog` 설계 검토 당시의 과거 감사 기록입니다. 현재 구현에서는 중앙 운영 기준값 탭과 관련 코드가 폐기됐고, 오프라인 반은 `settings/offlineClassCatalog`, 시간표 그룹·이미지는 `settings/timetableCatalog`, 강사 과목은 `settings/instructorsMenu.subjects`를 사용합니다. 아래 본문의 필드·체크리스트는 현행 운영 지침이 아닙니다. 최신 기준은 `docs/audits/SETTINGS_VALUE_OWNERSHIP_AUDIT.md`, `ADMIN_CMS_STATE.md`, `md/DATABASE_SCHEMA.md`, `docs/OPERATION_MANUAL.md`를 봅니다.
 
 이번 감사는 분석/문서화만 수행했다. 코드, HTML, CSS, Firestore rules, Functions, `dist/**`, Firebase/Cloudflare 설정, DB 데이터는 수정하지 않았다.
 

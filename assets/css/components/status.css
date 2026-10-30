@@ -54,13 +54,13 @@
   margin: 0;
 }
 
-/* Admin toast — always above modal overlays (z-index 10000) */
+/* Admin status toast — always above every modal and confirmation layer. */
 #statusMsg {
   position: fixed;
   top: 80px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 11000;
+  z-index: 2147483000;
   min-width: min(300px, 90vw);
   max-width: min(420px, 90vw);
   text-align: center;
@@ -101,6 +101,7 @@
   border-radius: 8px;
   font-size: 0.9rem;
   line-height: 1.45;
+  white-space: pre-line;
   background: color-mix(in srgb, var(--error-color, #c62828) 12%, transparent);
   color: var(--error-color, #c62828);
 }

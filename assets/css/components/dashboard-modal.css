@@ -8,6 +8,7 @@
   padding: 20px;
   background: rgba(15, 23, 42, 0.55);
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -15,8 +16,10 @@
   display: none;
 }
 
+html.modal-open,
 body.modal-open {
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .dashboard-modal {
@@ -252,32 +255,31 @@ body.modal-open {
 }
 
 .account-deletion-content ul {
-  margin: 10px 0 16px;
+  margin: 10px 0 14px;
   padding-left: 20px;
 }
 
-.account-deletion-email {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  background: #b83232;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.account-deletion-email:hover {
-  background: #962727;
-  color: #fff;
-}
-
 .account-deletion-content .account-deletion-address {
-  margin-top: 10px;
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
   font-size: 13px;
+}
+
+.account-deletion-address span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.account-deletion-address strong {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 480px) {
@@ -288,6 +290,12 @@ body.modal-open {
 
   .dashboard-modal__readonly-grid {
     grid-template-columns: 1fr;
+  }
+
+  .account-deletion-content .account-deletion-address {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
 }

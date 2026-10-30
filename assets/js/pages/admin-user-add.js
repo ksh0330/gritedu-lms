@@ -2,14 +2,17 @@
 // 사용자 관리 페이지
 import { app, db, requireRole } from "/assets/js/firebase-init.js";
 import {
-  doc, getDoc, getDocs, setDoc, updateDoc, deleteField, serverTimestamp, collection, writeBatch, query, where
+  doc, getDoc, getDocs, setDoc, deleteField, serverTimestamp, collection, writeBatch, query, where
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { getSettingDoc, invalidateSetting } from "/assets/js/utils/settings-cache.js";
+import { setAdminRefreshButtonState } from "/assets/js/utils/admin-refresh.js";
 import {
   getAuth, createUserWithEmailAndPassword, deleteUser as deleteAuthUser, setPersistence, inMemoryPersistence
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
 import { initializeApp as initApp2 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
 import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import { adminXlsxFilename, writeAdminXlsx } from "/assets/js/utils/admin-xlsx.js";
+import { showAdminToast } from "/assets/js/utils/admin-toast.js";
 import { formatGrade, normalizeGrade } from "/assets/js/utils/grade.js";
 import { validatePhone } from "/assets/js/utils/validation.js";
 import { CONSENT_SOURCE_ADMIN, LEGAL_POLICY_VERSION } from "/assets/js/utils/legal-policy.js";
@@ -19,10 +22,18 @@ import {
   executeInstructorAccountUnlink
 } from "/assets/js/utils/instructor-account-cleanup.js";
 import {
-  buildSubjectSelectHtml,
-} from "/assets/js/utils/catalog-select-helpers.js";
-import { loadInstructorMenuSubjects } from "/assets/js/utils/instructor-subjects.js";
+  getInstructorSubjects,
+  loadInstructorMenuSubjects,
+  normalizeSubjectList
+} from "/assets/js/utils/instructor-subjects.js";
 import { requestPhraseConfirmation } from "/assets/js/utils/confirm-phrase-modal.js";
+import { mergeInstructorPrivate, privateInstructorData, publicInstructorData, selectInstructorProfileForAccount } from "/assets/js/utils/instructor-privacy.js";
+import { setupPasswordVisibilityToggles } from "/assets/js/utils/password-visibility.js";
+import {
+  bindCommittedSearch,
+  normalizeListPageSize,
+  renderListPagination,
+} from "/assets/js/utils/list-controls.js";
 
 // 역할 가드: 관리자만 접근 가능
 (async () => {
@@ -159,14 +170,75 @@ function getCreatedAtMillis(value) {
   return date.getTime();
 }
 
-const DELETABLE_ROLES = ["student", "instructor", "parent", "admin"];
-const LEGACY_USER_DOC_IDS = {
-  parent: "parents"
-};
+const DELETABLE_ROLES = ["student", "instructor", "admin"];
 
 async function getRefsByField(collectionName, fieldName, value) {
   const snap = await getDocs(query(collection(db, collectionName), where(fieldName, "==", value)));
   return snap.docs.map((item) => item.ref);
+}
+
+async function getAccountTransientCleanupRefs(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return { emailVerifications: [], signupAttempts: [] };
+  }
+
+  const verificationRef = doc(db, "emailVerifications", normalizedEmail);
+  const [verificationSnap, signupAttemptRefs] = await Promise.all([
+    getDoc(verificationRef),
+    getRefsByField("signupAttempts", "email", normalizedEmail)
+  ]);
+
+  return {
+    emailVerifications: verificationSnap.exists() ? [verificationRef] : [],
+    signupAttempts: signupAttemptRefs
+  };
+}
+
+function createCleanupOperatorError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  error.isOperatorSafe = true;
+  return error;
+}
+
+function isBlockingStudentParentLink(docSnap) {
+  return String(docSnap.data()?.status || "active").trim() !== "revoked";
+}
+
+async function loadStudentCleanupData(uid, fallbackUser = {}) {
+  const studentRef = doc(db, "students", uid);
+  const [
+    studentSnap,
+    enrollmentRefs,
+    classMemberRefs,
+    sessionAccessRefs,
+    parentLinksSnap,
+    childLinkAttemptRefs
+  ] = await Promise.all([
+    getDoc(studentRef),
+    getRefsByField("enrollments", "userId", uid),
+    getRefsByField("offlineClassMembers", "studentUid", uid),
+    getRefsByField("offlineSessionAccess", "studentUid", uid),
+    getDocs(query(collection(db, "studentParentLinks"), where("studentUid", "==", uid))),
+    getRefsByField("memberChildLinkAttempts", "matchedStudentUid", uid)
+  ]);
+  const student = studentSnap.exists() ? (studentSnap.data() || {}) : fallbackUser;
+  const transientRefs = await getAccountTransientCleanupRefs(student.email || fallbackUser.email);
+  const parentLinkDocs = parentLinksSnap.docs;
+  const blockingParentLinks = parentLinkDocs.filter(isBlockingStudentParentLink);
+
+  return {
+    studentRef: studentSnap.exists() ? studentRef : null,
+    student,
+    enrollmentRefs,
+    classMemberRefs,
+    sessionAccessRefs,
+    parentLinkRefs: parentLinkDocs.map((item) => item.ref),
+    blockingParentLinks,
+    childLinkAttemptRefs,
+    transientRefs
+  };
 }
 
 async function deleteRefsInBatches(refs) {
@@ -193,19 +265,7 @@ async function deleteRefsInBatches(refs) {
   return deletedCount;
 }
 
-async function deleteUserMirrorEntry(uid, role) {
-  const roleDocId = LEGACY_USER_DOC_IDS[role];
-  if (!roleDocId) return false;
-
-  const usersRef = doc(db, "users", roleDocId);
-  const usersDoc = await getDoc(usersRef);
-  if (!usersDoc.exists() || usersDoc.data()?.[uid] == null) return false;
-
-  await updateDoc(usersRef, { [uid]: deleteField() });
-  return true;
-}
-
-async function deleteUserFirestoreData(uid, role) {
+async function deleteUserFirestoreData(uid, role, fallbackUser = {}) {
   if (!DELETABLE_ROLES.includes(role)) {
     throw new Error("알 수 없는 사용자 역할입니다.");
   }
@@ -216,28 +276,30 @@ async function deleteUserFirestoreData(uid, role) {
   const refsToDelete = [];
 
   if (role === "student") {
-    const [enrollmentRefs, classMemberRefs, sessionAccessRefs] = await Promise.all([
-      getRefsByField("enrollments", "userId", uid),
-      getRefsByField("offlineClassMembers", "studentUid", uid),
-      getRefsByField("offlineSessionAccess", "studentUid", uid)
-    ]);
+    const cleanupData = await loadStudentCleanupData(uid, fallbackUser);
+    if (cleanupData.blockingParentLinks.length > 0) {
+      throw createCleanupOperatorError(
+        "active-parent-link",
+        "활성 자녀 연결이 남아 있습니다. 회원 관리에서 연결을 먼저 해제한 뒤 다시 시도해 주세요."
+      );
+    }
 
     refsToDelete.push(
-      ...enrollmentRefs,
-      ...classMemberRefs,
-      ...sessionAccessRefs,
-      doc(db, "students", uid)
+      ...cleanupData.enrollmentRefs,
+      ...cleanupData.classMemberRefs,
+      ...cleanupData.sessionAccessRefs,
+      ...cleanupData.parentLinkRefs,
+      ...cleanupData.childLinkAttemptRefs,
+      ...cleanupData.transientRefs.signupAttempts,
+      ...cleanupData.transientRefs.emailVerifications,
+      cleanupData.studentRef
     );
   } else if (role === "instructor") {
     throw new Error("강사 데이터 정리는 미리보기 확인 후 실행해야 합니다.");
-  } else if (role === "parent") {
-    refsToDelete.push(doc(db, "parents", uid));
   }
 
-  const deletedCount = await deleteRefsInBatches(refsToDelete);
-  const deletedFieldCount = await deleteUserMirrorEntry(uid, role) ? 1 : 0;
-
-  return { deletedCount, deletedFieldCount };
+  const deletedCount = await deleteRefsInBatches(refsToDelete.filter(Boolean));
+  return { deletedCount };
 }
 
 function sanitizeInstructorVideos(videos) {
@@ -246,7 +308,8 @@ function sanitizeInstructorVideos(videos) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       return item;
     }
-    const { youtube_url, ...rest } = item;
+    const rest = { ...item };
+    delete rest.youtube_url;
     return rest;
   });
 }
@@ -259,9 +322,7 @@ function buildPublicInstructorProfile(data = {}, instructorId = "") {
   return {
     name: data.name || "",
     subject: data.subject || "",
-    email: data.email || "",
-    emailLower: normalizeEmail(data.emailLower || data.email),
-    note: data.note || "",
+    subjects: getInstructorSubjects(data),
     bio: data.bio || "",
     brief: data.brief || "",
     photo,
@@ -269,7 +330,6 @@ function buildPublicInstructorProfile(data = {}, instructorId = "") {
     curriculumImageUrl,
     curriculumImageUrls,
     instructorId,
-    pending: data.pending === true,
     createdAt: data.createdAt || serverTimestamp(),
     updatedAt: serverTimestamp()
   };
@@ -283,21 +343,25 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
-function hasLinkedUid(data = {}) {
-  return typeof data.uid === "string" && data.uid.trim() !== "";
-}
-
-function getProfileEmailLower(data = {}) {
-  return normalizeEmail(data.emailLower || data.email);
-}
-
-function toInstructorProfileResult(docSnap) {
-  const data = docSnap.data() || {};
-  return {
-    id: docSnap.id,
-    instructorId: docSnap.id,
-    ...data
-  };
+async function loadInstructorProfilesWithPrivate() {
+  const [profiles, privateSnap, accountsSnap] = await Promise.all([
+    getDocs(collection(db, "instructors")),
+    getDocs(collection(db, "instructorPrivate")),
+    getDocs(collection(db, "instructorAccounts"))
+  ]);
+  const privateById = new Map(privateSnap.docs.map((snap) => [snap.id, snap.data() || {}]));
+  const accountByProfileId = new Map(accountsSnap.docs.map((snap) => [
+    String(snap.data()?.instructorId || "").trim(), { ...(snap.data() || {}), uid: snap.id }
+  ]));
+  return profiles.docs.map((snap) => ({
+    ...mergeInstructorPrivate(
+      snap.data() || {},
+      privateById.get(snap.id),
+      accountByProfileId.get(snap.id) || accountByProfileId.get(String(snap.data()?.instructorId || "").trim())
+    ),
+    id: snap.id,
+    instructorId: snap.id
+  }));
 }
 
 async function assertInstructorAccountEmailAvailable(email, emailLower) {
@@ -367,35 +431,7 @@ function calculateGrade(selectedGrade, createdAt) {
 }
 
 function toast(msg, err = false) {
-  const statusMsg = $("#statusMsg");
-  if (statusMsg) {
-    // 메시지 내용 설정
-    statusMsg.textContent = msg;
-    statusMsg.style.color = err ? "var(--error-color)" : "var(--success-color)";
-    statusMsg.style.background = err ? "var(--error-bg)" : "var(--success-bg)";
-    statusMsg.style.padding = "12px";
-    statusMsg.style.borderRadius = "8px";
-    statusMsg.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-    
-    // 표시 (opacity와 pointer-events 변경)
-    statusMsg.style.opacity = "1";
-    statusMsg.style.pointerEvents = "auto";
-    
-    setTimeout(() => {
-      if (statusMsg.textContent === msg) {
-        // 숨김 (내용만 제거하고 위치는 유지)
-        statusMsg.style.opacity = "0";
-        statusMsg.style.pointerEvents = "none";
-        setTimeout(() => {
-          if (statusMsg.textContent === msg) {
-            statusMsg.textContent = "";
-            statusMsg.style.background = "";
-            statusMsg.style.boxShadow = "";
-          }
-        }, 300); // 페이드아웃 애니메이션 시간
-      }
-    }, 3000);
-  }
+  showAdminToast(msg, err);
 }
 
 // DOM 요소를 찾을 때까지 기다리는 함수
@@ -417,64 +453,12 @@ function waitForElement(selector, maxRetries = 50, interval = 100) {
   });
 }
 
-// 이름과 과목으로 기존 강사 정보 찾기 (instructors 컬렉션에서)
-async function findInstructorByNameAndSubject(name, subject) {
-  try {
-    const instructorsSnap = await getDocs(collection(db, "instructors"));
-    const matches = instructorsSnap.docs.filter(doc => {
-      const data = doc.data();
-      return data.pending &&
-             !hasLinkedUid(data) &&
-             data.name === name &&
-             data.subject === subject;
-    });
-
-    if (matches.length > 1) {
-      throw new Error("이름과 과목이 같은 미연결 강사 프로필이 여러 개 있습니다. 강사 관리에서 먼저 정리해주세요.");
-    }
-
-    if (matches.length === 1) {
-      return toInstructorProfileResult(matches[0]);
-    }
-    return null;
-  } catch (error) {
-    console.error("강사 정보 검색 실패:", error);
-    throw error;
-  }
-}
-
 async function findInstructorProfileForAccount(userData, emailLower) {
-  const instructorsSnap = await getDocs(collection(db, "instructors"));
-  const emailMatches = [];
-  const linkedEmailMatches = [];
-
-  instructorsSnap.docs.forEach((docSnap) => {
-    const data = docSnap.data() || {};
-    if (!emailLower || getProfileEmailLower(data) !== emailLower) return;
-    if (hasLinkedUid(data)) {
-      linkedEmailMatches.push(toInstructorProfileResult(docSnap));
-    } else {
-      emailMatches.push(toInstructorProfileResult(docSnap));
-    }
-  });
-
-  if (linkedEmailMatches.length) {
-    throw new Error("이미 계정에 연결된 강사 프로필 이메일입니다.");
-  }
-  if (emailMatches.length > 1) {
-    throw new Error("이메일이 같은 미연결 강사 프로필이 여러 개 있습니다. 강사 관리에서 먼저 정리해주세요.");
-  }
-  if (emailMatches.length === 1) {
-    return emailMatches[0];
-  }
-
-  return findInstructorByNameAndSubject(
-    normalizeText(userData.name),
-    normalizeText(userData.subject)
-  );
+  const profiles = await loadInstructorProfilesWithPrivate();
+  return selectInstructorProfileForAccount(profiles, { ...userData, emailLower });
 }
 
-function buildInstructorAccountPayload({ uid, instructorId, name, email, emailLower, subject }) {
+function buildInstructorAccountPayload({ uid, instructorId, name, email, emailLower, subject, subjects }) {
   return {
     uid,
     instructorId,
@@ -482,6 +466,7 @@ function buildInstructorAccountPayload({ uid, instructorId, name, email, emailLo
     email,
     emailLower,
     subject,
+    subjects: normalizeSubjectList(subjects),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
@@ -533,7 +518,9 @@ async function addSingleUser(userData) {
   if (!passwordRegex.test(userData.password)) {
     throw new Error("비밀번호는 영문, 숫자, 특수문자를 각각 포함하여 8자 이상이어야 합니다.");
   }
-  if (userData.role === 'instructor' && (!userData.subject || !userData.subject.trim())) {
+  userData.subjects = normalizeSubjectList(userData.subjects || userData.subject);
+  userData.subject = userData.subjects[0] || "";
+  if (userData.role === 'instructor' && userData.subjects.length === 0) {
     throw new Error("과목을 입력해주세요.");
   }
   if (userData.role === "student") {
@@ -605,7 +592,7 @@ async function addSingleUser(userData) {
     // 학년 자동 설정 (생성일 기준)
     const createdAt = serverTimestamp();
     const finalGrade = calculateGrade(userData.grade, createdAt);
-    let finalName = userData.name;
+    const finalName = normalizeText(userData.name);
 
     // students 컬렉션에 개별 문서로 저장 (회원가입과 일관성 유지)
     const studentData = {
@@ -667,46 +654,54 @@ async function addSingleUser(userData) {
     const existingInstructor = matchedInstructorProfile;
     const instructorId = existingInstructor?.id || `inst_${Date.now()}`;
     const name = normalizeText(existingInstructor?.name || userData.name);
-    const subject = normalizeText(existingInstructor?.subject || userData.subject);
+    const subjects = existingInstructor
+      ? getInstructorSubjects(existingInstructor)
+      : normalizeSubjectList(userData.subjects);
+    const subject = subjects[0] || "";
     const phone = normalizeText(userData.phone || existingInstructor?.phone);
 
-    const profilePayload = {
-      ...buildPublicInstructorProfile({
+    const profilePayload = publicInstructorData(buildPublicInstructorProfile({
         ...(existingInstructor || {}),
         name,
         email: instructorEmail,
         subject,
+        subjects,
         phone,
         pending: false
-      }, instructorId),
-      uid: newUserId,
-      instructorId,
-      name,
-      email: instructorEmail,
-      emailLower: instructorEmailLower,
-      subject,
-      ...(phone ? { phone } : {}),
-      pending: false,
-      updatedAt: serverTimestamp()
-    };
+      }, instructorId));
 
     const instructorBatch = writeBatch(db);
     instructorBatch.set(doc(db, "instructors", instructorId), profilePayload, { merge: true });
+    instructorBatch.set(doc(db, "instructorPrivate", instructorId), {
+      ...privateInstructorData({ ...(existingInstructor || {}), uid: newUserId, email: instructorEmail,
+        phone, note: userData.note || existingInstructor?.note, pending: false }),
+      createdAt: existingInstructor?.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
     instructorBatch.set(doc(db, "instructorAccounts", newUserId), buildInstructorAccountPayload({
       uid: newUserId,
       instructorId,
       name,
       email: instructorEmail,
       emailLower: instructorEmailLower,
-      subject
+      subject,
+      subjects
     }), { merge: true });
     await instructorBatch.commit();
   }
   } catch (error) {
+    let rollbackFailed = false;
     try {
       await deleteAuthUser(userCredential.user);
     } catch (rollbackError) {
+      rollbackFailed = true;
       console.warn("인증 계정 롤백 실패:", rollbackError);
+    }
+    if (userData.role === "instructor") {
+      if (rollbackFailed) {
+        throw new Error("강사 정보 저장과 인증 계정 되돌리기가 모두 실패했습니다. 같은 이메일로 다시 생성하지 말고, 입력한 이메일의 Auth 계정과 강사 프로필·연결 문서를 관리자에게 확인받으세요.");
+      }
+      throw new Error("강사 정보 저장에 실패해 새 인증 계정을 되돌렸습니다. 입력 내용과 권한을 확인한 뒤 다시 시도할 수 있습니다.");
     }
     throw error;
   }
@@ -719,6 +714,7 @@ async function initUserAddForm() {
   try {
     // DOM 요소들이 준비될 때까지 기다림
     const form = await waitForElement("#userAddForm");
+    setupPasswordVisibilityToggles(form);
     const roleSelect = await waitForElement("#roleSelect");
     const studentFields = $("#studentFields");
     const studentFields2 = $("#studentFields2");
@@ -729,20 +725,23 @@ async function initUserAddForm() {
     const memberPhone = $("#memberPhone");
     const memberSignupSource = $("#memberSignupSource");
     const memberSignupSourceOther = $("#memberSignupSourceOther");
-    const memberSignupSourceGroup = $("#memberSignupSourceGroup");
-    const memberSignupSourceOtherGroup = $("#memberSignupSourceOtherGroup");
 
     // 초기 상태에서 모든 역할별 required 필드의 required 제거 (기본값)
-    const userSubject = $("#userSubject");
+    const userSubjectChoices = $("#userSubjectChoices");
     const userChildGrade = $("#userChildGrade");
     const userPhone = $("#userPhone");
-    if (userSubject) {
+    if (userSubjectChoices) {
       const subjects = await loadInstructorMenuSubjects(getSettingDoc);
-      userSubject.innerHTML = buildSubjectSelectHtml(subjects, {
-        emptyLabel: "선택하세요",
-        allowCustom: false
+      userSubjectChoices.innerHTML = subjects.map((subject, index) => `
+        <label class="subject-choice-chip" for="userSubject${index}">
+          <input type="checkbox" id="userSubject${index}" name="subjects" value="${escapeHtml(subject)}">
+          <span>${escapeHtml(subject)}</span>
+        </label>
+      `).join("");
+      userSubjectChoices.addEventListener("change", (event) => {
+        const checkbox = event.target.closest('input[type="checkbox"]');
+        if (checkbox) checkbox.closest(".subject-choice-chip")?.classList.toggle("is-checked", checkbox.checked);
       });
-      userSubject.removeAttribute("required");
     }
     if (userChildGrade) userChildGrade.removeAttribute('required');
     if (userPhone) userPhone.removeAttribute('required');
@@ -795,23 +794,10 @@ async function initUserAddForm() {
       if (parentFields3) parentFields3.style.display = 'none';
       
       // required 속성 관리: 숨겨진 필드의 required 제거, 표시된 필드만 required 유지
-      const userSubject = $("#userSubject");
       const userChildGrade = $("#userChildGrade");
       const userPhone = $("#userPhone");
       const memberPurpose = $("#memberPurpose");
       const memberPhone = $("#memberPhone");
-      const memberSignupSource = $("#memberSignupSource");
-      const memberSignupSourceOther = $("#memberSignupSourceOther");
-      
-      // 강사 과목 필드: 강사일 때만 required
-      if (userSubject) {
-        if (isInstructor) {
-          userSubject.setAttribute('required', 'required');
-        } else {
-          userSubject.removeAttribute('required');
-        }
-      }
-
       if (userPhone) {
         if (isStudent) {
           userPhone.setAttribute('required', 'required');
@@ -849,13 +835,9 @@ async function initUserAddForm() {
       
       // 숨겨진 필드의 required 속성 제거 (HTML5 검증 오류 방지)
       const currentRole = normalizeRole(roleSelect?.value);
-      const userSubject = $("#userSubject");
       const userChildGrade = $("#userChildGrade");
       const userPhone = $("#userPhone");
       
-      if (currentRole !== 'instructor' && userSubject) {
-        userSubject.removeAttribute('required');
-      }
       if (currentRole !== 'parent' && userChildGrade) {
         userChildGrade.removeAttribute('required');
       }
@@ -872,6 +854,7 @@ async function initUserAddForm() {
       const formData = new FormData(form);
       const data = Object.fromEntries(formData);
       data.role = normalizeRole(data.role);
+      data.subjects = formData.getAll("subjects");
 
       // 비고 필드 직접 읽기 (학생/강사/학부모 필드가 같은 name을 사용하므로)
       const memoInput = $("#userMemo");
@@ -905,7 +888,7 @@ async function initUserAddForm() {
           password: data.password,
           school: data.school || '',
           grade: data.grade || '',
-          subject: data.subject || '',
+          subjects: data.subjects,
           phone: data.role === "member" ? (data.memberPhone || '') : (data.phone || ''),
           signupSource: data.role === "member" ? (data.memberSignupSource || '') : (data.signupSource || ''),
           signupSourceOther: data.memberSignupSourceOther || '',
@@ -918,8 +901,11 @@ async function initUserAddForm() {
 
         // PATCH: role 정규화 - instructor로 통일 (2024-12-19)
         const roleText = data.role === "student" ? "학생" : data.role === "member" ? "회원" : "강사";
-        toast(`${roleText}이 성공적으로 추가되었습니다.`);
+        toast(data.role === "instructor" ? "강사가 성공적으로 추가되었습니다." : `${roleText}이 성공적으로 추가되었습니다.`);
         form.reset();
+        userSubjectChoices?.querySelectorAll(".subject-choice-chip").forEach((chip) => {
+          chip.classList.remove("is-checked");
+        });
         roleSelect?.dispatchEvent(new Event('change', { bubbles: true }));
         if (studentFields) studentFields.style.display = 'none';
         if (studentFields2) studentFields2.style.display = 'none';
@@ -956,35 +942,46 @@ async function initUserAddForm() {
 initUserAddForm();
 
 // ================== 사용자 목록 실시간 표시 ==================
-const tbody = $("#tblUsers")?.querySelector('tbody');
 const searchInput = $("#searchUsers");
 const roleFilterInput = $("#roleFilterUsers");
 let allUsers = [];
 let filteredUsers = [];
 let currentPage = 1;
-const itemsPerPage = 10;
+let itemsPerPage = 10;
+let appliedUserKeyword = "";
 let currentSort = { field: 'createdAt', direction: 'desc' };
 let usersLoaded = false;
+let instructorPrivateExportById = new Map();
+
+function setUsersExportReady() {
+  const button = $("#dlUsers");
+  if (!button) return;
+  button.disabled = !usersLoaded || !filteredUsers.length;
+  button.title = !usersLoaded
+    ? "사용자 목록을 불러온 뒤 다운로드할 수 있습니다"
+    : (filteredUsers.length ? "현재 필터 결과 전체를 엑셀로 다운로드" : "다운로드할 사용자가 없습니다");
+}
 
 function setUsersReadyState() {
   const tbodyElement = $("#tblUsers")?.querySelector('tbody');
   if (tbodyElement) {
-    tbodyElement.innerHTML = '<tr><td colspan="8" class="muted">현황 불러오기를 눌러 사용자 목록을 확인하세요.</td></tr>';
+    tbodyElement.innerHTML = '<tr><td colspan="8" class="muted">새로고침을 눌러 사용자 목록을 확인하세요.</td></tr>';
   }
   const paginationContainer = $("#paginationContainer");
   if (paginationContainer) paginationContainer.innerHTML = "";
   allUsers = [];
   filteredUsers = [];
   updateUserStats([]);
+  setUsersExportReady();
 }
 
 // 모든 사용자 데이터 단발 조회 (onSnapshot 제거)
 async function loadUsers() {
-  const refreshBtn = $("#refreshUsers");
-  if (refreshBtn) {
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = usersLoaded ? "새로고침 중..." : "불러오는 중...";
-  }
+  const refreshBtn = $("#refreshBtn");
+  usersLoaded = false;
+  setUsersExportReady();
+  instructorPrivateExportById = new Map();
+  setAdminRefreshButtonState(refreshBtn, true);
   const users = { students: [], members: [], instructors: [], parents: [], admins: [] };
 
   function checkAndUpdate() {
@@ -998,11 +995,12 @@ async function loadUsers() {
   }
 
   try {
-    const [studentsSnap, membersSnap, instructorAccountsSnap, instructorsSnap, adminsSnap] = await Promise.all([
+    const [studentsSnap, membersSnap, instructorAccountsSnap, instructorsSnap, instructorPrivateSnap, adminsSnap] = await Promise.all([
       getDocs(collection(db, "students")),
       getDocs(collection(db, "members")),
       getDocs(collection(db, "instructorAccounts")),
       getDocs(collection(db, "instructors")),
+      getDocs(collection(db, "instructorPrivate")),
       getDocs(collection(db, "admins"))
     ]);
 
@@ -1012,9 +1010,12 @@ async function loadUsers() {
 
     users.members = membersSnap.docs.map(d => ({ uid: d.id, role: 'member', ...d.data() }));
 
+    const instructorPrivateById = new Map(instructorPrivateSnap.docs.map((d) => [d.id, d.data() || {}]));
+    instructorPrivateExportById = instructorPrivateById;
     const instructorProfileMap = new Map(instructorsSnap.docs.map((profileDoc) => [
       profileDoc.id,
-      { id: profileDoc.id, instructorId: profileDoc.id, ...(profileDoc.data() || {}) }
+      { ...mergeInstructorPrivate(profileDoc.data() || {}, instructorPrivateById.get(profileDoc.id)),
+        id: profileDoc.id, instructorId: profileDoc.id }
     ]));
     const linkedProfileIds = new Set();
 
@@ -1066,7 +1067,7 @@ async function loadUsers() {
         subject: profile.subject || "",
         createdAt: profile.createdAt || null,
         updatedAt: profile.updatedAt || null,
-        note: "강사 프로필만 있음"
+        note: profile.note || ""
       });
     });
 
@@ -1078,11 +1079,9 @@ async function loadUsers() {
     checkAndUpdate();
   } catch (err) {
     if (err.code !== 'permission-denied') console.error("사용자 로드 오류:", err);
+    toast("사용자 목록을 불러오지 못했습니다. 다시 시도해 주세요.", true);
   } finally {
-    if (refreshBtn) {
-      refreshBtn.disabled = false;
-      refreshBtn.textContent = usersLoaded ? "새로고침" : "현황 불러오기";
-    }
+    setAdminRefreshButtonState(refreshBtn, false);
   }
 }
 
@@ -1161,6 +1160,7 @@ function renderUsers(users) {
   
   // 필터링된 사용자 목록 저장
   filteredUsers = validUsers;
+  setUsersExportReady();
   
   // 통계 업데이트
   updateUserStats(allUsers);
@@ -1206,6 +1206,9 @@ function renderUsers(users) {
     const instructorStatusHtml = isInstructor
       ? `<span class="instructor-link-chip instructor-link-chip--${instructorStatus}">${getInstructorLinkStatusLabel(instructorStatus)}</span>`
       : "";
+    const schoolOrSubject = isInstructor
+      ? (getInstructorSubjects(user).join(", ") || "-")
+      : (user.school || (user.role === "member" ? getMemberPurposeLabel(user.memberPurpose) : user.childSchool) || "-");
     const actionHtml = isAdmin
       ? `<span class="manual-management-badge">수동 관리</span>`
       : isMember
@@ -1216,13 +1219,19 @@ function renderUsers(users) {
           </div>`
         : isInstructor
           ? (instructorStatus === "profileOnly"
-            ? `<span class="manual-management-badge">수동 관리</span>`
-            : `<div style="display:flex;gap:4px;flex-wrap:wrap;">
-                <button class="btn warning sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="사이트 데이터 정리" style="display:flex;align-items:center;gap:4px;">
+            ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button class="btn warning sm" onclick="deleteUser('${user.instructorId}', '${user.role}')" title="미연동 강사 프로필과 배정 데이터 정리" style="display:flex;align-items:center;gap:4px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
                 </button>
-                ${instructorStatus === "linked" ? `<button class="btn sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="강사 계정 연동 해제">강사 계정 미연동</button>` : ""}
-              </div>`)
+              </div>`
+            : instructorStatus === "linked"
+              ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button class="btn warning sm" type="button" disabled title="먼저 강사 계정을 미연동해야 데이터 정리를 할 수 있습니다." style="display:flex;align-items:center;gap:4px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
+                </button>
+                <button class="btn sm" onclick="unlinkInstructorAccount('${user.uid}')" title="강사 계정 연동 해제">강사 계정 미연동</button>
+              </div>`
+              : `<button class="btn warning sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="미연동 강사 데이터 정리">데이터 정리</button>`)
         : `<div style="display:flex;gap:4px;flex-wrap:wrap;">
             <button class="btn warning sm" onclick="deleteUser('${user.uid}', '${user.role}')" title="사이트 데이터 정리" style="display:flex;align-items:center;gap:4px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg>데이터 정리
@@ -1234,7 +1243,7 @@ function renderUsers(users) {
         <td><span class="pill">${roleText}</span>${instructorStatusHtml}</td>
         <td>${user.name || '-'}</td>
         <td>${user.email || '-'}</td>
-        <td>${user.school || user.subject || (user.role === 'member' ? getMemberPurposeLabel(user.memberPurpose) : user.childSchool) || '-'}</td>
+        <td>${escapeHtml(schoolOrSubject)}</td>
         <td>${user.role === 'student' ? formatGrade(user.grade) : (user.role === 'member' ? '-' : (user.childGrade || '-'))}</td>
         <td>${createdAt}</td>
         <td class="muted" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${user.note || ''}">${user.note || '-'}</td>
@@ -1251,99 +1260,26 @@ function renderUsers(users) {
 
 // 페이지네이션 UI 렌더링
 function renderPagination(totalItems) {
-  const paginationContainer = $("#paginationContainer");
-  if (!paginationContainer) return;
-
-  if (totalItems === 0) {
-    paginationContainer.innerHTML = '';
-    return;
-  }
-
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  
-  if (totalPages <= 1) {
-    paginationContainer.innerHTML = '';
-    return;
-  }
-
-  let paginationHTML = '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:20px;flex-wrap:wrap;">';
-  
-  // 이전 페이지 버튼
-  if (currentPage > 1) {
-    paginationHTML += `<button class="btn sm" onclick="goToPage(${currentPage - 1})" style="padding:6px 12px;">이전</button>`;
-  } else {
-    paginationHTML += `<button class="btn sm" disabled style="padding:6px 12px;opacity:0.5;cursor:not-allowed;">이전</button>`;
-  }
-
-  // 페이지 번호 버튼들
-  const maxVisiblePages = 10;
-  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-  
-  // 시작 페이지 조정
-  if (endPage - startPage < maxVisiblePages - 1) {
-    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-  }
-
-  // 첫 페이지
-  if (startPage > 1) {
-    paginationHTML += `<button class="btn sm" onclick="goToPage(1)" style="padding:6px 12px;">1</button>`;
-    if (startPage > 2) {
-      paginationHTML += `<span style="padding:6px 4px;color:var(--muted);">...</span>`;
-    }
-  }
-
-  // 페이지 번호들
-  for (let i = startPage; i <= endPage; i++) {
-    if (i === currentPage) {
-      paginationHTML += `<button class="btn sm" style="padding:6px 12px;background:var(--brand);color:#fff;border-color:var(--brand);" disabled>${i}</button>`;
-    } else {
-      paginationHTML += `<button class="btn sm" onclick="goToPage(${i})" style="padding:6px 12px;">${i}</button>`;
-    }
-  }
-
-  // 마지막 페이지
-  if (endPage < totalPages) {
-    if (endPage < totalPages - 1) {
-      paginationHTML += `<span style="padding:6px 4px;color:var(--muted);">...</span>`;
-    }
-    paginationHTML += `<button class="btn sm" onclick="goToPage(${totalPages})" style="padding:6px 12px;">${totalPages}</button>`;
-  }
-
-  // 다음 페이지 버튼
-  if (currentPage < totalPages) {
-    paginationHTML += `<button class="btn sm" onclick="goToPage(${currentPage + 1})" style="padding:6px 12px;">다음</button>`;
-  } else {
-    paginationHTML += `<button class="btn sm" disabled style="padding:6px 12px;opacity:0.5;cursor:not-allowed;">다음</button>`;
-  }
-
-  // 페이지 정보 표시
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
-  paginationHTML += `<span style="margin-left:16px;color:var(--muted);font-size:13px;">${startItem}-${endItem} / 총 ${totalItems}명</span>`;
-
-  paginationHTML += '</div>';
-  paginationContainer.innerHTML = paginationHTML;
+  const state = renderListPagination($("#paginationContainer"), {
+    currentPage,
+    itemLabel: "명",
+    onPageChange: (page) => window.goToPage(page),
+    pageSize: itemsPerPage,
+    totalItems,
+  });
+  currentPage = state.currentPage;
 }
 
 // 페이지 이동 함수
 window.goToPage = (page) => {
   currentPage = page;
   renderUsers(filteredUsers);
-  
-  // 페이지 상단으로 스크롤
-  const table = $("#tblUsers");
-  if (table) {
-    table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
 };
 
-// 검색
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
-    filterUsers();
-  });
-}
+bindCommittedSearch(searchInput, $("#accountSearchButton"), (keyword) => {
+  appliedUserKeyword = keyword;
+  filterUsers();
+});
 
 if (roleFilterInput) {
   roleFilterInput.addEventListener('change', () => {
@@ -1351,13 +1287,18 @@ if (roleFilterInput) {
   });
 }
 
+$("#accountsPageSize")?.addEventListener("change", (event) => {
+  itemsPerPage = normalizeListPageSize(event.target.value);
+  filterUsers();
+});
+
 function filterUsers(resetPage = true) {
   if (!usersLoaded) {
     setUsersReadyState();
     return;
   }
 
-  const keyword = searchInput?.value.trim().toLowerCase() || '';
+  const keyword = appliedUserKeyword;
   const roleFilter = roleFilterInput?.value || '';
 
   let filtered = allUsers;
@@ -1417,10 +1358,12 @@ function buildCleanupDialogHtml({
 }) {
   return `
     <div class="cleanup-dialog" role="dialog" aria-modal="true" aria-labelledby="${labelId}">
-      <button type="button" class="modal-close cleanup-dialog__close" data-cleanup-close aria-label="닫기">×</button>
       <div class="cleanup-dialog__header">
-        <h2 id="${labelId}">${escapeHtml(title)}</h2>
-        <p>정리 전 미리보기를 확인한 뒤 확인 문구를 입력해 주세요.</p>
+        <div>
+          <h2 id="${labelId}">${escapeHtml(title)}</h2>
+          <p>정리 전 미리보기를 확인한 뒤 확인 문구를 입력해 주세요.</p>
+        </div>
+        <button type="button" class="modal-close admin-modal-close cleanup-dialog__close" data-cleanup-close aria-label="닫기">×</button>
       </div>
       <div id="${bodyId}"></div>
       <div class="cleanup-confirm">
@@ -1510,6 +1453,9 @@ function scheduleCleanupModalClose(modalId, closeFn) {
 }
 
 function getCleanupErrorMessage(error) {
+  if (error?.isOperatorSafe === true && error?.message) {
+    return error.message;
+  }
   const text = String(error?.code || error?.message || error || "").toLowerCase();
   if (text.includes("permission") || text.includes("권한") || text.includes("insufficient")) {
     return "권한 또는 규칙 설정을 확인해 주세요.";
@@ -1519,17 +1465,13 @@ function getCleanupErrorMessage(error) {
 
 async function buildStudentCleanupPreview(uid) {
   const user = allUsers.find((item) => item.uid === uid && item.role === "student") || {};
-  const studentRef = doc(db, "students", uid);
-  const [studentSnap, enrollmentRefs, classMemberRefs, sessionAccessRefs] = await Promise.all([
-    getDoc(studentRef),
-    getRefsByField("enrollments", "userId", uid),
-    getRefsByField("offlineClassMembers", "studentUid", uid),
-    getRefsByField("offlineSessionAccess", "studentUid", uid)
-  ]);
-  const student = studentSnap.exists() ? (studentSnap.data() || {}) : user;
+  const cleanupData = await loadStudentCleanupData(uid, user);
+  const student = cleanupData.student;
+  const activeParentLinks = cleanupData.blockingParentLinks.length;
 
   return {
     uid,
+    hasBlockingParentLinks: activeParentLinks > 0,
     profile: {
       name: student.name || user.name || "",
       email: student.email || user.email || "",
@@ -1538,10 +1480,15 @@ async function buildStudentCleanupPreview(uid) {
       grade: student.grade || user.grade || ""
     },
     counts: {
-      profile: studentSnap.exists() ? 1 : 0,
-      enrollments: enrollmentRefs.length,
-      offlineClassMembers: classMemberRefs.length,
-      offlineSessionAccess: sessionAccessRefs.length
+      profile: cleanupData.studentRef ? 1 : 0,
+      enrollments: cleanupData.enrollmentRefs.length,
+      offlineClassMembers: cleanupData.classMemberRefs.length,
+      offlineSessionAccess: cleanupData.sessionAccessRefs.length,
+      activeParentLinks,
+      revokedParentLinks: cleanupData.parentLinkRefs.length - activeParentLinks,
+      childLinkAttempts: cleanupData.childLinkAttemptRefs.length,
+      signupAttempts: cleanupData.transientRefs.signupAttempts.length,
+      emailVerifications: cleanupData.transientRefs.emailVerifications.length
     }
   };
 }
@@ -1597,7 +1544,7 @@ function renderStudentCleanupModal(preview) {
   const counts = preview.counts || {};
 
   if (confirmInput) confirmInput.value = "";
-  if (executeButton) executeButton.disabled = false;
+  if (executeButton) executeButton.disabled = preview.hasBlockingParentLinks;
 
   if (body) {
     body.innerHTML = `
@@ -1613,13 +1560,22 @@ function renderStudentCleanupModal(preview) {
           { label: "학생 프로필", count: counts.profile },
           { label: "학생 온라인 수강 기록", count: counts.enrollments },
           { label: "오프라인 반 배정 기록", count: counts.offlineClassMembers },
-          { label: "오프라인 수업 접근 기록", count: counts.offlineSessionAccess }
+          { label: "오프라인 수업 접근 기록", count: counts.offlineSessionAccess },
+          { label: "활성 학부모 연결", count: counts.activeParentLinks },
+          { label: "해제된 학부모 연결 기록", count: counts.revokedParentLinks },
+          { label: "자녀 연결 시도 기록", count: counts.childLinkAttempts },
+          { label: "임시 가입/인증 기록", count: counts.signupAttempts + counts.emailVerifications }
         ])}
       </section>
+      ${preview.hasBlockingParentLinks ? `
+        <div class="cleanup-feedback" data-type="error">
+          활성 학부모 연결이 남아 있어 정리를 실행할 수 없습니다. 회원 관리에서 연결을 먼저 해제해 회원의 자녀 수를 정상 반영한 뒤 다시 확인해 주세요.
+        </div>
+      ` : ""}
       <div class="cleanup-two-column">
       <section class="cleanup-card">
         <h3>정리되는 항목</h3>
-        ${renderCleanupSummaryList(["학생 프로필", "학생 온라인 수강 기록", "오프라인 반 배정/접근 기록"])}
+        ${renderCleanupSummaryList(["학생 프로필", "학생 온라인 수강 기록", "오프라인 반 배정/접근 기록", "해제된 학부모 연결 기록", "자녀 연결 시도 기록", "임시 가입/인증 기록"])}
       </section>
       <section class="cleanup-card">
         <h3>유지되는 항목</h3>
@@ -1678,13 +1634,20 @@ async function executeActiveStudentCleanup() {
 
   let completed = false;
   try {
-    await deleteUserFirestoreData(activeStudentCleanupPreview.uid, "student");
+    await deleteUserFirestoreData(
+      activeStudentCleanupPreview.uid,
+      "student",
+      activeStudentCleanupPreview.profile
+    );
     completed = true;
     setCleanupFeedback("studentCleanupModal", "데이터 정리가 완료되었습니다. Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요.", "success");
     scheduleCleanupModalClose("studentCleanupModal", closeStudentCleanupModal);
     await loadUsers();
   } catch (error) {
     console.error("학생 데이터 정리 실패:", error);
+    if (error?.code === "active-parent-link" && activeStudentCleanupPreview) {
+      activeStudentCleanupPreview.hasBlockingParentLinks = true;
+    }
     setCleanupFeedback("studentCleanupModal", getCleanupErrorMessage(error), "error");
   } finally {
     if (executeButton) executeButton.textContent = completed ? "완료" : "데이터 정리 실행";
@@ -1692,6 +1655,9 @@ async function executeActiveStudentCleanup() {
       setStudentCleanupCompleted();
     } else {
       setStudentCleanupActionsDisabled(false);
+      if (activeStudentCleanupPreview?.hasBlockingParentLinks && executeButton) {
+        executeButton.disabled = true;
+      }
     }
   }
 }
@@ -1722,8 +1688,7 @@ function getMemberCleanupProfile(memberSnap, user = {}) {
   };
 }
 
-async function buildMemberCleanupPreview(uid) {
-  const user = allUsers.find((item) => item.uid === uid && item.role === "member") || {};
+async function loadMemberCleanupData(uid, fallbackUser = {}) {
   const memberRef = doc(db, "members", uid);
   const [memberSnap, enrollmentsSnap, childLinksSnap, childLinkAttemptsSnap] = await Promise.all([
     getDoc(memberRef),
@@ -1731,10 +1696,31 @@ async function buildMemberCleanupPreview(uid) {
     getDocs(query(collection(db, "studentParentLinks"), where("memberUid", "==", uid))),
     getDocs(query(collection(db, "memberChildLinkAttempts"), where("memberUid", "==", uid)))
   ]);
+  const profile = getMemberCleanupProfile(memberSnap, fallbackUser);
+  const transientRefs = await getAccountTransientCleanupRefs(profile.email);
 
-  const enrollmentDocs = enrollmentsSnap.docs;
-  const childLinkDocs = childLinksSnap.docs;
-  const childLinkAttemptDocs = childLinkAttemptsSnap.docs;
+  return {
+    profile,
+    refs: {
+      member: memberSnap.exists() ? memberRef : null,
+      enrollments: enrollmentsSnap.docs.map((item) => item.ref),
+      childLinks: childLinksSnap.docs.map((item) => item.ref),
+      childLinkAttempts: childLinkAttemptsSnap.docs.map((item) => item.ref),
+      signupAttempts: transientRefs.signupAttempts,
+      emailVerifications: transientRefs.emailVerifications
+    },
+    docs: {
+      enrollments: enrollmentsSnap.docs,
+      childLinks: childLinksSnap.docs
+    }
+  };
+}
+
+async function buildMemberCleanupPreview(uid) {
+  const user = allUsers.find((item) => item.uid === uid && item.role === "member") || {};
+  const cleanupData = await loadMemberCleanupData(uid, user);
+  const enrollmentDocs = cleanupData.docs.enrollments;
+  const childLinkDocs = cleanupData.docs.childLinks;
   const enrollmentSamples = await Promise.all(enrollmentDocs.slice(0, MEMBER_CLEANUP_SAMPLE_LIMIT).map(async (docSnap) => {
     const row = docSnap.data() || {};
     return {
@@ -1745,18 +1731,14 @@ async function buildMemberCleanupPreview(uid) {
 
   return {
     uid,
-    profile: getMemberCleanupProfile(memberSnap, user),
-    refs: {
-      member: memberSnap.exists() ? memberRef : null,
-      enrollments: enrollmentDocs.map((item) => item.ref),
-      childLinks: childLinkDocs.map((item) => item.ref),
-      childLinkAttempts: childLinkAttemptDocs.map((item) => item.ref)
-    },
+    profile: cleanupData.profile,
     counts: {
-      memberProfile: memberSnap.exists() ? 1 : 0,
-      enrollments: enrollmentDocs.length,
-      childLinks: childLinkDocs.length,
-      childLinkAttempts: childLinkAttemptDocs.length
+      memberProfile: cleanupData.refs.member ? 1 : 0,
+      enrollments: cleanupData.refs.enrollments.length,
+      childLinks: cleanupData.refs.childLinks.length,
+      childLinkAttempts: cleanupData.refs.childLinkAttempts.length,
+      signupAttempts: cleanupData.refs.signupAttempts.length,
+      emailVerifications: cleanupData.refs.emailVerifications.length
     },
     samples: {
       enrollments: enrollmentSamples,
@@ -1843,7 +1825,8 @@ function renderMemberCleanupModal(preview) {
         { label: "회원 프로필", count: counts.memberProfile },
         { label: "온라인 수강 기록", count: counts.enrollments },
         { label: "자녀 연결 기록", count: counts.childLinks },
-        { label: "자녀 연결 시도 기록", count: counts.childLinkAttempts }
+        { label: "자녀 연결 시도 기록", count: counts.childLinkAttempts },
+        { label: "임시 가입/인증 기록", count: counts.signupAttempts + counts.emailVerifications }
       ])}
       </section>
       <section class="cleanup-card">
@@ -1865,7 +1848,7 @@ function renderMemberCleanupModal(preview) {
       <div class="cleanup-two-column">
       <section class="cleanup-card">
         <h3>정리되는 항목</h3>
-        ${renderCleanupSummaryList(["회원 프로필", "온라인 수강 기록", "자녀 연결 기록", "자녀 연결 시도 기록"])}
+        ${renderCleanupSummaryList(["회원 프로필", "온라인 수강 기록", "자녀 연결 기록", "자녀 연결 시도 기록", "임시 가입/인증 기록"])}
       </section>
       <section class="cleanup-card">
         <h3>유지되는 항목</h3>
@@ -1924,11 +1907,17 @@ async function executeActiveMemberCleanup() {
 
   let completed = false;
   try {
+    const cleanupData = await loadMemberCleanupData(
+      activeMemberCleanupPreview.uid,
+      activeMemberCleanupPreview.profile
+    );
     const refsToDelete = [
-      activeMemberCleanupPreview.refs.member,
-      ...activeMemberCleanupPreview.refs.enrollments,
-      ...activeMemberCleanupPreview.refs.childLinks,
-      ...activeMemberCleanupPreview.refs.childLinkAttempts
+      ...cleanupData.refs.enrollments,
+      ...cleanupData.refs.childLinks,
+      ...cleanupData.refs.childLinkAttempts,
+      ...cleanupData.refs.signupAttempts,
+      ...cleanupData.refs.emailVerifications,
+      cleanupData.refs.member
     ].filter(Boolean);
     await deleteRefsInBatches(refsToDelete);
     completed = true;
@@ -1970,8 +1959,7 @@ function ensureInstructorCleanupModal() {
     bodyId: "instructorCleanupBody",
     confirmId: "instructorCleanupConfirmInput",
     cancelId: "instructorCleanupCancel",
-    executeId: "instructorCleanupExecute",
-    extraFooter: '<button type="button" class="btn" id="instructorCleanupUnlink">강사 계정 연동 해제</button>'
+    executeId: "instructorCleanupExecute"
   });
   document.body.appendChild(modal);
 
@@ -1981,16 +1969,11 @@ function ensureInstructorCleanupModal() {
     if (event.target === modal) closeInstructorCleanupModal();
   });
   modal.querySelector("#instructorCleanupExecute")?.addEventListener("click", executeActiveInstructorCleanup);
-  modal.querySelector("#instructorCleanupUnlink")?.addEventListener("click", executeActiveInstructorUnlink);
   modal.querySelector("#instructorCleanupConfirmInput")?.addEventListener("input", () => {
     clearCleanupFeedback(modal);
   });
 
   return modal;
-}
-
-function countLine(label, count) {
-  return `<li><strong>${escapeHtml(label)}:</strong> ${Number(count || 0).toLocaleString("ko-KR")}개</li>`;
 }
 
 function renderInstructorCleanupModal(preview, user = {}) {
@@ -2002,7 +1985,6 @@ function renderInstructorCleanupModal(preview, user = {}) {
   const confirmInput = modal.querySelector("#instructorCleanupConfirmInput");
   const executeButton = modal.querySelector("#instructorCleanupExecute");
   const counts = preview.counts || {};
-  const unlink = preview.unlink || {};
   const manualReviewCount =
     (counts.nameOnlyCourses || 0) +
     (counts.nameOnlyOfflineClasses || 0) +
@@ -2040,14 +2022,7 @@ function renderInstructorCleanupModal(preview, user = {}) {
       </section>
       </div>
       <section class="cleanup-card">
-      <h3>${unlink.canUnlink ? "강사 계정 미연동" : "연동된 강사 정보 없음"}</h3>
-      <p style="margin:0 0 12px;">${unlink.canUnlink ? "강사 계정 연동을 해제하면 프로필/배정 정보는 보존하거나 다시 연결할 수 있습니다." : "이미 연동 해제된 계정이거나 자동으로 해제할 강사 연결을 찾을 수 없습니다."}</p>
-      <p class="muted" style="margin:0 0 12px;">Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요.</p>
-      ${unlink.canUnlink ? "" : `
-        <div style="padding:12px;border-radius:12px;background:var(--danger-bg, #fee2e2);color:var(--danger-color, #991b1b);margin-bottom:14px;">
-          강사 계정 연동 해제를 자동 실행할 수 없습니다. ${escapeHtml(unlink.error || "보존할 강사 프로필을 확정할 수 없습니다.")}
-        </div>
-      `}
+      <h3>수동 확인 항목</h3>
       ${manualReviewCount ? `
         <div style="padding:12px;border-radius:12px;background:var(--info-bg, #eff6ff);color:var(--info-color, #1d4ed8);">
           이름만 일치하는 수동 확인 후보가 ${manualReviewCount.toLocaleString("ko-KR")}개 있습니다.
@@ -2061,14 +2036,6 @@ function renderInstructorCleanupModal(preview, user = {}) {
       ` : '<p class="muted" style="margin:0;">이름만 일치하는 수동 확인 후보는 없습니다.</p>'}
       </section>
     `;
-  }
-
-  const unlinkButton = modal.querySelector("#instructorCleanupUnlink");
-  if (unlinkButton) {
-    unlinkButton.hidden = !unlink.canUnlink;
-    unlinkButton.disabled = !unlink.canUnlink;
-    unlinkButton.title = unlink.canUnlink ? "" : (unlink.error || "강사 계정 연동 해제를 자동 실행할 수 없습니다.");
-    unlinkButton.textContent = "강사 계정 미연동";
   }
 
   modal.style.display = "flex";
@@ -2085,24 +2052,23 @@ function closeInstructorCleanupModal() {
 
 function setInstructorCleanupActionsDisabled(disabled) {
   const executeButton = document.getElementById("instructorCleanupExecute");
-  const unlinkButton = document.getElementById("instructorCleanupUnlink");
   const cancelButton = document.getElementById("instructorCleanupCancel");
   if (executeButton) executeButton.disabled = disabled;
-  if (unlinkButton && !unlinkButton.hidden) unlinkButton.disabled = disabled || !(activeInstructorCleanupPreview?.unlink?.canUnlink);
   if (cancelButton) cancelButton.disabled = disabled;
 }
 
 function setInstructorCleanupCompleted() {
   const executeButton = document.getElementById("instructorCleanupExecute");
-  const unlinkButton = document.getElementById("instructorCleanupUnlink");
   const cancelButton = document.getElementById("instructorCleanupCancel");
   if (executeButton) executeButton.disabled = true;
-  if (unlinkButton && !unlinkButton.hidden) unlinkButton.disabled = true;
   if (cancelButton) cancelButton.disabled = false;
 }
 
 async function openInstructorCleanupPreview(uid) {
-  const user = allUsers.find((item) => item.uid === uid && item.role === "instructor") || {};
+  const user = allUsers.find((item) => (
+    item.role === "instructor" &&
+    (item.uid === uid || item.instructorId === uid)
+  )) || {};
   const preview = await buildInstructorAccountCleanupPreview(uid);
   renderInstructorCleanupModal(preview, user);
 }
@@ -2151,7 +2117,7 @@ async function executeActiveInstructorUnlink() {
   if (!activeInstructorCleanupPreview) return;
   const confirmationModal = await requestPhraseConfirmation({
     title: "강사 계정 연동 해제",
-    message: "강사 로그인 계정과 프로필의 연결을 해제합니다. Auth 계정은 삭제되지 않습니다.",
+    message: "연동을 해제하면 강사 계정 정보가 삭제되어 계정/사용자 목록에서 사라지고, 이 계정으로 강사 기능을 사용할 수 없습니다. 강사 프로필과 과목·강좌·반·시간표 배정 정보는 그대로 보존되며, 이후 같은 강사명과 과목으로 새 계정을 생성하면 기존 프로필에 다시 연결됩니다. Firebase Auth 계정은 삭제되지 않으므로 Firebase Console에서 직접 삭제해야 합니다.",
     phrase: "연동 해제",
     confirmLabel: "연동 해제",
     pendingMessage: "강사 계정 연동을 해제하는 중입니다.",
@@ -2161,21 +2127,17 @@ async function executeActiveInstructorUnlink() {
     },
   });
   if (!confirmationModal) return;
-  const unlinkButton = document.getElementById("instructorCleanupUnlink");
-  if (unlinkButton) {
-    unlinkButton.textContent = "연동 해제 중...";
-  }
   setInstructorCleanupActionsDisabled(true);
-  setCleanupFeedback("instructorCleanupModal", "데이터를 정리하는 중입니다.", "info");
+  setCleanupFeedback("instructorCleanupModal", "강사 계정 연동을 해제하는 중입니다.", "info");
 
   let completed = false;
   try {
     await executeInstructorAccountUnlink(activeInstructorCleanupPreview);
     completed = true;
-    const successMessage = "강사 계정 연동이 해제되었습니다. Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요.";
+    const successMessage = "강사 계정 연동이 해제되어 사용자 목록에서 제거되었습니다. Firebase Auth 계정은 Firebase Console에서 직접 삭제해 주세요.";
     setCleanupFeedback("instructorCleanupModal", successMessage, "success");
     confirmationModal.success("강사 계정 연동이 해제되었습니다.");
-    toast("강사 계정 연동이 해제되었습니다.");
+    toast(successMessage);
     await loadUsers();
   } catch (error) {
     console.error("강사 계정 연동 해제 실패:", error);
@@ -2184,9 +2146,6 @@ async function executeActiveInstructorUnlink() {
     confirmationModal.error(errorMessage);
     toast(errorMessage, true);
   } finally {
-    if (unlinkButton) {
-      unlinkButton.textContent = completed ? "완료" : "강사 계정 미연동";
-    }
     if (completed) {
       setInstructorCleanupCompleted();
     } else {
@@ -2194,6 +2153,22 @@ async function executeActiveInstructorUnlink() {
     }
   }
 }
+
+window.unlinkInstructorAccount = async (uid) => {
+  try {
+    const preview = await buildInstructorAccountCleanupPreview(uid);
+    if (!preview.unlink?.canUnlink) {
+      throw new Error(preview.unlink?.error || "강사 계정 연동 해제 대상을 확인할 수 없습니다.");
+    }
+    activeInstructorCleanupPreview = preview;
+    await executeActiveInstructorUnlink();
+  } catch (error) {
+    console.error("강사 계정 연동 해제 준비 실패:", error);
+    toast(getCleanupErrorMessage(error), true);
+  } finally {
+    activeInstructorCleanupPreview = null;
+  }
+};
 
 // 사용자 삭제 (Firestore 관련 데이터 정리)
 window.deleteUser = async (uid, role) => {
@@ -2213,6 +2188,11 @@ window.deleteUser = async (uid, role) => {
   }
 
   if (role === "instructor") {
+    const instructorUser = allUsers.find((item) => item.uid === uid && item.role === "instructor");
+    if (instructorUser && getInstructorLinkStatus(instructorUser) === "linked") {
+      toast("연결된 강사는 데이터 정리를 할 수 없습니다. 먼저 강사 계정을 미연동해 주세요.", true);
+      return;
+    }
     try {
       await openInstructorCleanupPreview(uid);
     } catch (error) {
@@ -2232,13 +2212,7 @@ window.deleteUser = async (uid, role) => {
     return;
   }
 
-  const roleText = role === "student" ? "학생" : role === "instructor" ? "강사" : "사용자";
-  const cleanupDetails = role === "student"
-    ? "\n\n학생 데이터 정리 범위:\n- 학생 프로필\n- 온라인 수강 기록\n- 오프라인 반 배정 기록\n- 오프라인 수업 접근 기록\n- 호환용 사용자 정보"
-    : role === "instructor"
-      ? "\n\n강사 데이터 정리 범위:\n- 강사 프로필/계정 관련 사이트 데이터\n- 호환용 사용자 정보\n\n담당 강좌/반 연결 상태는 별도 확인이 필요할 수 있습니다."
-      : "";
-  const message = `이 작업은 사이트에 저장된 사용자 정보와 연결 데이터를 정리합니다. Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요.${cleanupDetails}\n\n${roleText} 사이트 데이터를 정리할까요?`;
+  const message = "이 작업은 사이트에 저장된 사용자 정보와 연결 데이터를 정리합니다. Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요.\n\n사용자 사이트 데이터를 정리할까요?";
   if (!confirm(message)) return;
 
   // 삭제 중 표시
@@ -2248,7 +2222,7 @@ window.deleteUser = async (uid, role) => {
     const result = await deleteUserFirestoreData(uid, role);
     
     // 성공 메시지
-    toast(`데이터 정리가 완료되었습니다. Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요. (${result.deletedCount}개 문서, ${result.deletedFieldCount}개 필드 정리)`, false);
+    toast(`데이터 정리가 완료되었습니다. Auth 계정 삭제는 Firebase Console에서 별도로 처리하세요. (${result.deletedCount}개 문서 정리)`, false);
     
     // 페이지 새로고침 (목록 업데이트)
     setTimeout(() => {
@@ -2296,29 +2270,31 @@ document.addEventListener('click', (e) => {
   }
   
   // 버튼 표시/숨김
-  const refreshBtn = document.querySelector("#refreshUsers");
+  const refreshBtn = document.querySelector("#refreshBtn");
   const dlBtn = document.querySelector("#dlUsers");
   
   if (tabId === 'signup') {
     // 회원가입 설정 탭으로 전환 시 설정 로드
     loadSignupSettings();
   } else if (tabId === 'users') {
-    if (refreshBtn) refreshBtn.style.display = 'inline-block';
+    if (refreshBtn) refreshBtn.style.display = 'inline-flex';
     if (dlBtn) dlBtn.style.display = 'inline-block';
   }
 });
 
 // 새로고침
-$("#refreshUsers")?.addEventListener("click", () => {
-  loadUsers();
+$("#refreshBtn")?.addEventListener("click", async () => {
+  await loadUsers();
   if (usersLoaded) toast("새로고침되었습니다.");
 });
 
 
 // 엑셀 다운로드 (비밀번호/초기 비밀번호는 포함하지 않음)
 $("#dlUsers")?.addEventListener("click", async () => {
+  if (!usersLoaded) return toast("사용자 목록을 먼저 불러와 주세요.", true);
+  if (!filteredUsers.length) return toast(allUsers.length ? "필터 결과에 사용자가 없습니다." : "등록된 사용자가 없습니다.", true);
   try {
-    const rows = allUsers.map(u => {
+    const rows = filteredUsers.map(u => {
       if (u.role === 'student') {
         return {
           역할: '학생',
@@ -2327,6 +2303,7 @@ $("#dlUsers")?.addEventListener("click", async () => {
           학교: u.school || "",
           학년: formatGrade(u.grade),
           전화번호: u.phone || "",
+          상태: String(u.status || "active") === "active" ? "활성" : "비활성",
           이용약관동의: getConsentStatusLabel(u.termsAgreed),
           개인정보동의: getConsentStatusLabel(u.privacyAgreed),
           동의출처: getConsentSourceLabel(u.consentSource),
@@ -2359,30 +2336,35 @@ $("#dlUsers")?.addEventListener("click", async () => {
         };
       // PATCH: role 정규화 - instructor로 통일 (2024-12-19)
       } else if (u.role === 'instructor') {
+        const privateData = instructorPrivateExportById.get(u.instructorId) || {};
         return {
           역할: '강사',
           이름: u.name || "",
-          이메일: u.email || "",
+          이메일: privateData.email || "",
           과목: u.subject || "",
+          전화번호: privateData.phone || "",
+          상태: u.status || "확인 불가",
           생성일: formatCreatedAt(getUserCreatedAtValue(u)),
-          비고: u.note || ""
+          비고: privateData.note || ""
         };
       } else {
         return {
           역할: '관리자',
           이름: u.name || "",
           이메일: u.email || "",
+          상태: u.status || "확인 불가",
           생성일: formatCreatedAt(getUserCreatedAtValue(u)),
           비고: u.note || ""
         };
       }
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "사용자");
-    XLSX.writeFile(wb, "그릿에듀_사용자목록.xlsx");
-    toast("엑셀 파일이 다운로드되었습니다.");
+    const filtered = !!(appliedUserKeyword || roleFilterInput?.value);
+    const done = await writeAdminXlsx(XLSX, {
+      rows, sheetName: "사용자", button: $("#dlUsers"),
+      filename: adminXlsxFilename("사용자목록", rows.length, filtered ? "필터결과" : "전체"),
+    });
+    if (done) toast(`사용자 ${rows.length}명 엑셀 파일을 다운로드했습니다.`);
   } catch (error) {
     console.error("엑셀 다운로드 실패:", error);
     toast("엑셀 다운로드 실패: " + (error.message || error), true);
@@ -2391,12 +2373,12 @@ $("#dlUsers")?.addEventListener("click", async () => {
 
 // 초기 탭 버튼 표시 설정 (DOM 로드 후)
 function initTabButtons() {
-  const refreshBtn = $("#refreshUsers");
+  const refreshBtn = $("#refreshBtn");
   const dlBtn = $("#dlUsers");
   setUsersReadyState();
   if (refreshBtn) {
-    refreshBtn.style.display = 'flex';
-    refreshBtn.textContent = "현황 불러오기";
+    refreshBtn.style.display = 'inline-flex';
+    setAdminRefreshButtonState(refreshBtn, false);
   }
   if (dlBtn) dlBtn.style.display = 'flex';
 }

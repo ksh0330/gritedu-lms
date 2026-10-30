@@ -3,11 +3,12 @@
   "description": "Cloud Functions for Firebase",
   "scripts": {
     "lint": "eslint .",
-    "serve": "firebase emulators:start --only functions,auth,firestore",
-    "shell": "firebase functions:shell",
+    "test": "node --test test/*.test.js",
+    "serve": "firebase emulators:start --only functions,auth,firestore --project gritedu-lms",
+    "shell": "firebase functions:shell --project gritedu-lms",
     "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "deploy": "firebase deploy --only functions --project gritedu-lms",
+    "logs": "firebase functions:log --project gritedu-lms"
   },
   "engines": {
     "node": "22"

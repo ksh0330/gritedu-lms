@@ -2,10 +2,12 @@
 // 로그인
 import { auth, authPersistenceReady, getUserRole, getDashboardUrl, signOut } from "/assets/js/firebase-init.js";
 import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+import { setupPasswordVisibilityToggles } from "/assets/js/utils/password-visibility.js";
 
 const form = document.getElementById("loginForm");
 const loginStatus = document.getElementById("loginStatus");
 const loginButton = form?.querySelector('button[type="submit"]');
+if (form) setupPasswordVisibilityToggles(form);
 
 function getSafeNextUrl() {
   const raw = new URLSearchParams(location.search).get("next");

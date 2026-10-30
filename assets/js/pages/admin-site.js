@@ -6,9 +6,7 @@ import { auth, db, requireRole } from "/assets/js/firebase-init.js";
 
 import {
 
-  doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc,
-
-  orderBy, serverTimestamp
+  doc, getDoc, setDoc, collection, getDocs, serverTimestamp
 
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
@@ -22,15 +20,13 @@ import {
 } from "/assets/js/utils/kakao-channel.js";
 import { calculateDday, DEFAULT_DDAY_SETTINGS, normalizeDdaySettings } from "/assets/js/utils/dday.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
-import { handleError, createSimpleErrorUI } from "/assets/js/utils/error-handler.js";
+import { showAdminToast } from "/assets/js/utils/admin-toast.js";
 import {
-  containsBlockedImageSource,
   getBlockedImageSourceMessage,
   PUBLIC_IMAGE_FIELD,
   sanitizePublicImageSrc,
 } from "/assets/js/utils/public-image-url.js";
 import {
-  assignImageSrc,
   bindGuardedImages,
   isImageLoadExhausted,
 } from "/assets/js/utils/image-load-guard.js";
@@ -218,55 +214,7 @@ function addImageCacheBuster(url) {
 
 
 function toast(msg, err = false) {
-
-  const statusMsg = $("#statusMsg");
-
-  if (statusMsg) {
-
-    statusMsg.textContent = msg;
-
-    statusMsg.style.color = err ? "var(--error-color)" : "var(--success-color)";
-
-    statusMsg.style.background = err ? "var(--error-bg)" : "var(--success-bg)";
-
-    statusMsg.style.padding = "12px";
-
-    statusMsg.style.borderRadius = "8px";
-
-    statusMsg.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-
-    statusMsg.style.opacity = "1";
-
-    statusMsg.style.pointerEvents = "auto";
-
-    setTimeout(() => {
-
-      if (statusMsg.textContent === msg) {
-
-        statusMsg.style.opacity = "0";
-
-        statusMsg.style.pointerEvents = "none";
-
-        setTimeout(() => {
-
-          if (statusMsg.textContent === msg) {
-
-            statusMsg.textContent = "";
-
-            statusMsg.style.background = "";
-
-            statusMsg.style.boxShadow = "";
-
-          }
-
-        }, 300);
-
-      }
-
-    }, 3000);
-
-  }
-
+  showAdminToast(msg, err);
 }
 
 
@@ -881,7 +829,7 @@ window.saveContent = async (slug) => {
 
 // HTML 태그 삽입
 
-window.insertHTMLTag = (slug, tag, label) => {
+window.insertHTMLTag = (slug, tag) => {
 
   const editor = $(`#editor-${slug}`);
 
@@ -928,12 +876,6 @@ window.insertHTMLTag = (slug, tag, label) => {
 };
 
 
-
-function validateStoryContactContentBlocked(content, label = "본문") {
-  if (!containsBlockedImageSource(content)) return true;
-  toast(`${label}에 허용되지 않는 이미지 소스가 포함되어 있습니다. ${getBlockedImageSourceMessage()}`, true);
-  return false;
-}
 
 // 이미지 삽입
 window.insertImage = async (slug) => {
@@ -1037,6 +979,11 @@ let homeOrder = [];
 let instructorsOrder = [];
 let homeHidden = [];
 let instructorsHidden = [];
+let instructorSettingsSaving = false;
+let persistedHomeOrder = [];
+let persistedInstructorsOrder = [];
+let persistedHomeHidden = [];
+let persistedInstructorsHidden = [];
 
 let allInstructorsList = [];
 let lastInstructorPreviewKey = '';
@@ -1067,8 +1014,13 @@ function setCurrentInstructorHidden(hidden) {
 }
 
 // 페이지 타입 전환
-window.switchInstructorPageType = (type) => {
+window.switchInstructorPageType = (type, preserveDraft = true) => {
   if (type !== 'home' && type !== 'instructors') return;
+  if (instructorSettingsSaving) return;
+  const currentList = $("#instructorOrderList");
+  if (preserveDraft && currentList?.children.length) {
+    setCurrentInstructorOrder(Array.from(currentList.children, li => li.getAttribute('data-id')));
+  }
   
   currentInstructorPageType = type;
   
@@ -1137,31 +1089,25 @@ async function loadInstructorsForOrder() {
       const data = settingsResult.data;
       
       // 기존 order 필드가 있으면 homeOrder로 마이그레이션 (하위 호환성)
-      if (Array.isArray(data.order) && !data.homeOrder && !data.instructorsOrder) {
-        homeOrder = data.order;
-        instructorsOrder = [...data.order]; // 초기값은 동일하게
-      } else {
-        homeOrder = Array.isArray(data.homeOrder) ? data.homeOrder : [];
-        instructorsOrder = Array.isArray(data.instructorsOrder) ? data.instructorsOrder : [];
-      }
+      homeOrder = Array.isArray(data.homeOrder) ? data.homeOrder : (Array.isArray(data.order) ? data.order : []);
+      instructorsOrder = Array.isArray(data.instructorsOrder) ? data.instructorsOrder : (Array.isArray(data.order) ? [...data.order] : []);
       
       // 기존 hidden 필드가 있으면 homeHidden으로 마이그레이션 (하위 호환성)
-      if (Array.isArray(data.hidden) && !data.homeHidden && !data.instructorsHidden) {
-        homeHidden = data.hidden;
-        instructorsHidden = [...data.hidden]; // 초기값은 동일하게
-      } else {
-        homeHidden = Array.isArray(data.homeHidden) ? data.homeHidden : [];
-        instructorsHidden = Array.isArray(data.instructorsHidden) ? data.instructorsHidden : [];
-      }
+      homeHidden = Array.isArray(data.homeHidden) ? data.homeHidden : (Array.isArray(data.hidden) ? data.hidden : []);
+      instructorsHidden = Array.isArray(data.instructorsHidden) ? data.instructorsHidden : (Array.isArray(data.hidden) ? [...data.hidden] : []);
     } else {
       homeOrder = [];
       instructorsOrder = [];
       homeHidden = [];
       instructorsHidden = [];
     }
+    persistedHomeOrder = [...homeOrder];
+    persistedInstructorsOrder = [...instructorsOrder];
+    persistedHomeHidden = [...homeHidden];
+    persistedInstructorsHidden = [...instructorsHidden];
 
     // 초기 페이지 타입 버튼 상태 설정
-    switchInstructorPageType(currentInstructorPageType);
+    window.switchInstructorPageType(currentInstructorPageType, false);
     
     renderInstructorList();
 
@@ -1316,44 +1262,50 @@ window.saveInstructorOrder = async () => {
 
   const list = $("#instructorOrderList");
 
-  if (!list) return;
+  if (!list || instructorSettingsSaving) return;
 
   
 
   const newOrder = Array.from(list.children).map(li => li.getAttribute('data-id'));
 
 
+  const pageType = currentInstructorPageType;
+  const orderField = pageType === 'home' ? 'homeOrder' : 'instructorsOrder';
+  instructorSettingsSaving = true;
   try {
-    // 현재 페이지 타입에 맞는 순서와 숨김 설정 저장
     setCurrentInstructorOrder(newOrder);
-    const currentHidden = getCurrentInstructorHidden();
-
     await setDoc(doc(db, "settings", "instructorsMenu"), {
-      homeOrder: homeOrder,
-      instructorsOrder: instructorsOrder,
-      homeHidden: homeHidden,
-      instructorsHidden: instructorsHidden,
+      [orderField]: newOrder,
       updatedAt: serverTimestamp()
     }, { merge: true });
     invalidateSetting("instructorsMenu");
+    if (pageType === 'home') persistedHomeOrder = [...newOrder];
+    else persistedInstructorsOrder = [...newOrder];
 
-    toast(`${currentInstructorPageType === 'home' ? '메인홈' : '강사진 페이지'} 강사진 순서가 저장되었습니다.`);
+    toast(`${pageType === 'home' ? '메인홈' : '강사진 페이지'} 강사진 순서가 저장되었습니다.`);
 
   } catch (error) {
 
     console.error("강사진 순서 저장 실패:", error);
 
     toast("저장 실패: " + error.message, true);
-
+  } finally {
+    instructorSettingsSaving = false;
   }
 
 };
 
 // 강사진 숨김/표시 토글
 
-window.toggleInstructorVisibility = (id) => {
-
-  const instructorHidden = getCurrentInstructorHidden();
+window.toggleInstructorVisibility = async (id) => {
+  if (instructorSettingsSaving) return;
+  const pageType = currentInstructorPageType;
+  const list = $("#instructorOrderList");
+  if (list?.children.length) {
+    setCurrentInstructorOrder(Array.from(list.children, li => li.getAttribute('data-id')));
+  }
+  const previousHidden = [...getCurrentInstructorHidden()];
+  const instructorHidden = [...previousHidden];
   const index = instructorHidden.indexOf(id);
 
   
@@ -1371,21 +1323,42 @@ window.toggleInstructorVisibility = (id) => {
   renderInstructorList();
   updateInstructorPreview();
   
-  // 자동 저장
-  saveInstructorOrder();
+  instructorSettingsSaving = true;
+  try {
+    await setDoc(doc(db, "settings", "instructorsMenu"), {
+      [pageType === 'home' ? 'homeHidden' : 'instructorsHidden']: instructorHidden,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    invalidateSetting("instructorsMenu");
+    if (pageType === 'home') persistedHomeHidden = [...instructorHidden];
+    else persistedInstructorsHidden = [...instructorHidden];
+    toast("강사 표시 상태가 변경되었습니다.");
+  } catch (error) {
+    setCurrentInstructorHidden(previousHidden);
+    renderInstructorList();
+    updateInstructorPreview();
+    console.error("강사 표시 상태 저장 실패:", error);
+    toast("강사 표시 상태 저장 실패: " + error.message, true);
+  } finally {
+    instructorSettingsSaving = false;
+  }
 };
 
 // 강사진 순서 자동 정리 (존재하지 않는 ID 제거)
 
 window.cleanupInstructorOrder = async () => {
+  if (instructorSettingsSaving) return;
+  const pageType = currentInstructorPageType;
+  const previousOrder = [...getCurrentInstructorOrder()];
+  const previousHidden = [...getCurrentInstructorHidden()];
 
   try {
 
     // 현재 강사 목록의 ID 수집
 
     const validIds = new Set(allInstructorsList.map(inst => inst.id));
-    const instructorOrder = getCurrentInstructorOrder();
-    const instructorHidden = getCurrentInstructorHidden();
+    const instructorOrder = pageType === 'home' ? persistedHomeOrder : persistedInstructorsOrder;
+    const instructorHidden = pageType === 'home' ? persistedHomeHidden : persistedInstructorsHidden;
 
     // 저장된 순서에서 유효한 ID만 필터링
 
@@ -1413,17 +1386,22 @@ window.cleanupInstructorOrder = async () => {
     }
 
     // 현재 페이지 타입에 맞게 정리된 순서 저장
-    setCurrentInstructorOrder(cleanedOrder);
-    setCurrentInstructorHidden(cleanedHidden);
-    
+    instructorSettingsSaving = true;
     await setDoc(doc(db, "settings", "instructorsMenu"), {
-      homeOrder: homeOrder,
-      instructorsOrder: instructorsOrder,
-      homeHidden: homeHidden,
-      instructorsHidden: instructorsHidden,
+      [pageType === 'home' ? 'homeOrder' : 'instructorsOrder']: cleanedOrder,
+      [pageType === 'home' ? 'homeHidden' : 'instructorsHidden']: cleanedHidden,
       updatedAt: serverTimestamp()
     }, { merge: true });
     invalidateSetting("instructorsMenu");
+    if (pageType === 'home') {
+      persistedHomeOrder = [...cleanedOrder];
+      persistedHomeHidden = [...cleanedHidden];
+    } else {
+      persistedInstructorsOrder = [...cleanedOrder];
+      persistedInstructorsHidden = [...cleanedHidden];
+    }
+    setCurrentInstructorOrder(getCurrentInstructorOrder().filter(id => validIds.has(id)));
+    setCurrentInstructorHidden(getCurrentInstructorHidden().filter(id => validIds.has(id)));
 
     toast(`✅ 순서 정리 완료!\n제거된 ID: ${removedCount}개`);
 
@@ -1438,11 +1416,16 @@ window.cleanupInstructorOrder = async () => {
     
 
   } catch (error) {
+    setCurrentInstructorOrder(previousOrder);
+    setCurrentInstructorHidden(previousHidden);
+    renderInstructorList();
+    updateInstructorPreview();
 
     console.error("순서 정리 실패:", error);
 
     toast("정리 실패: " + error.message, true);
-
+  } finally {
+    instructorSettingsSaving = false;
   }
 
 };
@@ -1622,13 +1605,7 @@ function enableDragAndDrop(listEl, type) {
 
     // 미리보기 업데이트
 
-    if (type === 'instructor') {
-      updateInstructorPreview();
-    } else if (type === 'faq') {
-
-      updateFAQPreview();
-
-    }
+    if (type === 'instructor') updateInstructorPreview();
 
   });
 
@@ -1650,7 +1627,7 @@ function buildContactMessageLinesEditorHTML(lines, index) {
           </div>
           ${
             canRemove
-              ? `<button type="button" class="btn sm" style="margin-top:26px;" data-contact-action="remove-message-line" data-loc-index="${index}" data-line-index="${lineIndex}" aria-label="${label} 삭제">삭제</button>`
+              ? `<button type="button" class="btn sm danger" style="margin-top:26px;" data-contact-action="remove-message-line" data-loc-index="${index}" data-line-index="${lineIndex}" aria-label="${label} 삭제">삭제</button>`
               : ""
           }
         </div>`;
@@ -1691,7 +1668,7 @@ function buildContactTransportItemsEditorHTML(items, index) {
               <label style="display:block;font-weight:600;margin-bottom:6px;font-size:12px;">안내 문구</label>
               <textarea id="contact-loc-${index}-transport-${itemIndex}-text" rows="3" placeholder="교통 안내 문구 (줄바꿈 가능)" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);color:var(--text);font-family:inherit;resize:vertical;">${escapeHtml(item.text || "")}</textarea>
             </div>
-            <button type="button" class="btn sm" data-contact-action="remove-transport-item" data-loc-index="${index}" data-item-index="${itemIndex}" aria-label="교통수단 삭제">삭제</button>
+            <button type="button" class="btn sm danger" data-contact-action="remove-transport-item" data-loc-index="${index}" data-item-index="${itemIndex}" aria-label="교통수단 삭제">삭제</button>
           </div>
         </div>`;
     })
@@ -1717,7 +1694,7 @@ function buildSingleLocationEditorHTML(loc, index, totalCount) {
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
           <strong style="font-size:16px;">위치 ${index + 1}</strong>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="btn sm" onclick="removeContactLocation(${index})" ${delDisabled ? "disabled style=\"opacity:0.5;cursor:not-allowed\"" : ""}>이 위치 삭제</button>
+            <button type="button" class="btn sm danger" onclick="removeContactLocation(${index})" ${delDisabled ? "disabled style=\"opacity:0.5;cursor:not-allowed\"" : ""}>이 위치 삭제</button>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;">
@@ -1969,7 +1946,7 @@ window.formatContactText = (command) => {
   
   editor.focus();
   document.execCommand(command, false, null);
-  updateContactPreview();
+  window.updateContactPreview();
 };
 
 // 상담문의 글자 크기 변경
@@ -1997,7 +1974,7 @@ window.changeContactFontSize = () => {
       document.execCommand('insertHTML', false, `<span style="font-size: ${fontSize}"></span>`);
     }
   }
-  updateContactPreview();
+  window.updateContactPreview();
 };
 
 // 상담문의 글자 색깔 변경
@@ -2008,7 +1985,7 @@ window.changeContactFontColor = () => {
   
   editor.focus();
   document.execCommand('foreColor', false, fontColor);
-  updateContactPreview();
+  window.updateContactPreview();
 };
 
 // 상담문의 오시는길 텍스트 포맷팅
@@ -2018,7 +1995,7 @@ window.formatContactDirectionsText = (command) => {
   
   editor.focus();
   document.execCommand(command, false, null);
-  updateContactPreview();
+  window.updateContactPreview();
 };
 
 // 상담문의 오시는길 글자 크기 변경
@@ -2046,7 +2023,7 @@ window.changeContactDirectionsFontSize = () => {
       document.execCommand('insertHTML', false, `<span style="font-size: ${fontSize}"></span>`);
     }
   }
-  updateContactPreview();
+  window.updateContactPreview();
 };
 
 // 상담문의 오시는길 글자 색깔 변경
@@ -2057,7 +2034,7 @@ window.changeContactDirectionsFontColor = () => {
   
   editor.focus();
   document.execCommand('foreColor', false, fontColor);
-  updateContactPreview();
+  window.updateContactPreview();
 };
 
 // 상담문의 오시는길 이미지 파일 준비 (비활성화)

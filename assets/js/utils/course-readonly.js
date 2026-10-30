@@ -26,6 +26,7 @@ export function isInternalSubjectCode(value) {
 const ACCESS_LABEL = {
   public: "공개",
   memberOnly: "회원전용",
+  approvalRequired: "회원전용",
   member: "회원전용",
   paid: "유료"
 };
@@ -58,6 +59,7 @@ const COURSE_FORMAT_BADGE_LABEL = {
 const ACCESS_TYPE_BADGE_LABEL = {
   public: "공개 강좌",
   memberOnly: "회원전용 강좌",
+  approvalRequired: "회원전용 강좌",
   member: "회원전용 강좌",
   paid: "유료"
 };
@@ -147,6 +149,7 @@ function normalizeLesson(rawLesson, lessonIndex, weekContext = {}) {
 
   return {
     id: lessonId,
+    ...(isObject && asText(rawLesson.completionId) ? { completionId: asText(rawLesson.completionId) } : {}),
     title,
     url,
     type,
@@ -181,6 +184,7 @@ function normalizeWeek(rawWeek, index) {
 
   const videos = lessons.map((lesson) => ({
     id: lesson.id,
+    ...(lesson.completionId ? { completionId: lesson.completionId } : {}),
     title: lesson.title || "",
     url: lesson.url
   }));
@@ -297,6 +301,7 @@ export function normalizeAccessType(value) {
     return "memberOnly";
   }
   if (normalized === "paid") return "paid";
+  if (normalized === "approvalrequired") return "approvalRequired";
   return "public";
 }
 
@@ -589,9 +594,18 @@ export function buildCanonicalCoursePayload(input = {}, options = {}) {
   const shortDescription = deriveShortDescription(input.shortDescription, input.description || input.fullDescription) || null;
   const description = asText(input.description || input.fullDescription) || null;
   const subject = asText(input.subject) || null;
-  const instructorUid = asText(input.instructorUid) || null;
-  const instructorId = asText(input.instructorId) || asText(existingCourse.instructorId) || null;
-  const instructorName = asText(input.instructorName) || null;
+  const instructorUids = normalizeTextList(input.instructorUids);
+  const instructorIds = normalizeTextList(input.instructorIds);
+  const instructorNames = normalizeTextList(input.instructorNames);
+  const hasExplicitInstructorAssignment =
+    Object.prototype.hasOwnProperty.call(input, "instructorUids") ||
+    Object.prototype.hasOwnProperty.call(input, "instructorIds");
+  const instructorUid = instructorUids[0] || asText(input.instructorUid) || null;
+  const instructorId = instructorIds[0] ||
+    asText(input.instructorId) ||
+    (!hasExplicitInstructorAssignment ? asText(existingCourse.instructorId) : "") ||
+    null;
+  const instructorName = instructorNames[0] || asText(input.instructorName) || null;
   const grade = asText(input.grade) || null;
   const year = asText(input.year) || null;
   const lectureContent = asText(input.lectureContent) || null;
@@ -620,16 +634,22 @@ export function buildCanonicalCoursePayload(input = {}, options = {}) {
   const normalizedWeeksForSave = weeks.map((week, index) => {
     const videos = (Array.isArray(week.videos) ? week.videos : week.lessons || [])
       .map((video) => ({
+        id: asText(video?.id),
+        completionId: asText(video?.completionId),
         title: asText(video?.title),
         url: asText(video?.url || video?.fullUrl || video?.videoUrl || video)
       }))
       .filter((video) => video.url)
       .map((video) => ({
+        ...(video.id ? { id: video.id } : {}),
+        ...(video.completionId ? { completionId: video.completionId } : {}),
         ...(video.title ? { title: video.title } : {}),
         url: video.url
       }));
 
     return {
+      id: asText(week.id) || `week_${index + 1}`,
+      weekNumber: index + 1,
       title: asText(week.title) || `${index + 1}주차`,
       description: asText(week.description || week.content),
       videos
@@ -646,6 +666,9 @@ export function buildCanonicalCoursePayload(input = {}, options = {}) {
     instructorUid,
     instructorId,
     instructorName,
+    instructorUids: instructorUids.length ? instructorUids : (instructorUid ? [instructorUid] : []),
+    instructorIds: instructorIds.length ? instructorIds : (instructorId ? [instructorId] : []),
+    instructorNames: instructorNames.length ? instructorNames : (instructorName ? [instructorName] : []),
     grade,
     year,
     lectureContent,
@@ -677,13 +700,25 @@ export function normalizeCourseForReadOnly(rawCourse, options = {}) {
 
   const thumbnail = asText(course.thumbnail) || asText(course.coverImage) || asText(course.image);
 
-  const instructorUid = asText(course.instructorUid);
-  const instructorId = asText(course.instructorId);
-  let instructorName = asText(course.instructorName) || asText(course.instructor);
-  if (!instructorName && instructorUid && instructorsByUid[instructorUid]) {
-    instructorName = asText(instructorsByUid[instructorUid]?.name);
+  const instructorUids = normalizeTextList(course.instructorUids);
+  const instructorIds = normalizeTextList(course.instructorIds);
+  const instructorNames = normalizeTextList(course.instructorNames);
+  const instructorUid = instructorUids[0] || asText(course.instructorUid);
+  const instructorId = instructorIds[0] || asText(course.instructorId);
+  if (!instructorUids.length && instructorUid) instructorUids.push(instructorUid);
+  if (!instructorIds.length && instructorId) instructorIds.push(instructorId);
+  instructorUids.forEach((uid) => {
+    const name = asText(instructorsByUid[uid]?.name);
+    if (name && !instructorNames.includes(name)) instructorNames.push(name);
+  });
+  let primaryInstructorName = asText(course.instructorName) || asText(course.instructor);
+  if (primaryInstructorName && !instructorNames.includes(primaryInstructorName)) {
+    instructorNames.unshift(primaryInstructorName);
   }
-  if (!instructorName) instructorName = "강사 미정";
+  if (!instructorNames.length && instructorUid && instructorsByUid[instructorUid]) {
+    instructorNames.push(asText(instructorsByUid[instructorUid]?.name));
+  }
+  const instructorName = instructorNames.filter(Boolean).join(", ") || "강사 미정";
 
   const gradeCode = asText(course.grade);
   const gradeLabel = getGradeLabel(gradeCode, labelMaps);
@@ -753,6 +788,9 @@ export function normalizeCourseForReadOnly(rawCourse, options = {}) {
     instructorUid,
     instructorId,
     instructorName,
+    instructorUids,
+    instructorIds,
+    instructorNames,
     accessType,
     accessLabel,
     visibility,

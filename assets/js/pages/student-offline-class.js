@@ -9,6 +9,12 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
+import { getSettingDoc } from "/assets/js/utils/settings-cache.js";
+import {
+  getSubjectColorStyle,
+  loadSharedSubjectColorMap,
+  mergeSubjectColorMap
+} from "/assets/js/utils/subject-colors.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -37,9 +43,9 @@ function formatTimeDisplay(value) {
   return t.length >= 5 ? t.slice(0, 5) : t;
 }
 
-function normalizeScheduleItems(classRow) {
-  if (Array.isArray(classRow?.scheduleItems) && classRow.scheduleItems.length) {
-    return classRow.scheduleItems
+function normalizeScheduleItems(classRow, fieldName = "scheduleItems") {
+  if (Array.isArray(classRow?.[fieldName]) && classRow[fieldName].length) {
+    return classRow[fieldName]
       .map((item) => ({
         day: String(item?.day || "").trim(),
         startTime: formatTimeDisplay(item?.startTime),
@@ -48,6 +54,7 @@ function normalizeScheduleItems(classRow) {
       }))
       .filter((item) => item.day);
   }
+  if (fieldName !== "scheduleItems") return [];
   const days = Array.isArray(classRow?.scheduleDays) ? classRow.scheduleDays : [];
   if (!days.length) return [];
   const start = formatTimeDisplay(classRow?.startTime);
@@ -66,27 +73,35 @@ function formatScheduleLine(item) {
   return parts.join(" ");
 }
 
-function formatSchedule(classRow) {
-  const items = normalizeScheduleItems(classRow)
-    .slice()
-    .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-  if (!items.length) return "-";
-  return items.map((item) => formatScheduleLine(item)).join(" / ");
-}
-
-function formatScheduleHtml(classRow) {
-  const items = normalizeScheduleItems(classRow)
+function formatScheduleHtml(classRow, fieldName = "scheduleItems") {
+  const items = normalizeScheduleItems(classRow, fieldName)
     .slice()
     .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
   if (!items.length) return "-";
   return items.map((item) => escapeHtml(formatScheduleLine(item))).join("<br>");
 }
 
+function formatClinicScheduleHtml(classRow) {
+  return formatScheduleHtml(classRow, "clinicScheduleItems");
+}
+
 function formatSchoolGrade(classRow) {
-  const school = String(classRow?.school || "").trim();
+  const school = (Array.isArray(classRow?.schools) && classRow.schools.length
+    ? classRow.schools
+    : [classRow?.school])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
   const grade = String(classRow?.grade || "").trim();
   if (school && grade) return `${school} / ${grade}`;
   return school || grade || "-";
+}
+
+function formatInstructorNames(classRow) {
+  const names = Array.isArray(classRow?.instructorNames) ? classRow.instructorNames : [];
+  return names.map((value) => String(value || "").trim()).filter(Boolean).join(", ") ||
+    String(classRow?.instructorName || "").trim() ||
+    "미배정";
 }
 
 function isScheduleVisible(classRow) {
@@ -219,6 +234,16 @@ let sessionCurrentPage = 1;
 let expandedSessionId = null;
 let sessionsUiBound = false;
 let expandFirstOnNextRender = true;
+let subjectColorMap = mergeSubjectColorMap({});
+
+async function loadSubjectColorMap() {
+  try {
+    subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc);
+  } catch (error) {
+    console.warn("[student-offline-class] subject colors load failed, using defaults", error);
+    subjectColorMap = mergeSubjectColorMap({});
+  }
+}
 
 function logFirebaseLoadError(label, err, context = {}) {
   console.warn(`[offline-class] ${label}`, {
@@ -263,24 +288,49 @@ function renderBlockedMessage(title, message, extraHtml = "") {
 function renderClassHeader(classRow) {
   const head = $("#offlineClassHead");
   if (!head) return;
+  const subject = String(classRow.subject || "과목").trim();
+  const subjectColorStyle = getSubjectColorStyle(subject, subjectColorMap);
   const isArchived = classRow.status === "archived";
+  const description = String(classRow.description || "").trim();
+  const descriptionHtml = description
+    ? `<p class="offline-class-summary__description">${escapeHtml(description)}</p>`
+    : "";
   const archivedNotice = isArchived
-    ? '<p class="student-offline-archived-notice" role="status">이 반은 보관 상태입니다. 기존에 허용된 수업별 영상만 조회할 수 있습니다.</p>'
+    ? '<p class="offline-class-summary__notice" role="status">보관된 반입니다. 기존에 허용된 수업 영상만 볼 수 있습니다.</p>'
     : "";
   const scheduleHtml = isScheduleVisible(classRow)
     ? `
-      <p class="student-offline-class-meta student-offline-class-meta--schedule"><span class="student-offline-class-meta__label">시간표</span></p>
-      <p class="student-offline-class-meta student-offline-class-meta--schedule-lines">${formatScheduleHtml(classRow)}</p>`
+      <div class="offline-class-summary__item offline-class-summary__item--schedule">
+        <dt>수업 일정</dt>
+        <dd>${formatScheduleHtml(classRow)}</dd>
+      </div>
+      <div class="offline-class-summary__item offline-class-summary__item--schedule">
+        <dt>클리닉</dt>
+        <dd>${formatClinicScheduleHtml(classRow)}</dd>
+      </div>`
     : "";
   head.innerHTML = `
-    <div class="student-offline-class-info">
-      <p class="student-offline-class-label course-label" data-subject="${escapeHtml(String(classRow.subject || "과목").trim())}">${escapeHtml(classRow.subject || "과목")}</p>
-      <h1 class="page-title">${escapeHtml(classRow.className || "오프라인 반")}</h1>
-      <p class="home-subdesc">${escapeHtml(formatSchoolGrade(classRow))}</p>
-      <p class="student-offline-class-meta">담당: ${escapeHtml(classRow.instructorName || "미배정")}</p>
-      ${scheduleHtml}
+    <article class="offline-class-summary">
+      <header class="offline-class-summary__header">
+        <div class="offline-class-summary__badges">
+          <p class="course-label offline-class-summary__subject${subjectColorStyle ? " has-subject-color" : ""}" data-subject="${escapeHtml(subject)}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${escapeHtml(subject)}</p>
+        </div>
+        <h1 class="page-title">${escapeHtml(classRow.className || "오프라인 반")}</h1>
+      </header>
+      <dl class="offline-class-summary__grid">
+        <div class="offline-class-summary__item">
+          <dt>학교·학년</dt>
+          <dd>${escapeHtml(formatSchoolGrade(classRow))}</dd>
+        </div>
+        <div class="offline-class-summary__item">
+          <dt>담당 강사</dt>
+          <dd>${escapeHtml(formatInstructorNames(classRow))}</dd>
+        </div>
+        ${scheduleHtml}
+      </dl>
+      ${descriptionHtml}
       ${archivedNotice}
-    </div>`;
+    </article>`;
 }
 
 function ensureExpandedSession(pageSessions) {
@@ -295,7 +345,7 @@ function ensureExpandedSession(pageSessions) {
   }
 }
 
-function renderSessionPagination(totalItems, totalPages) {
+function renderSessionPagination(totalPages) {
   const nav = $("#offlineSessionsPagination");
   if (!nav) return;
   if (totalPages <= 1) {
@@ -308,21 +358,18 @@ function renderSessionPagination(totalItems, totalPages) {
   const nextDisabled = sessionCurrentPage >= totalPages ? " disabled" : "";
   nav.innerHTML = `
     <button type="button" class="btn sm" data-session-page="prev"${prevDisabled} aria-label="이전 페이지">이전</button>
-    <span class="student-offline-sessions-pagination__info">${sessionCurrentPage} / ${totalPages} 페이지</span>
     <button type="button" class="btn sm" data-session-page="next"${nextDisabled} aria-label="다음 페이지">다음</button>`;
 }
 
 function renderSessionsView() {
   const list = $("#offlineSessionsList");
   const section = $("#offlineSessionsSection");
-  const meta = $("#offlineSessionsMeta");
   if (!list || !section) return;
 
   section.hidden = false;
 
   if (!allAccessibleSessions.length) {
-    if (meta) meta.textContent = "";
-    renderSessionPagination(0, 0);
+    renderSessionPagination(0);
     list.innerHTML =
       '<p class="student-offline-sessions-empty">현재 표시할 수업이 없습니다.</p>';
     return;
@@ -337,8 +384,7 @@ function renderSessionsView() {
   const pageSessions = allAccessibleSessions.slice(start, start + SESSIONS_PAGE_SIZE);
   ensureExpandedSession(pageSessions);
 
-  if (meta) meta.textContent = `총 ${total}개 수업`;
-  renderSessionPagination(total, totalPages);
+  renderSessionPagination(totalPages);
 
   list.innerHTML = pageSessions
     .map((session) => {
@@ -352,7 +398,7 @@ function renderSessionsView() {
         .map((v) => {
           const label = escapeHtml(v.title || "영상");
           const url = escapeHtml(v.url);
-          return `<li><a href="${url}" target="_blank" rel="noopener noreferrer" class="student-offline-video-link"><span class="student-offline-video-link__title">${label}</span><span class="student-offline-video-link__go" aria-hidden="true">↗</span></a></li>`;
+          return `<li><a href="${url}" target="_blank" rel="noopener noreferrer" class="student-offline-video-link"><span class="student-offline-video-link__icon" aria-hidden="true">▶</span><span class="student-offline-video-link__title">${label}</span><span class="visually-hidden">새 창에서 보기</span><span class="student-offline-video-link__go" aria-hidden="true">↗</span></a></li>`;
         })
         .join("");
       const desc = String(session.description || "").trim();
@@ -361,7 +407,7 @@ function renderSessionsView() {
         : "";
       const videoContentHtml = hasPlayableVideo
         ? `<ul class="student-offline-video-list">${videoItems}</ul>`
-        : '<p class="student-offline-session-desc">이 수업은 등록된 영상이 없습니다.</p>';
+        : '<p class="student-offline-session-desc student-offline-session-empty">이 수업은 등록된 영상이 없습니다.</p>';
       const panelId = `session-panel-${escapeHtml(session.id)}`;
       return `
       <article class="student-offline-session-card${isOpen ? " is-open" : ""}">
@@ -509,6 +555,8 @@ async function init() {
 
   const urlClassId = getClassIdFromUrl();
   const studentUid = user?.uid || auth.currentUser?.uid || "";
+
+  await loadSubjectColorMap();
 
   if (!urlClassId) {
     renderBlockedMessage("오프라인 반", "배정된 반이 아닙니다.");

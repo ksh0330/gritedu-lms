@@ -2,6 +2,7 @@ import { auth, db } from "/assets/js/firebase-init.js";
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
 import { handleError } from "/assets/js/utils/error-handler.js";
+import { getSubjectColorStyle } from "/assets/js/utils/subject-colors.js";
 import {
   dom,
   state,
@@ -9,6 +10,7 @@ import {
   renderEmptyTable,
   renderListPagination,
   formatInstructorGrade,
+  formatListLoadError,
   setDashboardText
 } from "/assets/js/pages/instructor-dashboard/context.js";
 
@@ -30,9 +32,9 @@ function formatTimeDisplay(value) {
   return t.length >= 5 ? t.slice(0, 5) : t;
 }
 
-function normalizeScheduleItems(classRow) {
-  if (Array.isArray(classRow?.scheduleItems) && classRow.scheduleItems.length) {
-    return classRow.scheduleItems
+function normalizeScheduleItems(classRow, fieldName = "scheduleItems") {
+  if (Array.isArray(classRow?.[fieldName]) && classRow[fieldName].length) {
+    return classRow[fieldName]
       .map((item) => ({
         day: String(item?.day || "").trim(),
         startTime: formatTimeDisplay(item?.startTime),
@@ -41,6 +43,7 @@ function normalizeScheduleItems(classRow) {
       }))
       .filter((item) => item.day);
   }
+  if (fieldName !== "scheduleItems") return [];
   const days = Array.isArray(classRow?.scheduleDays) ? classRow.scheduleDays : [];
   if (!days.length) return [];
   const start = formatTimeDisplay(classRow?.startTime);
@@ -59,16 +62,25 @@ function formatScheduleLine(item) {
   return parts.join(" ");
 }
 
-export function formatScheduleHtml(classRow) {
-  const items = normalizeScheduleItems(classRow)
+export function formatScheduleHtml(classRow, fieldName = "scheduleItems") {
+  const items = normalizeScheduleItems(classRow, fieldName)
     .slice()
     .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
   if (!items.length) return '<span class="muted">-</span>';
   return items.map((item) => escapeHtml(formatScheduleLine(item))).join("<br>");
 }
 
+export function formatClinicScheduleHtml(classRow) {
+  return formatScheduleHtml(classRow, "clinicScheduleItems");
+}
+
 function formatSchoolGrade(classRow) {
-  const school = String(classRow?.school || "").trim();
+  const school = (Array.isArray(classRow?.schools) && classRow.schools.length
+    ? classRow.schools
+    : [classRow?.school])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ");
   const grade = formatInstructorGrade(classRow?.grade);
   const hasGrade = grade && grade !== "-";
   if (school && hasGrade) return `${school} / ${grade}`;
@@ -83,7 +95,8 @@ function getAssignedInstructorIds(classRow) {
   const ids = [
     classRow?.instructorUid,
     classRow?.instructorId,
-    ...(Array.isArray(classRow?.instructorUids) ? classRow.instructorUids : [])
+    ...(Array.isArray(classRow?.instructorUids) ? classRow.instructorUids : []),
+    ...(Array.isArray(classRow?.instructorIds) ? classRow.instructorIds : [])
   ];
   return ids.map((id) => String(id || "").trim()).filter(Boolean);
 }
@@ -100,11 +113,6 @@ function classStatusBadge(status) {
     return '<span class="instructor-offline-status instructor-offline-status--archived">보관</span>';
   }
   return '<span class="instructor-offline-status instructor-offline-status--active">운영중</span>';
-}
-
-function setOfflineMeta(text) {
-  if (dom.offlineClassesMeta) dom.offlineClassesMeta.textContent = text;
-  dom.offlineClassesMeta?.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
 }
 
 function offlineClassMatchesFilters(classRow) {
@@ -173,7 +181,6 @@ function renderOfflineClassesTable() {
 
   if (!state.myOfflineClasses.length) {
     renderEmptyTable(dom.offlineClassesTable, 6, "담당 오프라인 반이 없습니다.");
-    setOfflineMeta("담당 오프라인 반이 없습니다.");
     if (dom.offlineClassesPagination) {
       dom.offlineClassesPagination.innerHTML = "";
       dom.offlineClassesPagination.onclick = null;
@@ -183,7 +190,6 @@ function renderOfflineClassesTable() {
 
   if (total === 0) {
     renderEmptyTable(dom.offlineClassesTable, 6, "조건에 맞는 오프라인 반이 없습니다.");
-    setOfflineMeta(`담당 오프라인 반 ${state.myOfflineClasses.length}개 / 조건에 맞는 반 0개`);
     if (dom.offlineClassesPagination) {
       dom.offlineClassesPagination.innerHTML = "";
       dom.offlineClassesPagination.onclick = null;
@@ -200,17 +206,19 @@ function renderOfflineClassesTable() {
   dom.offlineClassesTable.innerHTML = pageRows
     .map((classRow) => {
       const className = escapeHtml(classRow.className || "반명 없음");
-      const subject = escapeHtml(classRow.subject || "-");
+      const subjectValue = String(classRow.subject || "-").trim();
+      const subject = escapeHtml(subjectValue);
+      const subjectColorStyle = getSubjectColorStyle(subjectValue, state.subjectColorMap);
       const schoolGrade = escapeHtml(formatSchoolGrade(classRow));
       const schedule = isScheduleVisible(classRow)
-        ? formatScheduleHtml(classRow)
+        ? `<strong>수업 일정:</strong><br>${formatScheduleHtml(classRow)}<br><strong>클리닉:</strong><br>${formatClinicScheduleHtml(classRow)}`
         : '<span class="muted">표시 안 함</span>';
       const status = classStatusBadge(classRow.status);
       const href = `/members/instructors/offline-class.html?classId=${encodeURIComponent(classRow.id)}`;
       return `
       <tr>
         <td class="instructor-offline-class-name">${className}</td>
-        <td>${subject}</td>
+        <td><span class="instructor-subject-badge${subjectColorStyle ? " has-subject-color" : ""}" data-subject="${subject}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${subject}</span></td>
         <td>${schoolGrade}</td>
         <td class="instructor-offline-schedule-cell">${schedule}</td>
         <td>${status}</td>
@@ -221,12 +229,6 @@ function renderOfflineClassesTable() {
     })
     .join("");
 
-  setOfflineMeta(
-    total === state.myOfflineClasses.length
-      ? `담당 오프라인 반 ${total}개`
-      : `담당 오프라인 반 ${state.myOfflineClasses.length}개 / 조건에 맞는 반 ${total}개`
-  );
-
   state.offlineClassesPage = renderListPagination(dom.offlineClassesPagination, {
     page: state.offlineClassesPage,
     totalItems: total,
@@ -234,7 +236,6 @@ function renderOfflineClassesTable() {
     onPageChange: (nextPage) => {
       state.offlineClassesPage = nextPage;
       renderOfflineClassesTable();
-      dom.offlineClassesPagination?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }) || state.offlineClassesPage;
 }
@@ -262,17 +263,15 @@ export async function loadMyOfflineClasses() {
   if (!dom.offlineClassesTable) return;
 
   try {
+    state.offlineClassesLoadError = null;
     renderEmptyTable(dom.offlineClassesTable, 6, "오프라인 반을 불러오는 중입니다...");
-    setOfflineMeta("오프라인 반을 불러오는 중입니다...");
 
     const currentUserId = state.user?.uid || auth.currentUser?.uid;
     if (!currentUserId) {
       renderEmptyTable(dom.offlineClassesTable, 6, "현재 로그인 정보를 확인할 수 없습니다.");
-      setOfflineMeta("로그인 정보를 확인할 수 없습니다.");
       return;
     }
 
-    let snapshots;
     const classQueries = [
       query(collection(db, "offlineClasses"), where("instructorUid", "==", currentUserId)),
       query(collection(db, "offlineClasses"), where("instructorId", "==", currentUserId))
@@ -284,19 +283,7 @@ export async function loadMyOfflineClasses() {
       );
     }
 
-    try {
-      snapshots = await Promise.all(classQueries.map((q) => getDocs(q)));
-    } catch (queryError) {
-      if (queryError.code === "failed-precondition" || queryError.code === "unimplemented") {
-        console.warn("[instructor-dashboard] assigned offline class query requires index/configuration", queryError);
-        renderEmptyTable(dom.offlineClassesTable, 6, "담당 오프라인 반 조회 설정을 확인해야 합니다. 관리자에게 문의해 주세요.");
-        setOfflineMeta("오프라인 반 조회 설정 확인 필요");
-        setDashboardText(dom.statOfflineClasses, "-");
-        return;
-      } else {
-        throw queryError;
-      }
-    }
+    const snapshots = await Promise.all(classQueries.map((classQuery) => getDocs(classQuery)));
 
     const rowsById = new Map();
     snapshots.forEach((snapshot) => {
@@ -318,8 +305,9 @@ export async function loadMyOfflineClasses() {
     setDashboardText(dom.statOfflineClasses, String(state.myOfflineClasses.length));
   } catch (error) {
     handleError(error, "Load instructor offline classes", { showToast: false, logError: true });
-    renderEmptyTable(dom.offlineClassesTable, 6, "오프라인 반 목록을 불러오지 못했습니다.");
-    setOfflineMeta("오프라인 반 목록을 불러오지 못했습니다.");
+    state.offlineClassesLoadError = error;
+    const errorMessage = formatListLoadError("오프라인 반 목록을 불러오지 못했습니다.", error);
+    renderEmptyTable(dom.offlineClassesTable, 6, errorMessage);
     state.myOfflineClasses = [];
     state.filteredOfflineClasses = [];
     setDashboardText(dom.statOfflineClasses, "-");

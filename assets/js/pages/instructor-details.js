@@ -586,7 +586,7 @@ function renderAssignedCoursesSection(courses, detailSections) {
   visibleCourses.forEach((course) => {
     const card = document.createElement("a");
     card.className = "assigned-course-card";
-    card.href = `/course-detail.html?courseId=${encodeURIComponent(course.id)}`;
+    card.href = `/course-detail?courseId=${encodeURIComponent(course.id)}`;
 
     const metaItems = getAssignedCourseMetaItems(course);
     const meta = document.createElement("div");

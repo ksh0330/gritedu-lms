@@ -20,11 +20,10 @@
 
   <main class="grit-page-container admin-members-page">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        관리자 CMS로 돌아가기
       </a>
     </div>
 
@@ -34,7 +33,8 @@
         <p class="desc">일반 회원과 학부모 회원의 기본 정보, 온라인 수강, 자녀 연동 현황을 확인합니다.</p>
       </div>
       <div class="page-header-actions admin-members-actions">
-        <button type="button" class="btn primary sm" id="refreshMembersBtn">현황 불러오기</button>
+        <button type="button" class="btn primary sm" id="refreshBtn" title="회원 현황 불러오기">현황 불러오기</button>
+        <button type="button" class="btn sm admin-export-btn" id="dlMembers" title="회원 현황을 불러온 뒤 다운로드할 수 있습니다" disabled>엑셀</button>
       </div>
     </div>
 
@@ -42,15 +42,14 @@
       <div class="admin-members-section-head">
         <div>
           <h2>회원 목록</h2>
-          <p>회원별 상세에서 수강 및 자녀 연동 정보를 확인합니다.</p>
         </div>
       </div>
-      <div class="admin-toolbar admin-members-toolbar">
+      <div class="admin-toolbar admin-toolbar--primary-list admin-members-toolbar">
         <label class="sr-only" for="memberKeywordFilter">회원 검색</label>
         <div class="admin-toolbar__search-wrap">
-          <span class="admin-toolbar__search-icon" aria-hidden="true">
+          <button type="button" id="memberKeywordSearchButton" class="admin-toolbar__search-button" aria-label="회원 검색 실행" title="검색">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.25"/><path d="M20 20l-3.5-3.5"/></svg>
-          </span>
+          </button>
           <input type="search" id="memberKeywordFilter" class="admin-toolbar__search-input" placeholder="이름, 이메일, 연락처 검색" aria-label="회원 검색">
         </div>
         <select id="memberPurposeFilter" class="admin-toolbar__select" aria-label="회원 유형 필터">
@@ -66,9 +65,16 @@
           <option value="ad">광고, 홍보</option>
           <option value="other">기타</option>
         </select>
+        <label class="admin-list-page-size" for="membersPageSize">
+          <select id="membersPageSize" class="admin-toolbar__select" aria-label="회원 목록 표시 개수">
+            <option value="10">10개</option>
+            <option value="20">20개</option>
+            <option value="50">50개</option>
+          </select>
+        </label>
       </div>
-      <p id="membersMeta" class="admin-members-meta">현황 불러오기를 누르면 회원 목록을 확인할 수 있습니다.</p>
-      <div class="admin-members-table-wrap">
+        <p id="membersMeta" class="admin-members-meta" hidden></p>
+      <div class="admin-members-table-wrap admin-list-viewport">
         <table class="admin-table admin-members-table">
           <thead>
             <tr>
@@ -76,13 +82,14 @@
               <th>이름</th>
               <th>이메일</th>
               <th>연락처</th>
+              <th>자녀</th>
               <th>가입 경로</th>
               <th>가입일</th>
               <th>관리</th>
             </tr>
           </thead>
           <tbody id="membersTableBody">
-            <tr><td colspan="7" class="muted">현황 불러오기를 눌러 회원 목록을 불러오세요.</td></tr>
+              <tr><td colspan="8" class="muted">현황 불러오기를 눌러 회원 목록을 확인하세요.</td></tr>
           </tbody>
         </table>
       </div>
@@ -92,8 +99,10 @@
 
   <div id="memberDetailModal" class="member-detail-modal" hidden>
     <div class="member-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="memberDetailTitle">
-      <button type="button" id="closeMemberDetailModal" class="modal-close" aria-label="닫기">×</button>
-      <h2 id="memberDetailTitle">회원 상세</h2>
+      <div class="member-detail-header">
+        <h2 id="memberDetailTitle">회원 상세</h2>
+        <button type="button" id="closeMemberDetailModal" class="modal-close admin-modal-close" aria-label="닫기">×</button>
+      </div>
       <div id="memberDetailBody"></div>
     </div>
   </div>

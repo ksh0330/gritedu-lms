@@ -1779,11 +1779,11 @@ function generateSitemapXml() {
   const lastmod = getCurrentDateYmd();
   const pages = [
     { path: '/', priority: '1.0' },
-    { path: '/courses.html', priority: '0.9' },
-    { path: '/instructors.html', priority: '0.9' },
-    { path: '/contact.html', priority: '0.9' },
-    { path: '/story.html', priority: '0.8' },
-    { path: '/schedule.html', priority: '0.5' },
+    { path: '/courses', priority: '0.9' },
+    { path: '/instructors', priority: '0.9' },
+    { path: '/contact', priority: '0.9' },
+    { path: '/story', priority: '0.8' },
+    { path: '/schedule', priority: '0.5' },
   ];
 
   const urlEntries = pages.map((page) => {

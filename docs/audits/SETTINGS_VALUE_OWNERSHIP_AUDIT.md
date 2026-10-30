@@ -22,7 +22,7 @@
 현재 기준값은 각 관리 페이지 상단 패널에서 관리합니다.
 
 - 온라인 강의 관리: `settings/courseCatalog`
-- 오프라인 반 관리: `settings/timetableCatalog`
+- 오프라인 반 관리: `settings/offlineClassCatalog`
 - 시간표 관리: `settings/timetableCatalog`
 - 강사 관리: `settings/instructorsMenu.subjects`
 - 계정 생성/관리: 강사 과목 선택값은 `settings/instructorsMenu.subjects` 공유
@@ -33,7 +33,8 @@
 | 문서 | 책임 | 주요 필드 | 관리 화면 | 공개/연결 영향 |
 | --- | --- | --- | --- | --- |
 | `settings/courseCatalog` | 온라인 강좌 기준값 | `chipGroups.subject`, `chipGroups.grade` | 온라인 강의 관리 | 공개 강좌/강좌 상세/dashboard label과 필터 |
-| `settings/timetableCatalog` | 오프라인 반 + 공개 시간표 기준값 | `subjects`, `grades`, `schools`, `classrooms`, `gradeTabs` | 오프라인 반 관리, 시간표 관리 | 오프라인 반 입력값, 공개 시간표 필터 |
+| `settings/offlineClassCatalog` | 오프라인 반 그룹별 기준값 | `groupCatalogs[groupId].subjects/grades/schools` | 오프라인 반 관리 | 반 추가/수정 선택값 |
+| `settings/timetableCatalog` | 공개 시간표 그룹·학교급·이미지 | `scheduleGroups`, `scheduleDivisions`, `groupCatalogs[groupId].scheduleImages` | 시간표 관리 | 공개 시간표 그룹·이미지 |
 | `settings/instructorsMenu` | 강사진 노출/정렬/숨김/상세 섹션 + 강사 과목 기준값 | `subjects`, `homeOrder`, `instructorsOrder`, `homeHidden`, `instructorsHidden`, `detailSections` | 강사 관리, 사이트 관리 일부 | 강사 관리/계정 생성 과목, 공개 강사진 노출 |
 | `settings/signup` | 회원가입 on/off 정책 | `enabled`, `studentEnabled`, `memberEnabled` | 계정 생성/관리의 가입 설정 | 회원가입 flow/rules 조건 |
 | `settings/popups` | 팝업 설정 | `popups` | 팝업 관리 | 홈 팝업 |
@@ -51,8 +52,8 @@
 | 관리자 화면 | 기준값 관리 패널 | 저장 문서 | 모달 내부 정책 |
 | --- | --- | --- | --- |
 | 온라인 강의 관리 | 과목, 학년 | `settings/courseCatalog` | 기준값 선택, 직접 입력 |
-| 오프라인 반 관리 | 과목, 학년, 학교, 강의실 | `settings/timetableCatalog` | 기준값 선택, 직접 입력 |
-| 시간표 관리 | 과목, 학년, 학교, 강의실 | `settings/timetableCatalog` | 기준값 선택, 직접 입력 |
+| 오프라인 반 관리 | 과목, 학년, 학교 | `settings/offlineClassCatalog` | 기준값 선택, 직접 입력 |
+| 시간표 관리 | 그룹, 학교급, 시간표 이미지 | `settings/timetableCatalog` | 그룹별 이미지 관리 |
 | 강사 관리 | 강사 과목 | `settings/instructorsMenu.subjects` | 복수 선택, 직접 입력 |
 | 계정 생성/관리 | 자체 기준값 패널 없음 | `settings/signup`, `settings/instructorsMenu` read | 강사 과목 선택은 강사 관리 기준값 공유 |
 | 사이트 관리 | 기준값 패널 없음 | `pages/*`, `settings/instructorsMenu` 일부 | 강사진 노출 순서/숨김/상세 섹션만 관리 |
@@ -110,29 +111,42 @@
 - 화면에는 label 중심으로 표시합니다.
 - 연도(`courses.year`)와 강좌 형식(`single`, `series`)은 settings catalog가 아니라 강좌 문서/코드 enum으로 관리합니다.
 
-## 5. `settings/timetableCatalog`
+## 5. `settings/offlineClassCatalog`와 `settings/timetableCatalog`
 
-오프라인 반 관리와 시간표 관리가 공유하는 기준값입니다.
+`offlineClassCatalog`는 오프라인 반 선택 목록, `timetableCatalog`는 공개 시간표 그룹·학교급·이미지를 각각 담당합니다.
 
 주요 구조:
 
 ```js
 {
-  subjects: ["국어", "영어", "수학", "과학", "수리논술", "컨설팅"],
-  grades: ["중1", "중2", "중3", "고1", "고2", "고3", "졸업/N수"],
-  schools: ["문일중", "금천고"],
-  classrooms: ["101호", "세미나실"],
-  gradeTabs: []
+  // settings/offlineClassCatalog
+  groupCatalogs: {
+    regular: { subjects: [], grades: [], schools: [] },
+    summer: { subjects: [], grades: [], schools: [] },
+    winter: { subjects: [], grades: [], schools: [] }
+  }
+}
+
+{
+  // settings/timetableCatalog
+  scheduleGroups: [],
+  scheduleDivisions: [],
+  groupCatalogs: {
+    regular: { scheduleImages: [] },
+    summer: { scheduleImages: [] },
+    winter: { scheduleImages: [] }
+  }
 }
 ```
 
 운영 기준:
 
-- 오프라인 반과 공개 시간표가 같은 기준값을 공유합니다.
-- `gradeTabs`는 기존 공개 시간표 탭 호환이 필요하면 유지합니다.
+- 두 문서는 `groupId`만 공유하고 기준값 데이터는 분리합니다.
+- 오프라인 반 과목·학년·학교 저장은 `offlineClassCatalog`만 갱신합니다.
+- 시간표 이미지는 `timetableCatalog.groupCatalogs[groupId].scheduleImages`만 갱신합니다.
+- 두 문서의 legacy top-level 배열은 제거하며 신규 저장하지 않습니다.
 - 공개 시간표 `schedule.js`는 `timetableCatalog`가 configured이면 `publicTimetableEntries`에서 유도한 값을 필터 후보에 자동 병합하지 않습니다.
-- `school` 단일값과 `schools[]` 배열은 기존 시간표 데이터 하위호환을 위해 유지합니다.
-- `assets/school.csv`는 회원가입/자녀 학교 검색용 정적 데이터이며 `timetableCatalog.schools`와 병합하지 않습니다.
+- `assets/school.csv`는 회원가입/자녀 학교 검색용 정적 데이터이며 `offlineClassCatalog.schools`와 병합하지 않습니다.
 
 ## 6. `settings/instructorsMenu`
 
@@ -161,7 +175,8 @@
 - 공개 강사진 필터도 강사 과목 기준값을 따릅니다.
 - 강사별 저장값은 `subjects[]` 배열을 우선하고, 기존 단일 `subject`는 대표 과목으로 유지합니다.
 - 기존 데이터에 `subjects[]`가 없으면 `subject` 또는 `category`를 fallback으로 표시합니다.
-- `order`, `hidden`은 legacy fallback이고, 현재 노출 순서/숨김은 `homeOrder`, `instructorsOrder`, `homeHidden`, `instructorsHidden`을 사용합니다.
+- 현재 운영 문서에는 `subjects`, `homeOrder`, `instructorsOrder`, `homeHidden`, `instructorsHidden`, `detailSections`, 갱신 메타데이터만 유지합니다.
+- `subjectOptions`, `order`, `hidden`은 코드의 읽기 fallback만 남고 관리자 저장 시 삭제됩니다.
 
 ## 7. `settings/signup`, `settings/popups`
 
@@ -225,6 +240,6 @@
 보존 중인 하위호환:
 
 - `courseCatalog.instructorSubjectChips` 기본값은 공개 강사진 fallback 용도로 남아 있을 수 있습니다.
-- `instructorsMenu.order`, `hidden` legacy fallback은 기존 데이터 호환을 위해 즉시 삭제하지 않습니다.
+- `instructorsMenu.order`, `hidden`, `subjectOptions`는 읽기 fallback만 유지하며 관리자 저장 및 운영 데이터 정리 시 삭제합니다.
 - 강사 `subject` 단일 필드는 대표 과목으로 유지합니다.
 - 시간표 `school` 단일 필드는 `schools[]` 배열의 대표값으로 유지합니다.

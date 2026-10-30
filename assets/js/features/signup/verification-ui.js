@@ -57,6 +57,11 @@ export function updateVerificationUI() {
     emailInput.disabled = shouldLockEmailInput;
     emailInput.readOnly = shouldLockEmailInput;
   }
+  if (verificationCodeInput && !isVerified) {
+    const shouldLockCodeInput = isSending || isVerifying;
+    verificationCodeInput.disabled = shouldLockCodeInput;
+    verificationCodeInput.readOnly = shouldLockCodeInput;
+  }
 
   if (isVerified) {
     sendBtn.disabled = true;
@@ -181,12 +186,12 @@ export function updateVerificationUI() {
   if (timerProgressBar) timerProgressBar.classList.remove("warning");
 }
 
-export function startVerificationTimer(targetEmail = null) {
+export function startVerificationTimer(targetEmail = null, sessionToken = null) {
   if (signupState.verification.timerId) {
     clearInterval(signupState.verification.timerId);
   }
 
-  signupState.setVerificationSent(targetEmail);
+  signupState.setVerificationSent(targetEmail, sessionToken);
   updateVerificationUI();
 
   signupState.verification.timerId = setInterval(() => {

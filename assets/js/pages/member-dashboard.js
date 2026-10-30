@@ -11,11 +11,20 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-functions.js";
 import { normalizeAccessType, normalizeCourseForReadOnly } from "/assets/js/utils/course-readonly.js";
+import { getCurrentCourseCompletion } from "/assets/js/utils/course-completion.js";
 import { CONSENT_SOURCE_SETTINGS, LEGAL_POLICY_VERSION } from "/assets/js/utils/legal-policy.js";
 import { loadSchoolCsvText } from "/assets/js/utils/school-csv.js";
+import { getSettingDoc } from "/assets/js/utils/settings-cache.js";
+import { withAsyncTimeout } from "/assets/js/utils/async-timeout.js";
+import {
+  getSubjectColorStyle,
+  loadSharedSubjectColorMap,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 const functions = getFunctions(app, "us-central1");
 const linkMemberChildFn = httpsCallable(functions, "linkMemberChild");
+let subjectColorMap = mergeSubjectColorMap({});
 
 const MEMBER_PURPOSE_LABELS = {
   parent: "학부모 회원",
@@ -42,7 +51,8 @@ const GRADE_LABELS = {
   3: "중3",
   4: "고1",
   5: "고2",
-  6: "고3"
+  6: "고3",
+  7: "졸업/N수"
 };
 
 const CHILD_LINK_FAILURE_MESSAGE = "입력한 학생 정보를 확인해 주세요.";
@@ -52,6 +62,62 @@ const MARKETING_CONSENT_LIMIT_MESSAGE = "광고성 정보 수신 설정은 하�
 const MARKETING_CONSENT_SUCCESS_MESSAGE = "광고성 정보 수신 설정을 저장했습니다.";
 const DASHBOARD_SAVE_ERROR_MESSAGE = "저장 중 문제가 발생했습니다. 다시 시도해 주세요.";
 let schoolOptions = [];
+let isChildLinkInFlight = false;
+
+function getCallableErrorCode(error) {
+  return String(error?.code || "").toLowerCase();
+}
+
+function getChildLinkResultMessage(result = {}) {
+  const code = String(result.code || result.result || "");
+  const messages = {
+    notFound: "일치하는 학생 정보를 찾지 못했습니다. 학생의 등록 정보와 입력값을 다시 확인해 주세요.",
+    invalidInput: "입력 형식을 확인해 주세요. 이름·학교·학년·전화번호와 관계를 모두 입력해야 합니다.",
+    ambiguous: "같은 정보의 학생이 여러 명 확인됩니다. 안전한 연동을 위해 학원으로 문의해 주세요.",
+    rateLimited: "연동 시도 횟수가 많습니다. 잠시 후 다시 시도해 주세요.",
+    inactiveMember: "현재 회원 상태에서는 자녀를 연동할 수 없습니다. 학원으로 문의해 주세요.",
+    notParent: "학부모 회원 계정에서만 자녀를 연동할 수 있습니다.",
+    notMember: "회원 정보를 확인하지 못했습니다. 다시 로그인해 주세요."
+  };
+  return result.message || messages[code] || CHILD_LINK_FAILURE_MESSAGE;
+}
+
+function getChildLinkCallableErrorMessage(error) {
+  const code = getCallableErrorCode(error);
+  if (code.includes("unauthenticated")) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
+  if (code.includes("resource-exhausted")) {
+    return "연동 시도 횟수가 많습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (code.includes("unavailable") || code.includes("deadline-exceeded")) {
+    return "네트워크 연결이 불안정합니다. 잠시 후 다시 시도해 주세요.";
+  }
+  return CHILD_LINK_GENERIC_ERROR_MESSAGE;
+}
+
+function setChildLinkFormPending(form, submitButton, pending) {
+  isChildLinkInFlight = pending;
+  form.setAttribute("aria-busy", pending ? "true" : "false");
+  Array.from(form.elements).forEach((control) => {
+    if (pending) {
+      control.dataset.childLinkWasDisabled = control.disabled ? "true" : "false";
+      control.disabled = true;
+      return;
+    }
+    control.disabled = control.dataset.childLinkWasDisabled === "true";
+    delete control.dataset.childLinkWasDisabled;
+  });
+  submitButton.textContent = pending ? "연동 처리 중..." : "자녀 연동하기";
+}
+
+function lockDashboardScroll() {
+  document.documentElement.classList.add("modal-open");
+  document.body.classList.add("modal-open");
+}
+
+function unlockDashboardScroll() {
+  document.documentElement.classList.remove("modal-open");
+  document.body.classList.remove("modal-open");
+}
 
 function setText(id, value) {
   const element = document.getElementById(id);
@@ -81,6 +147,7 @@ function escapeHtml(value) {
 
 function toMillis(value) {
   if (!value) return 0;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value.toMillis === "function") return value.toMillis();
   if (value instanceof Date) return value.getTime();
   if (typeof value.seconds === "number") return value.seconds * 1000;
@@ -157,21 +224,55 @@ function formatRelation(value) {
   return RELATION_LABELS[value] || value || "-";
 }
 
-function summarizeScheduleDays(source = {}) {
-  if (Array.isArray(source.scheduleItems) && source.scheduleItems.length) {
-    const days = source.scheduleItems
-      .map((item) => String(item?.day || "").trim())
-      .filter(Boolean);
-    if (days.length) return [...new Set(days)].join(", ");
+const SCHEDULE_DAY_LABELS = {
+  mon: "월",
+  tue: "화",
+  wed: "수",
+  thu: "목",
+  fri: "금",
+  sat: "토",
+  sun: "일",
+};
+
+function formatScheduleTime(value) {
+  const text = String(value || "").trim();
+  return text.length >= 5 ? text.slice(0, 5) : text;
+}
+
+function normalizeScheduleItems(source = {}, fieldName = "scheduleItems") {
+  if (Array.isArray(source[fieldName]) && source[fieldName].length) {
+    return source[fieldName].map((item) => ({
+      day: String(item?.day || "").trim(),
+      startTime: formatScheduleTime(item?.startTime),
+      endTime: formatScheduleTime(item?.endTime),
+      room: String(item?.room || "").trim(),
+    })).filter((item) => item.day);
   }
-  if (Array.isArray(source.scheduleDays) && source.scheduleDays.length) {
-    const days = source.scheduleDays
-      .map((day) => String(day || "").trim())
-      .filter(Boolean);
-    if (days.length) return [...new Set(days)].join(", ");
-  }
-  const day = String(source.day || "").trim();
-  return day;
+  if (fieldName !== "scheduleItems") return [];
+  const days = Array.isArray(source.scheduleDays) ? source.scheduleDays : [];
+  return days.map((day) => ({
+    day: String(day || "").trim(),
+    startTime: formatScheduleTime(source.startTime),
+    endTime: formatScheduleTime(source.endTime),
+    room: String(source.room || "").trim(),
+  })).filter((item) => item.day);
+}
+
+function formatScheduleLines(source, fieldName) {
+  return normalizeScheduleItems(source, fieldName).map((item) => {
+    const day = SCHEDULE_DAY_LABELS[item.day] || item.day;
+    const time = item.startTime && item.endTime
+      ? `${item.startTime}–${item.endTime}`
+      : item.startTime || item.endTime;
+    return [day, time, item.room].filter(Boolean).join(" ");
+  });
+}
+
+function formatInstructorNames(source = {}) {
+  const names = Array.isArray(source.instructorNames)
+    ? source.instructorNames.map((name) => String(name || "").trim()).filter(Boolean)
+    : [];
+  return names.join(", ") || String(source.instructorName || "").trim();
 }
 
 function setChildLinkMessage(message, type = "") {
@@ -325,7 +426,7 @@ function isActiveEnrollment(row) {
 
 function isAvailableMemberCourse(course) {
   if (!course || typeof course !== "object") return false;
-  if (normalizeAccessType(course.accessType) !== "memberOnly") return false;
+  if (!["memberOnly", "approvalRequired"].includes(normalizeAccessType(course.accessType))) return false;
   const status = String(course.status || "").trim().toLowerCase();
   if (status !== "published") return false;
   const visibility = String(course.visibility || "public").trim().toLowerCase();
@@ -335,28 +436,13 @@ function isAvailableMemberCourse(course) {
   return true;
 }
 
-function getProgress(enrollment) {
-  const parsed = Number(enrollment?.progress);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(0, Math.min(100, Math.round(parsed)));
-}
-
-function setMemberCoursesMeta(text) {
-  const meta = document.getElementById("memberCoursesMeta");
-  if (meta) meta.textContent = text;
-}
-
-function setCourseCountSummary(count) {
-  setText("memberCourseCountSummary", `${Number(count || 0).toLocaleString("ko-KR")}개`);
-}
-
 function renderMemberCoursesEmpty(message) {
   const grid = document.getElementById("memberCoursesGrid");
   if (!grid) return;
   grid.innerHTML = `
     <div class="member-course-empty">
       <p>${escapeHtml(message)}</p>
-      <a href="/courses.html" class="btn sm">전체 강좌 보기</a>
+      <a href="/courses" class="btn sm">전체 강좌 보기</a>
     </div>
   `;
 }
@@ -374,21 +460,31 @@ function renderMemberCourses(courseRows) {
     const course = row.course;
     const enrollment = row.enrollment;
     const courseId = String(enrollment.courseId || course.id || "").trim();
-    const progress = getProgress(enrollment);
+    const progress = row.completion?.progress;
+    const progressText = progress == null ? "확인 불가" : `${progress}%`;
     const courseTitle = escapeHtml(course.title || "제목 없는 강좌");
     const instructorName = escapeHtml(course.instructorName || "강사 미정");
-    const subject = escapeHtml(course.subjectLabel || course.subject || "일반");
+    const subjectValue = course.subjectLabel || course.subject || "일반";
+    const subject = escapeHtml(subjectValue);
+    const subjectColorStyle = getSubjectColorStyle(subjectValue, subjectColorMap);
     const grade = escapeHtml(course.gradeLabel || course.grade || "학년 미정");
     const year = escapeHtml(course.year || "연도 미정");
     const coursePath = `/members/member/course.html?courseId=${encodeURIComponent(courseId)}`;
-    const detailPath = `/course-detail.html?courseId=${encodeURIComponent(courseId)}`;
+    const detailPath = `/course-detail?courseId=${encodeURIComponent(courseId)}`;
 
     return `
-      <article class="student-course-card">
+      <article class="student-course-card${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>
+        <div class="student-dashboard-card-badges">
+          <span class="student-dashboard-card-badge${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${subject}</span>
+          <span class="student-dashboard-card-badge">${grade}</span>
+          <span class="student-dashboard-card-badge">${year}</span>
+        </div>
         <h3>${courseTitle}</h3>
-        <p class="student-course-meta">${subject} | ${grade} | ${year}</p>
         <p class="student-course-meta">강사: ${instructorName}</p>
-        <p class="student-course-progress">학습 진도: ${progress}%</p>
+        <div class="student-course-progress" aria-label="학습 완료율 ${progressText}">
+          <div class="student-course-progress__head"><span>학습 완료율</span><strong>${progressText}</strong></div>
+          <div class="student-course-progress__track" aria-hidden="true"><span style="width:${progress ?? 0}%"></span></div>
+        </div>
         <div class="student-course-actions">
           <a class="btn primary sm" href="${coursePath}">강의 입장</a>
           <a class="btn sm" href="${detailPath}">상세 보기</a>
@@ -398,18 +494,44 @@ function renderMemberCourses(courseRows) {
   }).join("");
 }
 
-function formatChildOnlineRows(rows) {
-  if (!rows.length) return '<p class="muted">온라인 수강 기록이 없습니다.</p>';
+function formatChildOnlineRows(rows, unavailable = false) {
+  if (!rows.length) {
+    return unavailable
+      ? '<p class="muted">온라인 수강 정보를 불러오지 못했습니다.</p>'
+      : '<p class="muted">온라인 수강 기록이 없습니다.</p>';
+  }
+  const warning = unavailable
+    ? '<p class="muted">일부 강좌 정보를 불러오지 못했습니다.</p>'
+    : "";
   return `
+    ${warning}
     <ul class="member-child-detail-list">
       ${rows.map((row) => {
         const course = row.course || {};
         const enrollment = row.enrollment || {};
-        const progress = getProgress(enrollment);
+        const progress = row.completion?.progress;
+        const subjectValue = course.subjectLabel || course.subject || "과목 미정";
+        const subjectColorStyle = getSubjectColorStyle(subjectValue, subjectColorMap);
+        const progressLabel = progress == null
+          ? "학습 현황 확인 불가"
+          : progress >= 100
+          ? "수강 완료"
+          : progress > 0
+            ? `수강 중 (학습 완료율 ${progress}%)`
+            : "수강 전";
+        const progressType = progress == null ? "before" : progress >= 100 ? "complete" : progress > 0 ? "active" : "before";
         return `
-          <li>
-            <strong>${escapeHtml(course.title || enrollment.courseId || "제목 없는 강좌")}</strong>
-            <span>${escapeHtml(course.subjectLabel || course.subject || "과목 미정")} / ${escapeHtml(course.instructorName || "강사 미정")} / 진도 ${progress}%</span>
+          <li class="member-child-learning-card${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>
+            <div class="member-child-card-badges">
+              <span class="member-child-subject-badge${subjectColorStyle ? " has-subject-color" : ""}">${escapeHtml(subjectValue)}</span>
+            </div>
+            <div class="member-child-course-title">
+              <strong>${escapeHtml(course.title || enrollment.courseId || "제목 없는 강좌")}</strong>
+              <span class="member-child-progress member-child-progress--${progressType}">${escapeHtml(progressLabel)}</span>
+            </div>
+            <dl class="member-child-course-meta">
+              <div><dt>강사</dt><dd>${escapeHtml(course.instructorName || "강사 미정")}</dd></div>
+            </dl>
           </li>
         `;
       }).join("")}
@@ -417,18 +539,41 @@ function formatChildOnlineRows(rows) {
   `;
 }
 
-function formatChildOfflineRows(rows) {
-  if (!rows.length) return '<p class="muted">오프라인 반 기록이 없습니다.</p>';
+function formatChildOfflineRows(rows, unavailable = false) {
+  if (!rows.length) {
+    return unavailable
+      ? '<p class="muted">오프라인 반 정보를 불러오지 못했습니다.</p>'
+      : '<p class="muted">오프라인 반 기록이 없습니다.</p>';
+  }
+  const warning = unavailable
+    ? '<p class="muted">일부 오프라인 반 정보를 불러오지 못했습니다.</p>'
+    : "";
   return `
+    ${warning}
     <ul class="member-child-detail-list">
-      ${rows.map((row) => `
-        <li>
-          <strong>${escapeHtml(row.className || "반명 미정")}</strong>
-          <span>강사: ${escapeHtml(row.instructorName || "강사 미정")}</span>
-          <span>요일: ${escapeHtml(row.scheduleSummary || "요일 미정")}</span>
-          <span>입반일: ${escapeHtml(formatDateOrFallback(row.joinedAt, "입반일 미정"))}</span>
-        </li>
-      `).join("")}
+      ${rows.map((row) => {
+        const subjectValue = row.subject || "과목 미정";
+        const subjectColorStyle = getSubjectColorStyle(subjectValue, subjectColorMap);
+        const scheduleLines = row.scheduleVisible === false ? ["일정 비공개"] : formatScheduleLines(row, "scheduleItems");
+        const clinicLines = row.scheduleVisible === false ? ["일정 비공개"] : formatScheduleLines(row, "clinicScheduleItems");
+        const renderLines = (lines, fallback) => lines.length
+          ? lines.map((line) => escapeHtml(line)).join("<br>")
+          : escapeHtml(fallback);
+        return `
+          <li class="member-child-learning-card${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>
+            <div class="member-child-card-badges">
+              <span class="member-child-subject-badge${subjectColorStyle ? " has-subject-color" : ""}">${escapeHtml(subjectValue)}</span>
+            </div>
+            <strong>${escapeHtml(row.className || "반명 미정")}</strong>
+            <dl class="member-child-course-meta member-child-course-meta--offline">
+              <div><dt>강사</dt><dd>${escapeHtml(row.instructorName || "강사 미정")}</dd></div>
+              <div><dt>수업 일정</dt><dd>${renderLines(scheduleLines, "수업 일정 미정")}</dd></div>
+              <div><dt>클리닉 일정</dt><dd>${renderLines(clinicLines, "클리닉 일정 미정")}</dd></div>
+              <div><dt>입반일</dt><dd>${escapeHtml(formatDateOrFallback(row.joinedAtMillis || row.joinedAt, "입반일 미정"))}</dd></div>
+            </dl>
+          </li>
+        `;
+      }).join("")}
     </ul>
   `;
 }
@@ -446,40 +591,75 @@ function renderLinkedChildren(rows) {
     const snapshot = row.studentSnapshot || {};
     const onlineRows = row.onlineRows || [];
     const offlineRows = row.offlineRows || [];
+    const onlineCountLabel = row.onlineSummaryUnavailable && !onlineRows.length
+      ? "온라인 확인 불가"
+      : `온라인 ${onlineRows.length.toLocaleString("ko-KR")}`;
+    const offlineCountLabel = row.offlineSummaryUnavailable && !offlineRows.length
+      ? "오프라인 확인 불가"
+      : `오프라인 ${offlineRows.length.toLocaleString("ko-KR")}`;
     return `
-      <article class="member-linked-child-card">
-        <div class="member-linked-child-head">
-          <div>
+      <details class="member-linked-child-card">
+        <summary class="member-linked-child-head">
+          <div class="member-linked-child-identity">
             <strong>${escapeHtml(snapshot.name || "이름 없음")}</strong>
-            <span>${escapeHtml(snapshot.school || "-")} / ${escapeHtml(formatGrade(snapshot.grade))} / 관계 ${escapeHtml(row.relationDisplay || formatRelation(row.relationLabel))}</span>
+            <span>${escapeHtml(snapshot.school || "-")} · ${escapeHtml(formatGrade(snapshot.grade))} · ${escapeHtml(row.relationDisplay || formatRelation(row.relationLabel))}</span>
           </div>
-          <span class="member-linked-child-date">연동일 ${escapeHtml(formatDate(row.createdAt))}</span>
-        </div>
-        <div class="member-linked-child-counts" aria-label="자녀 요약">
-          <span>온라인 ${onlineRows.length.toLocaleString("ko-KR")}개</span>
-          <span>오프라인 ${offlineRows.length.toLocaleString("ko-KR")}개</span>
-        </div>
-        <details class="member-child-details">
-          <summary>자녀 수강 요약 보기</summary>
-          <div class="member-child-detail-grid">
-            <section>
-              <h4>온라인 강좌</h4>
-              ${formatChildOnlineRows(onlineRows)}
-            </section>
-            <section>
-              <h4>오프라인 반</h4>
-              ${formatChildOfflineRows(offlineRows)}
-            </section>
+          <div class="member-linked-child-summary-side">
+            <div class="member-linked-child-counts" aria-label="자녀 수강 요약">
+              <span>${escapeHtml(onlineCountLabel)}</span>
+              <span>${escapeHtml(offlineCountLabel)}</span>
+            </div>
+            <span class="member-linked-child-toggle" aria-hidden="true"></span>
           </div>
-        </details>
-      </article>
+        </summary>
+        <div class="member-linked-child-body">
+          <div class="member-child-profile-heading">
+            <strong>학생 정보</strong>
+            <span class="member-linked-child-date">연동일 ${escapeHtml(formatDate(row.createdAt))}</span>
+          </div>
+          <dl class="member-child-profile">
+            <div><dt>학교</dt><dd>${escapeHtml(snapshot.school || "-")}</dd></div>
+            <div><dt>학년</dt><dd>${escapeHtml(formatGrade(snapshot.grade))}</dd></div>
+            <div><dt>관계</dt><dd>${escapeHtml(row.relationDisplay || formatRelation(row.relationLabel))}</dd></div>
+          </dl>
+          <div class="member-child-details">
+            <div class="member-child-detail-grid">
+              <section>
+                <h4>온라인 강좌 <span>${row.onlineSummaryUnavailable && !onlineRows.length ? "-" : onlineRows.length.toLocaleString("ko-KR")}</span></h4>
+                ${formatChildOnlineRows(onlineRows, row.onlineSummaryUnavailable)}
+              </section>
+              <section>
+                <h4>오프라인 반 <span>${row.offlineSummaryUnavailable && !offlineRows.length ? "-" : offlineRows.length.toLocaleString("ko-KR")}</span></h4>
+                ${formatChildOfflineRows(offlineRows, row.offlineSummaryUnavailable)}
+              </section>
+            </div>
+          </div>
+        </div>
+      </details>
     `;
   }).join("");
 }
 
-async function loadChildOnlineRows(studentUid) {
+function loadCachedDocument(cache, collectionName, documentId) {
+  const id = String(documentId || "").trim();
+  if (!id) return Promise.resolve({data: null, failed: false});
+  if (!cache.has(id)) {
+    cache.set(id, getDoc(doc(db, collectionName, id))
+      .then((snapshot) => ({
+        data: snapshot.exists() ? {id: snapshot.id, ...snapshot.data()} : null,
+        failed: false
+      }))
+      .catch((error) => {
+        console.warn(`[member-dashboard] ${collectionName} document load failed`, id, error);
+        return {data: null, failed: true};
+      }));
+  }
+  return cache.get(id);
+}
+
+async function loadChildOnlineRows(studentUid, courseCache) {
   const uid = String(studentUid || "").trim();
-  if (!uid) return [];
+  if (!uid) return {rows: [], unavailable: false};
   const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments"), where("userId", "==", uid)));
   const enrollmentRows = [];
   enrollmentsSnapshot.forEach((enrollDoc) => {
@@ -490,38 +670,55 @@ async function loadChildOnlineRows(studentUid) {
     enrollmentRows.push({ id: enrollDoc.id, ...data });
   });
 
-  const rows = [];
-  for (const enrollment of enrollmentRows) {
-    let course = null;
-    try {
-      const courseSnap = await getDoc(doc(db, "courses", enrollment.courseId));
-      course = courseSnap.exists()
-        ? normalizeCourseForReadOnly({ id: courseSnap.id, ...courseSnap.data() })
-        : null;
-    } catch (error) {
-      console.warn("[member-dashboard] child course load failed", enrollment.courseId, error);
-    }
-    rows.push({ enrollment, course: course || { title: "제목 없는 강좌" } });
-  }
-  return rows;
+  const rows = await Promise.all(enrollmentRows.map(async (enrollment) => {
+    const result = await loadCachedDocument(courseCache, "courses", enrollment.courseId);
+    const course = result.data ? normalizeCourseForReadOnly(result.data) : null;
+    const completion = course && normalizeAccessType(course.accessType) !== "approvalRequired"
+      ? getCurrentCourseCompletion(enrollment.courseId, course.weeks, enrollment.watchedVideos)
+      : null;
+    return {
+      enrollment,
+      course: course || {title: result.failed ? "강좌 정보 확인 불가" : "제목 없는 강좌"},
+      completion,
+      courseUnavailable: result.failed
+    };
+  }));
+  return {rows, unavailable: rows.some((row) => row.courseUnavailable)};
 }
 
-async function loadChildOfflineRows(studentUid) {
+async function loadChildOfflineRows(studentUid, offlineClassCache) {
   const uid = String(studentUid || "").trim();
-  if (!uid) return [];
+  if (!uid) return {rows: [], unavailable: false};
   const membersSnapshot = await getDocs(query(collection(db, "offlineClassMembers"), where("studentUid", "==", uid)));
-  const rows = [];
-  membersSnapshot.forEach((memberDoc) => {
-    const data = memberDoc.data() || {};
-    if (String(data.status || "active").trim() !== "active") return;
-    rows.push({
-      className: data.classNameSnapshot || data.className || "",
-      instructorName: data.instructorNameSnapshot || data.instructorName || "",
-      scheduleSummary: data.scheduleSummarySnapshot || data.scheduleSummary || summarizeScheduleDays(data),
-      joinedAt: data.joinedAt || data.createdAt || null
-    });
-  });
-  return rows;
+  const memberships = membersSnapshot.docs
+    .map((memberDoc) => ({ id: memberDoc.id, ...memberDoc.data() }))
+    .filter((data) => String(data.status || "active").trim() === "active")
+    .filter((data) => String(data.classId || "").trim());
+
+  const rows = await Promise.all(memberships.map(async (membership) => {
+    const classId = String(membership.classId || "").trim();
+    const result = await loadCachedDocument(offlineClassCache, "offlineClasses", classId);
+    const classRow = result.data || {};
+    return {
+      classId,
+      className: classRow.className || membership.classNameSnapshot || membership.className || (result.failed ? "반 정보 확인 불가" : ""),
+      subject: classRow.subject || membership.subjectSnapshot || membership.subject || "",
+      instructorName: formatInstructorNames(classRow) || membership.instructorNameSnapshot || membership.instructorName || "",
+      scheduleVisible: classRow.scheduleVisible !== false,
+      scheduleItems: classRow.scheduleItems || membership.scheduleItemsSnapshot || [],
+      clinicScheduleItems: classRow.clinicScheduleItems || membership.clinicScheduleItemsSnapshot || [],
+      scheduleDays: classRow.scheduleDays || membership.scheduleDaysSnapshot || [],
+      startTime: classRow.startTime || membership.startTimeSnapshot || "",
+      endTime: classRow.endTime || membership.endTimeSnapshot || "",
+      room: classRow.room || membership.roomSnapshot || "",
+      joinedAt: membership.joinedAt || membership.createdAt || null,
+      classUnavailable: result.failed
+    };
+  }));
+  return {
+    rows: rows.sort((a, b) => String(a.className || "").localeCompare(String(b.className || ""), "ko")),
+    unavailable: rows.some((row) => row.classUnavailable)
+  };
 }
 
 async function loadLinkedChildren(uid) {
@@ -539,35 +736,34 @@ async function loadLinkedChildren(uid) {
     });
 
     rows.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
-    for (const row of rows) {
+    const courseCache = new Map();
+    const offlineClassCache = new Map();
+    await Promise.all(rows.map(async (row) => {
       const studentUid = String(row.studentUid || "").trim();
       try {
-        row.onlineRows = await loadChildOnlineRows(studentUid);
+        const online = await loadChildOnlineRows(studentUid, courseCache);
+        row.onlineRows = online.rows;
+        row.onlineSummaryUnavailable = online.unavailable;
       } catch (error) {
         console.warn("[member-dashboard] child online summary failed", studentUid, error);
         row.onlineRows = [];
+        row.onlineSummaryUnavailable = true;
       }
       try {
-        row.offlineRows = await loadChildOfflineRows(studentUid);
+        const offline = await loadChildOfflineRows(studentUid, offlineClassCache);
+        row.offlineRows = offline.rows;
+        row.offlineSummaryUnavailable = offline.unavailable;
       } catch (error) {
         console.warn("[member-dashboard] child offline summary failed", studentUid, error);
         row.offlineRows = [];
         row.offlineSummaryUnavailable = true;
       }
-    }
+    }));
     renderLinkedChildren(rows);
-    const onlineTotal = rows.reduce((sum, row) => sum + (row.onlineRows?.length || 0), 0);
-    const offlineTotal = rows.reduce((sum, row) => sum + (row.offlineRows?.length || 0), 0);
-    setText("memberCourseCountSummary", `${rows.length.toLocaleString("ko-KR")}명`);
-    setText("memberChildCountSummary", `${onlineTotal.toLocaleString("ko-KR")}개`);
-    setText("memberPurposeSummary", `${offlineTotal.toLocaleString("ko-KR")}개`);
     return rows.length;
   } catch (error) {
     console.error("[member-dashboard] linked children load failed:", error);
     list.innerHTML = '<p class="muted">연동된 자녀를 불러오지 못했습니다.</p>';
-    setText("memberCourseCountSummary", "0명");
-    setText("memberChildCountSummary", "0개");
-    setText("memberPurposeSummary", "0개");
     return 0;
   }
 }
@@ -579,6 +775,7 @@ function initChildLinkForm(uid) {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (isChildLinkInFlight) return;
     setChildLinkMessage("");
 
     const payload = {
@@ -589,25 +786,24 @@ function initChildLinkForm(uid) {
       relationLabel: document.getElementById("childRelationLabel")?.value || "guardian",
     };
 
-    submitButton.disabled = true;
-    submitButton.textContent = "연동 확인 중...";
+    setChildLinkFormPending(form, submitButton, true);
+    setChildLinkMessage("학생 정보를 확인하고 연동하고 있습니다...", "info");
 
     try {
-      const response = await linkMemberChildFn(payload);
+      const response = await withAsyncTimeout(linkMemberChildFn(payload));
       const result = response?.data || {};
       if (result.ok === true || result.success === true) {
         setChildLinkMessage(result.message || "자녀 계정이 연동되었습니다.", "success");
         form.reset();
+        await loadLinkedChildren(uid);
       } else {
-        setChildLinkMessage(result.message || CHILD_LINK_FAILURE_MESSAGE, "error");
+        setChildLinkMessage(getChildLinkResultMessage(result), "error");
       }
-      await loadLinkedChildren(uid);
     } catch (error) {
       console.error("[member-dashboard] child link failed:", error);
-      setChildLinkMessage(CHILD_LINK_GENERIC_ERROR_MESSAGE, "error");
+      setChildLinkMessage(getChildLinkCallableErrorMessage(error), "error");
     } finally {
-      submitButton.disabled = false;
-      submitButton.textContent = "자녀 연동하기";
+      setChildLinkFormPending(form, submitButton, false);
     }
   });
 }
@@ -616,10 +812,10 @@ async function loadMemberCourses(uid) {
   const grid = document.getElementById("memberCoursesGrid");
   if (!uid || !grid) return;
 
-  setMemberCoursesMeta("수강 강좌를 불러오는 중입니다.");
   grid.innerHTML = `<p class="student-course-empty">수강 강좌를 불러오는 중입니다.</p>`;
 
   try {
+    subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc);
     const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments"), where("userId", "==", uid)));
     const enrollmentByCourseId = new Map();
 
@@ -639,8 +835,6 @@ async function loadMemberCourses(uid) {
     const courseIds = Array.from(enrollmentByCourseId.keys());
     if (!courseIds.length) {
       renderMemberCoursesEmpty("수강 중인 온라인 강좌가 없습니다.");
-      setMemberCoursesMeta("아직 수강 신청한 강좌가 없습니다.");
-      setCourseCountSummary(0);
       return 0;
     }
 
@@ -651,7 +845,24 @@ async function loadMemberCourses(uid) {
         if (!courseSnap.exists()) continue;
         const normalized = normalizeCourseForReadOnly({ id: courseSnap.id, ...courseSnap.data() });
         if (!isAvailableMemberCourse(normalized)) continue;
-        courseRows.push({ course: normalized, enrollment: enrollmentByCourseId.get(courseId) });
+        let weeks = normalized.weeks;
+        if (normalizeAccessType(normalized.accessType) === "approvalRequired") {
+          try {
+            const privateSnap = await getDoc(doc(db, "coursePrivateContent", courseId));
+            weeks = privateSnap.exists() ? privateSnap.data()?.weeks : null;
+          } catch (error) {
+            console.warn("[member-dashboard] protected course content unavailable", courseId, error);
+            weeks = null;
+          }
+        }
+        const enrollment = enrollmentByCourseId.get(courseId);
+        courseRows.push({
+          course: normalized,
+          enrollment,
+          completion: Array.isArray(weeks)
+            ? getCurrentCourseCompletion(courseId, weeks, enrollment.watchedVideos)
+            : null
+        });
       } catch (error) {
         console.warn("[member-dashboard] failed to load course doc", courseId, error);
       }
@@ -664,47 +875,25 @@ async function loadMemberCourses(uid) {
     });
 
     renderMemberCourses(courseRows);
-    setMemberCoursesMeta(`수강 중인 강좌 ${courseRows.length}개`);
-    setCourseCountSummary(courseRows.length);
     return courseRows.length;
   } catch (error) {
     console.error("[member-dashboard] member courses load failed:", error);
     renderMemberCoursesEmpty("수강 강좌를 불러오는 중 오류가 발생했습니다.");
-    setMemberCoursesMeta("수강 강좌를 불러오지 못했습니다.");
-    setCourseCountSummary(0);
     return 0;
   }
 }
 
 function configureDashboardForPurpose(memberPurpose) {
   const isParent = memberPurpose === "parent";
-  const summaryStats = document.getElementById("memberSummaryStats");
   const coursesCta = document.getElementById("memberCoursesCta");
   const parentSection = document.getElementById("memberParentSection");
   const coursesSection = document.getElementById("memberCoursesSection");
   const childLinkPlaceholder = document.getElementById("memberChildLinkPlaceholder");
-  const childSummaryCard = document.getElementById("memberChildSummaryCard");
-  const tertiarySummaryCard = document.getElementById("memberTertiarySummaryCard");
 
-  if (summaryStats) summaryStats.dataset.purpose = isParent ? "parent" : "general";
   if (coursesCta) coursesCta.hidden = isParent;
   if (parentSection) parentSection.hidden = !isParent;
   if (coursesSection) coursesSection.hidden = isParent;
   if (childLinkPlaceholder) childLinkPlaceholder.hidden = !isParent;
-  if (childSummaryCard) childSummaryCard.hidden = !isParent;
-  if (tertiarySummaryCard) tertiarySummaryCard.hidden = !isParent;
-
-  if (isParent) {
-    setText("memberPrimarySummaryLabel", "연동 자녀");
-    setText("memberChildSummaryLabel", "자녀 온라인 수강");
-    setText("memberTertiarySummaryLabel", "자녀 오프라인 반");
-    setText("memberCourseCountSummary", "0명");
-    setText("memberChildCountSummary", "0개");
-    setText("memberPurposeSummary", "0개");
-    return;
-  }
-
-  setText("memberPrimarySummaryLabel", "내 온라인 강좌");
 }
 
 function populateMemberProfileForm(member = {}, user = {}) {
@@ -725,16 +914,17 @@ function setupMemberInfoModal(uid, member, user) {
 
   const close = () => {
     modal.hidden = true;
-    document.body.classList.remove("modal-open");
+    unlockDashboardScroll();
     setMemberProfileMessage("");
+    openButton.focus({ preventScroll: true });
   };
 
   openButton.addEventListener("click", () => {
     populateMemberProfileForm(member, user);
     setMemberProfileMessage("");
     modal.hidden = false;
-    document.body.classList.add("modal-open");
-    closeButton?.focus();
+    lockDashboardScroll();
+    closeButton?.focus({ preventScroll: true });
   });
   closeButton?.addEventListener("click", close);
   document.getElementById("cancelMemberProfileBtn")?.addEventListener("click", close);
@@ -793,15 +983,16 @@ function setupMemberMarketingConsentModal(uid, member) {
 
   const close = () => {
     modal.hidden = true;
-    document.body.classList.remove("modal-open");
+    unlockDashboardScroll();
     if (saveButton) saveButton.disabled = false;
+    openButton.focus({ preventScroll: true });
   };
 
   openButton.addEventListener("click", () => {
     input.checked = isMarketingConsentEnabled(member.marketingConsent || {});
     modal.hidden = false;
-    document.body.classList.add("modal-open");
-    closeButton?.focus();
+    lockDashboardScroll();
+    closeButton?.focus({ preventScroll: true });
   });
   closeButton?.addEventListener("click", close);
   cancelButton?.addEventListener("click", close);
@@ -847,13 +1038,14 @@ function setupMemberAccountDeletionModal() {
 
   const close = () => {
     modal.hidden = true;
-    document.body.classList.remove("modal-open");
+    unlockDashboardScroll();
+    openButton.focus({ preventScroll: true });
   };
 
   openButton.addEventListener("click", () => {
     modal.hidden = false;
-    document.body.classList.add("modal-open");
-    closeButton?.focus();
+    lockDashboardScroll();
+    closeButton?.focus({ preventScroll: true });
   });
   closeButton?.addEventListener("click", close);
   modal.addEventListener("click", (event) => {
@@ -874,7 +1066,6 @@ function setupMemberAccountDeletionModal() {
 
     setText("memberEmailCell", member.email || user.email || "");
     setText("memberPurposeCell", formatMemberPurpose(member.memberPurpose));
-    setText("memberPurposeSummary", formatMemberPurpose(member.memberPurpose));
     setText("memberCreatedAtCell", formatDate(member.createdAt));
     populateMemberProfileForm(member, user);
 
@@ -898,9 +1089,9 @@ function setupMemberAccountDeletionModal() {
       setupChildPhoneFormatting();
       setupChildSchoolOptions();
       initChildLinkForm(user.uid);
+      subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc);
       await loadLinkedChildren(user.uid);
     } else {
-      setText("memberPurposeSummary", formatMemberPurpose(member.memberPurpose));
       await loadMemberCourses(user.uid);
     }
 

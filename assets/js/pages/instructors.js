@@ -1,6 +1,6 @@
 import { app } from "/assets/js/firebase-init.js";
 import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-import { getPublicSettingDoc } from "/assets/js/utils/settings-cache.js";
+import { getPublicSettingDoc, getSettingDoc } from "/assets/js/utils/settings-cache.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
 import { normalizeCatalogList } from "/assets/js/utils/catalog-select-helpers.js";
 import {
@@ -14,6 +14,11 @@ import {
   INSTRUCTOR_PROFILE_PLACEHOLDER,
 } from "/assets/js/utils/public-image-url.js";
 import { bindGuardedImages } from "/assets/js/utils/image-load-guard.js";
+import {
+  getSubjectColorStyle,
+  loadSharedSubjectColorMap,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 const db = getFirestore(app);
 
@@ -23,9 +28,9 @@ const PLACEHOLDER = INSTRUCTOR_PROFILE_PLACEHOLDER;
 
 let ALL = [];
 let currentSubject = "all";
-let currentSearch = "";
 let instructorOrder = [];
 let instructorHidden = [];
+let subjectColorMap = mergeSubjectColorMap({});
 
 function showSkeleton() {
   if (grid) {
@@ -52,7 +57,12 @@ function cardHTML(instructor) {
   const raw = (instructor.photo || instructor.profilePhoto || instructor.imageUrl || "").trim();
   const photoUrl = resolveInstructorProfileImageUrl(raw);
   const name = (instructor.name || "").trim();
-  const subjectBadges = renderInstructorSubjectBadgesHtml(instructor, currentSubject, escapeHtml);
+  const subjectBadges = renderInstructorSubjectBadgesHtml(
+    instructor,
+    currentSubject,
+    escapeHtml,
+    subjectColorMap
+  );
   const brief = (instructor.brief || "").trim();
   const altText = name ? `${name} 강사` : "강사 이미지";
 
@@ -94,8 +104,8 @@ function applyInstructorOrder(t) {
   if (!instructorOrder || instructorOrder.length === 0) {
     // order 속성 또는 이름순으로 정렬하여 일관된 순서 유지
     return [...t].sort((a, b) => {
-      const orderA = "number" == typeof a.order ? a.order : 999;
-      const orderB = "number" == typeof b.order ? b.order : 999;
+      const orderA = typeof a.order === "number" ? a.order : 999;
+      const orderB = typeof b.order === "number" ? b.order : 999;
       if (orderA !== orderB) return orderA - orderB;
       return (a.name || "").localeCompare(b.name || "", "ko-KR");
     });
@@ -190,7 +200,7 @@ if (grid) {
     const r = t.target.closest(".inst-card");
     if (!r) return;
     const e = r.getAttribute("data-id");
-    if (e) location.href = `/instructor-details.html?doc=${encodeURIComponent(e)}`;
+    if (e) location.href = `/instructor-details?doc=${encodeURIComponent(e)}`;
   });
   
   grid.addEventListener("keydown", t => {
@@ -239,7 +249,8 @@ function renderInstructorSubjectChips(subjects) {
       const isAll = String(chip.value) === "all";
       const cls = isAll ? "on" : "";
       const pressed = isAll ? "true" : "false";
-      return `<button type="button" class="${cls}" data-subject="${v}" aria-pressed="${pressed}">${lab}</button>`;
+      const colorStyle = isAll ? "" : getSubjectColorStyle(chip.value, subjectColorMap);
+      return `<button type="button" class="${cls}${colorStyle ? " has-subject-color" : ""}" data-subject="${v}" aria-pressed="${pressed}"${colorStyle ? ` style="${colorStyle}"` : ""}>${lab}</button>`;
     })
     .join("");
 }
@@ -254,6 +265,12 @@ async function loadAllInstructors() {
     ]);
 
     const r = instructorsMenuResult.exists ? instructorsMenuResult.data : {};
+    subjectColorMap = await loadSharedSubjectColorMap(getSettingDoc, r);
+    renderInstructorSubjectChips(
+      Array.isArray(r.subjects) && r.subjects.length
+        ? r.subjects
+        : DEFAULT_INSTRUCTOR_MENU_SUBJECTS
+    );
     if (Array.isArray(r.instructorsOrder) && r.instructorsOrder.length > 0) {
       instructorOrder = r.instructorsOrder;
     } else if (Array.isArray(r.order)) {

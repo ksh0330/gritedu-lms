@@ -4,8 +4,8 @@ import { requireRole } from "/assets/js/firebase-init.js";
 import { state } from "/assets/js/pages/student-dashboard/context.js";
 import { loadMyCourses, setupCourseFilters, updateCourseFilterButtons } from "/assets/js/pages/student-dashboard/courses.js";
 import { loadMyOfflineClasses } from "/assets/js/pages/student-dashboard/offline-classes.js";
-import { setupProfileModalHandlers } from "/assets/js/pages/student-dashboard/profile.js";
-import { setWelcomeMessage, updateGradeIfNeeded } from "/assets/js/pages/student-dashboard/settings.js";
+import { setupProfileModalHandlers } from "/assets/js/pages/student-dashboard/profile.js?v=20260913-grade-tracking";
+import { setWelcomeMessage, updateGradeIfNeeded } from "/assets/js/pages/student-dashboard/settings.js?v=20260913-grade-tracking";
 import { mountDday } from "/assets/js/utils/dday.js";
 
 function ensureDashboardDdayHost() {
@@ -57,8 +57,8 @@ const roleCheckPromise = (async () => {
   setupCourseFilters();
   setupProfileModalHandlers();
   updateCourseFilterButtons();
-  await updateGradeIfNeeded();
-  await setWelcomeMessage();
+  const studentProfile = await updateGradeIfNeeded();
+  await setWelcomeMessage(studentProfile);
   await mountDday(ensureDashboardDdayHost(), { variant: "dashboard", placement: "dashboard" });
   await loadMyCourses();
   await loadMyOfflineClasses();

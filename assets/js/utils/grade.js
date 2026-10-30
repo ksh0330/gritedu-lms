@@ -29,3 +29,49 @@ export function formatGrade(value) {
   const code = normalizeGrade(value);
   return code ? GRADE_CODE_TO_LABEL[code] : "-";
 }
+
+export function getAutomaticGradePromotion({
+  grade,
+  createdYear,
+  lastPromotionYear,
+  currentYear,
+} = {}) {
+  const normalizedGrade = normalizeGrade(grade);
+  const gradeNumber = Number.parseInt(normalizedGrade, 10);
+  const accountCreatedYear = Number.parseInt(createdYear, 10);
+  const recordedPromotionYear = Number.parseInt(lastPromotionYear, 10);
+  const targetYear = Number.parseInt(currentYear, 10);
+
+  const canTrackPromotion =
+    Number.isInteger(targetYear) &&
+    gradeNumber >= 1 &&
+    gradeNumber < 7;
+
+  if (!canTrackPromotion) {
+    return { shouldPromote: false, grade: normalizedGrade };
+  }
+
+  if (!Number.isInteger(recordedPromotionYear)) {
+    return {
+      shouldPromote: false,
+      shouldInitialize: true,
+      grade: normalizedGrade,
+      promotionYear: targetYear,
+    };
+  }
+
+  const canPromote =
+    Number.isInteger(accountCreatedYear) &&
+    accountCreatedYear < targetYear &&
+    recordedPromotionYear < targetYear;
+
+  if (!canPromote) {
+    return { shouldPromote: false, grade: normalizedGrade };
+  }
+
+  return {
+    shouldPromote: true,
+    grade: String(gradeNumber + 1),
+    promotionYear: targetYear,
+  };
+}

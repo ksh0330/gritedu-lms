@@ -128,30 +128,29 @@
       }
     }
     .modal-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      flex: 0 0 auto;
+      margin: -24px -24px 20px;
+      padding: 20px 24px 16px;
+      position: sticky;
+      top: -24px;
+      z-index: 5;
     }
     .modal-header h2 {
       margin: 0;
       font-size: 20px;
       color: var(--text);
     }
-    .modal-close {
-      background: none;
-      border: none;
-      font-size: 28px;
-      cursor: pointer;
-      color: var(--muted);
-      padding: 0;
-      width: 32px;
-      height: 32px;
-      line-height: 32px;
-      transition: color 0.2s;
-    }
-    .modal-close:hover {
-      color: var(--text);
+    @media (max-width: 768px) {
+      .modal-header {
+        margin: -20px -20px 18px;
+        padding: 16px 20px 14px;
+        top: -20px;
+      }
     }
     .form-row {
       display: grid;
@@ -226,29 +225,14 @@
       background: rgba(255, 122, 0, 0.12);
       color: var(--text);
     }
-    .subject-choice-chip.is-checked[data-subject="국어"] {
-      border-color: var(--sub-ko);
-      background: color-mix(in srgb, var(--sub-ko) 14%, var(--card));
+    .subject-choice-chip.is-checked.has-subject-color {
+      border-color: var(--subject-color);
+      background: color-mix(in srgb, var(--subject-color) 15%, var(--card));
     }
-    .subject-choice-chip.is-checked[data-subject="영어"] {
-      border-color: var(--sub-en);
-      background: color-mix(in srgb, var(--sub-en) 14%, var(--card));
-    }
-    .subject-choice-chip.is-checked[data-subject="수학"] {
-      border-color: var(--sub-ma);
-      background: color-mix(in srgb, var(--sub-ma) 14%, var(--card));
-    }
-    .subject-choice-chip.is-checked[data-subject="과학"] {
-      border-color: var(--sub-sc);
-      background: color-mix(in srgb, var(--sub-sc) 18%, var(--card));
-    }
-    .subject-choice-chip.is-checked[data-subject="컨설팅"] {
-      border-color: var(--sub-consult);
-      background: color-mix(in srgb, var(--sub-consult) 14%, var(--card));
-    }
-    .subject-choice-chip.is-checked[data-subject="수리논술"] {
-      border-color: #0e7490;
-      background: color-mix(in srgb, #0e7490 14%, var(--card));
+
+    .admin-catalog-tag.has-subject-color {
+      border-color: color-mix(in srgb, var(--subject-color) 55%, var(--border));
+      box-shadow: inset 4px 0 0 var(--subject-color);
     }
     .subject-choice-chip input {
       width: 16px;
@@ -416,17 +400,17 @@
       color: #c2410c;
       border: 1px solid #fed7aa;
     }
-    .btn.sm {
+    .admin-instructors-page .admin-table .btn.sm {
       padding: 4px 8px;
       font-size: 12px;
       color: var(--text);
     }
-    .btn.danger {
+    .admin-instructors-page .btn.danger {
       background: #dc3545;
       border-color: #dc3545;
       color: #fff;
     }
-    .btn.danger:hover {
+    .admin-instructors-page .btn.danger:hover {
       background: #c82333;
     }
     .filter-panel {
@@ -858,4 +842,43 @@
   justify-content: flex-end;
   margin-top: 14px;
 }
+
+/* Page-scoped modal overflow guards */
+.admin-instructors-page .modal { overflow-x: hidden; }
+.admin-instructors-page .modal-content { min-width: 0; overflow-x: hidden; }
+.admin-instructors-page .modal-header { gap: 12px; }
+.admin-instructors-page .modal-header h2 { min-width: 0; overflow-wrap: anywhere; }
+.admin-instructors-page .modal-header .modal-close { flex: 0 0 auto; }
+.admin-instructors-page .form-row > *,
+.admin-instructors-page .assignment-summary-grid > *,
+.admin-instructors-page .assignment-inline-detail > * { min-width: 0; }
+
+@media (max-width: 480px) {
+  .admin-instructors-page .modal { padding: 8px; }
+  .admin-instructors-page .modal-content {
+    max-height: calc(100dvh - 16px);
+    max-width: calc(100vw - 16px);
+    padding: 16px;
+  }
+  .admin-instructors-page .modal-header {
+    margin: -16px -16px 16px;
+    padding: 14px 16px;
+    top: -16px;
+  }
+}
   
+@media (max-width: 640px) {
+  .admin-instructors-list-head,
+  .admin-instructors-stats {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .admin-instructors-list-head {
+    align-items: flex-start !important;
+  }
+
+  .admin-instructors-stats {
+    width: 100%;
+  }
+}

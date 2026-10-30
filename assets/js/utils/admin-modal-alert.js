@@ -53,6 +53,6 @@ export function ensureAdminToastHost(statusEl) {
   statusEl.style.top = "80px";
   statusEl.style.left = "50%";
   statusEl.style.transform = "translateX(-50%)";
-  statusEl.style.zIndex = "11000";
+  statusEl.style.zIndex = "2147483000";
   statusEl.style.pointerEvents = "none";
 }

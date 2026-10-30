@@ -19,11 +19,10 @@
 
   <main class="grit-page-container">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        관리자 CMS로 돌아가기
       </a>
     </div>
 
@@ -33,7 +32,8 @@
         <p class="muted admin-offline-classes-desc">반·강사·수업을 관리합니다.</p>
       </div>
       <div class="admin-offline-classes-head__actions">
-        <button type="button" class="btn sm" id="btnRefresh">새로고침</button>
+        <button type="button" class="btn sm secondary admin-refresh-btn" id="refreshBtn" title="데이터 새로고침">새로고침</button>
+        <button type="button" class="btn sm admin-export-btn" id="dlOfflineClasses" title="반 목록을 불러온 뒤 다운로드할 수 있습니다" disabled>엑셀</button>
         <button type="button" class="btn primary sm" id="addOfflineClassBtn">+ 반 추가</button>
       </div>
     </div>
@@ -90,10 +90,13 @@
     </div>
 
     <section class="grit-section">
-      <div class="admin-toolbar">
+      <div class="admin-toolbar admin-toolbar--primary-list">
         <label class="sr-only" for="filterSearch">반명 검색</label>
         <div class="admin-toolbar__search-wrap">
           <input type="search" id="filterSearch" class="admin-toolbar__search-input" placeholder="반명 검색" autocomplete="off">
+          <button type="button" id="offlineClassSearchButton" class="admin-toolbar__search-button" aria-label="오프라인 반 검색 실행" title="검색">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.25"/><path d="M20 20l-3.5-3.5"/></svg>
+          </button>
         </div>
         <select id="filterSubject" class="admin-toolbar__select" title="과목 필터">
           <option value="">전체 과목</option>
@@ -110,11 +113,18 @@
           <option value="active">운영 중</option>
           <option value="archived">보관</option>
         </select>
+        <label class="admin-list-page-size" for="offlineClassesPageSize">
+          <select id="offlineClassesPageSize" class="admin-toolbar__select" aria-label="오프라인 반 목록 표시 개수">
+            <option value="10">10개</option>
+            <option value="20">20개</option>
+            <option value="50">50개</option>
+          </select>
+        </label>
       </div>
 
       <p id="offlineClassesMeta" class="muted admin-offline-classes-meta" aria-live="polite"></p>
 
-      <div class="admin-table-wrap">
+      <div class="admin-table-wrap admin-list-viewport">
         <table class="admin-table" id="tblOfflineClasses">
           <thead>
             <tr>
@@ -122,16 +132,18 @@
               <th>과목</th>
               <th>학교/학년</th>
               <th>담당 강사</th>
-              <th>요일/시간</th>
+              <th>수업 수</th>
+              <th>학생 수</th>
               <th>상태</th>
               <th>관리</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="7" class="muted admin-table-empty">로딩 중...</td></tr>
+            <tr><td colspan="8" class="muted admin-table-empty">로딩 중...</td></tr>
           </tbody>
         </table>
       </div>
+      <nav id="offlineClassesPagination" aria-label="오프라인 반 목록 페이지"></nav>
     </section>
 
     <div id="statusMsg" class="admin-offline-classes-toast" aria-live="polite"></div>
@@ -146,7 +158,7 @@
           <h2 id="offlineClassMembersModalTitle">반 학생 관리</h2>
           <p id="offlineClassMembersModalSubtitle" class="muted admin-offline-members-subtitle"></p>
         </div>
-        <button type="button" class="modal-close" id="offlineClassMembersModalClose" aria-label="닫기">&times;</button>
+        <button type="button" class="modal-close admin-modal-close" id="offlineClassMembersModalClose" aria-label="닫기">&times;</button>
       </div>
       <div id="offlineClassMembersArchivedNotice" class="offline-members-archived-notice" hidden role="status">
         이 반은 보관 상태입니다. 학생 목록은 조회할 수 있으나 신규 입반은 제한됩니다.
@@ -155,15 +167,20 @@
         <h3 id="offlineMembersAddHeading" class="offline-members-section-title">학생 추가</h3>
         <div class="offline-members-add-toolbar">
           <label class="sr-only" for="offlineMemberStudentSearch">학생 검색</label>
-          <input type="search" id="offlineMemberStudentSearch" class="admin-toolbar__search-input" placeholder="이름, 학교, 전화번호 검색" autocomplete="off">
+          <div class="admin-toolbar__search-wrap">
+            <input type="search" id="offlineMemberStudentSearch" class="admin-toolbar__search-input" placeholder="이름, 학교, 학년, 전화번호 뒤 4자리 검색" autocomplete="off">
+            <button type="button" id="offlineMemberStudentSearchButton" class="admin-toolbar__search-button" aria-label="학생 검색 실행" title="검색">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.25"/><path d="M20 20l-3.5-3.5"/></svg>
+            </button>
+          </div>
           <button type="button" class="btn primary sm" id="offlineMemberAddBtn" disabled>선택 학생 입반</button>
         </div>
         <p class="muted offline-members-meta">여러 학생을 한 번에 선택할 수 있습니다.</p>
+        <div id="offlineClassMembersAlert" class="admin-modal-alert" role="alert" aria-live="assertive" hidden></div>
         <div id="offlineMemberSearchResults" class="offline-member-search-results muted">검색어를 입력하세요.</div>
       </section>
       <section class="offline-members-list-section" aria-labelledby="offlineMembersListHeading">
         <h3 id="offlineMembersListHeading" class="offline-members-section-title">반 학생 목록</h3>
-        <p id="offlineMembersMeta" class="muted offline-members-meta" aria-live="polite"></p>
         <div class="admin-table-wrap offline-members-table-wrap">
           <table class="admin-table" id="tblOfflineClassMembers">
             <thead>
@@ -194,13 +211,12 @@
         </div>
         <div class="offline-sessions-header-actions">
           <button type="button" class="btn primary sm" id="offlineSessionAddBtn">+ 수업 추가</button>
-          <button type="button" class="modal-close" id="offlineClassSessionsModalClose" aria-label="닫기">&times;</button>
+          <button type="button" class="modal-close admin-modal-close" id="offlineClassSessionsModalClose" aria-label="닫기">&times;</button>
         </div>
       </div>
       <div id="offlineClassSessionsArchivedNotice" class="offline-sessions-archived-notice" hidden role="status">
         이 반은 보관 상태입니다. 수업 목록은 조회할 수 있으나 신규 수업 등록은 제한됩니다.
       </div>
-      <p id="offlineSessionsMeta" class="muted offline-sessions-meta" aria-live="polite"></p>
       <div class="admin-table-wrap offline-sessions-table-wrap">
         <table class="admin-table" id="tblOfflineClassSessions">
           <thead>
@@ -225,7 +241,7 @@
     <div class="modal-content admin-offline-session-form-modal__content">
       <div class="modal-header">
         <h2 id="offlineSessionFormModalTitle">수업 추가</h2>
-        <button type="button" class="modal-close" id="offlineSessionFormModalClose" aria-label="닫기">&times;</button>
+        <button type="button" class="modal-close admin-modal-close" id="offlineSessionFormModalClose" aria-label="닫기">&times;</button>
       </div>
       <form id="offlineSessionForm" class="admin-offline-session-form">
         <input type="hidden" id="offlineSessionEditId" value="">
@@ -284,11 +300,12 @@
           <p id="offlineSessionAccessModalSubtitle" class="muted admin-offline-access-subtitle"></p>
           <p id="offlineSessionAccessModalMeta" class="muted admin-offline-access-meta"></p>
         </div>
-        <button type="button" class="modal-close" id="offlineSessionAccessModalClose" aria-label="닫기">&times;</button>
+        <button type="button" class="modal-close admin-modal-close" id="offlineSessionAccessModalClose" aria-label="닫기">&times;</button>
       </div>
       <p id="offlineSessionAccessHint" class="muted offline-session-access-hint">
         기본 권한을 바꿀 때만 수동 허용·차단을 사용하세요.
       </p>
+      <div id="offlineSessionAccessAlert" class="admin-modal-alert" role="alert" aria-live="assertive" hidden></div>
       <div class="admin-table-wrap offline-access-table-wrap">
         <table class="admin-table" id="tblSessionAccess">
           <thead>
@@ -316,7 +333,7 @@
     <div class="modal-content admin-offline-class-modal__content">
       <div class="modal-header">
         <h2 id="offlineClassModalTitle">오프라인 반 추가</h2>
-        <button type="button" class="modal-close" id="offlineClassModalClose" aria-label="닫기">&times;</button>
+        <button type="button" class="modal-close admin-modal-close" id="offlineClassModalClose" aria-label="닫기">&times;</button>
       </div>
       <form id="offlineClassForm" class="admin-offline-class-form">
         <input type="hidden" id="offlineClassEditId" value="">
@@ -348,8 +365,10 @@
                   <input type="text" id="classGradeCustom" class="admin-offline-custom-field" placeholder="학년 직접 입력" autocomplete="off" hidden>
                 </div>
                 <div class="form-group form-half">
-                  <label for="classSchool">학교</label>
-                  <select id="classSchool" name="school"><option value="">선택</option></select>
+                  <span class="form-label" id="classSchoolLabel">학교</span>
+                  <div id="classSchool" class="admin-multi-choice-list" role="group" aria-labelledby="classSchoolLabel" aria-describedby="classSchoolHint"></div>
+                  <input type="text" id="classSchoolCustom" class="admin-offline-custom-field" placeholder="목록에 없는 학교명 (여러 개는 쉼표로 구분)" autocomplete="off">
+                  <p class="muted admin-offline-multi-hint" id="classSchoolHint">학교를 클릭해 선택하거나 해제하세요.</p>
                 </div>
                 <div class="form-group form-half">
                   <label for="classStatus">상태</label>
@@ -364,10 +383,9 @@
               <h3 id="offlineClassInstructorHeading" class="admin-offline-form-section__title">담당 강사</h3>
               <div class="form-grid">
                 <div class="form-group form-full">
-                  <label for="classInstructorUid">담당 강사</label>
-                  <select id="classInstructorUid" name="instructorUid">
-                    <option value="">미배정</option>
-                  </select>
+                  <span class="form-label" id="classInstructorLabel">담당 강사</span>
+                  <div id="classInstructorUid" class="admin-multi-choice-list" role="group" aria-labelledby="classInstructorLabel" aria-describedby="classInstructorHint"></div>
+                  <p class="muted admin-offline-multi-hint" id="classInstructorHint">강사를 클릭해 선택하거나 해제하세요.</p>
                 </div>
               </div>
             </section>
@@ -379,10 +397,16 @@
                   <p class="muted schedule-items-hint">요일별로 시간과 강의실을 입력하세요.</p>
                   <label class="offline-session-checkbox-label" for="classScheduleVisible">
                     <input type="checkbox" id="classScheduleVisible" name="scheduleVisible" checked>
-                    학생/강사 화면에 수업 일정 표시
+                    학생/강사 화면에 수업/클리닉 일정 표시
                   </label>
                   <div id="scheduleItemsList" class="schedule-items-list"></div>
                   <button type="button" class="btn sm" id="scheduleItemAddBtn">+ 수업 일정 추가</button>
+                </div>
+                <div class="form-group form-full">
+                  <span class="form-label">클리닉</span>
+                  <p class="muted schedule-items-hint">요일별로 시간과 강의실을 입력하세요.</p>
+                  <div id="clinicScheduleItemsList" class="schedule-items-list"></div>
+                  <button type="button" class="btn sm" id="clinicScheduleItemAddBtn">+ 클리닉 일정 추가</button>
                 </div>
               </div>
             </section>

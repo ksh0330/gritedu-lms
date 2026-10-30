@@ -21,11 +21,10 @@
 
   <main class="grit-page-container">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        관리자 CMS로 돌아가기
       </a>
     </div>
     
@@ -35,7 +34,7 @@
         <p class="desc">사이트 공개 콘텐츠와 기본 설정을 관리합니다.</p>
       </div>
       <div class="page-header-actions">
-        <button class="btn sm" onclick="location.reload()" title="페이지 새로고침">새로고침</button>
+        <button type="button" class="btn sm secondary admin-refresh-btn" id="refreshBtn" title="데이터 새로고침" data-admin-refresh-reload>새로고침</button>
       </div>
     </div>
 
@@ -263,7 +262,7 @@
                     <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-schedule" onchange="updateKakaoChannelPreview()"> 시간표</label>
                     <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-contact" onchange="updateKakaoChannelPreview()"> 상담 문의</label>
                     <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-instructors" onchange="updateKakaoChannelPreview()"> 강사진</label>
-                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-courses" onchange="updateKakaoChannelPreview()"> 모든 강좌</label>
+                    <label class="kakao-channel-page-option"><input type="checkbox" id="kakaoPage-courses" onchange="updateKakaoChannelPreview()"> 온라인 강좌</label>
                   </div>
                 </div>
 
@@ -288,27 +287,28 @@
     <!-- 강사진 탭 -->
     <div id="tab-instructors" class="tab-content">
       <div class="content-manager">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-          <div style="display:flex;align-items:center;gap:12px;">
+        <div class="instructor-order-toolbar">
+          <div class="instructor-order-heading" style="display:flex;align-items:center;gap:12px;">
             <h2 style="margin:0;">강사진 순서</h2>
-            <div style="display:flex;gap:4px;background:var(--hover);padding:4px;border-radius:6px;">
+            <div class="instructor-page-switch" style="display:flex;gap:4px;background:var(--hover);padding:4px;border-radius:6px;">
               <button id="instructorPageFilterHome" class="btn sm" onclick="switchInstructorPageType('home')" style="min-width:80px;">메인홈 순서</button>
               <button id="instructorPageFilterInstructors" class="btn sm" onclick="switchInstructorPageType('instructors')" style="min-width:80px;">강사진 순서</button>
             </div>
           </div>
-          <div>
+          <div class="instructor-order-actions">
             <button class="btn sm" onclick="sortInstructors('alpha')">가나다순</button>
             <button class="btn sm" onclick="sortInstructors('subject')">과목순</button>
             <button class="btn sm" onclick="sortInstructors('newest')">최신순</button>
-            <button class="btn primary" onclick="saveInstructorOrder()">
+            <button class="btn primary sm" onclick="saveInstructorOrder()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>순서 저장
             </button>
-            <button class="btn" onclick="cleanupInstructorOrder()" title="존재하지 않는 ID를 순서에서 자동으로 제거" style="display:flex;align-items:center;gap:6px;">
+            <button class="btn sm" onclick="cleanupInstructorOrder()" title="존재하지 않는 ID를 순서에서 자동으로 제거">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>순서 정리
             </button>
           </div>
         </div>
         
+        <p class="note" style="margin:0 0 16px;">숨김/표시는 선택한 페이지에 즉시 저장됩니다. 순서 변경은 순서 저장을 누를 때까지 이 화면에만 적용됩니다.</p>
         <div class="manager-split">
           <div class="manager-panel">
             <h3 style="margin:0 0 12px 0;font-size:16px;">강사진 목록 (드래그로 순서 변경)</h3>
@@ -411,7 +411,7 @@
     </div>
 
     <!-- Toast 메시지 -->
-    <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:100000;min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
+    <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
   </main>
 
   <div data-include="footer"></div>

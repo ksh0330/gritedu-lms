@@ -1,5 +1,5 @@
 // /assets/js/firebase-init.js
-// 포트폴리오 공개본: 자신의 Firebase 웹 앱 설정으로 교체하세요.
+// 프로젝트: gritedu-lms (Firebase 콘솔과 동일한 projectId 사용)
 // 웹 클라이언트는 아래 firebaseConfig로 연결됨. API 키는 클라이언트용 공개 값이며,
 // "환경 변수"로 따로 두지 않아도 동작한다. (Functions의 EMAIL_USER 등은 서버(Functions) Secret — 이 파일과 무관)
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
@@ -12,13 +12,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_WEB_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
+  apiKey: "AIzaSyCYZXuZ5ZGRgSEzvEGfbaUg6ViiyidSVKU",
+  authDomain: "gritedu-lms.firebaseapp.com",
+  projectId: "gritedu-lms",
   // Storage는 사용하지 않음 (이미지는 로컬 assets 폴더에 저장)
   // storageBucket: "gritedu-lms.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_FIREBASE_APP_ID"
+  messagingSenderId: "789104307613",
+  appId: "1:789104307613:web:0d6acf64a261a1a86d9374"
 };
 
 const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);

@@ -36,6 +36,7 @@ function renderDeferredRosterPlaceholders() {
   if (dom.courseInfoLoading) dom.courseInfoLoading.style.display = "none";
   if (dom.courseInfo) {
     dom.courseInfo.textContent = "필요할 때 수강생 목록을 불러오세요.";
+    dom.courseInfo.hidden = false;
     dom.courseInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
   }
   renderEmptyTable(dom.enrollmentTable, 6, "수강생 불러오기를 눌러 온라인 수강생 현황을 조회하세요.");
@@ -43,6 +44,7 @@ function renderDeferredRosterPlaceholders() {
 
   if (dom.offlineEnrollmentInfo) {
     dom.offlineEnrollmentInfo.textContent = "필요할 때 오프라인 수강생 목록을 불러오세요.";
+    dom.offlineEnrollmentInfo.hidden = false;
     dom.offlineEnrollmentInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
   }
   renderEmptyTable(dom.offlineEnrollmentTable, 6, "수강생 불러오기를 눌러 오프라인 수강생 현황을 조회하세요.");

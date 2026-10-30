@@ -1,7 +1,11 @@
 import { db } from "/assets/js/firebase-init.js";
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { collection, query, where, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
+import { getCurrentCourseCompletion } from "/assets/js/utils/course-completion.js";
+import { normalizeAccessType } from "/assets/js/utils/course-readonly.js";
 import { handleError } from "/assets/js/utils/error-handler.js";
+import { isActiveCourseEnrollment } from "/assets/js/utils/instructor-course-access.js";
+import { bindCommittedSearch } from "/assets/js/utils/list-controls.js";
 import {
   dom,
   state,
@@ -9,8 +13,10 @@ import {
   renderEmptyTable,
   renderListPagination,
   resolveEnrollmentStudentFromSnapshot,
-  isMemberOnlyCourse,
+  isEnrollmentManagedCourse,
   formatLastActivity,
+  formatListLoadError,
+  setDashboardMessage,
   setDashboardText
 } from "/assets/js/pages/instructor-dashboard/context.js";
 
@@ -20,7 +26,7 @@ const expandedOnlineStudentIds = new Set();
 function aggregateStudentsByUser(rows) {
   const byUser = new Map();
 
-  rows.forEach(({ enrollment, course, studentId }) => {
+  rows.forEach(({ enrollment, course, studentId, weeks }) => {
     if (!studentId) return;
 
     const student = resolveEnrollmentStudentFromSnapshot(enrollment);
@@ -28,7 +34,10 @@ function aggregateStudentsByUser(rows) {
     const courseEntry = {
       courseId: course.id,
       courseTitle,
-      lastActivity: formatLastActivity(enrollment)
+      lastActivity: formatLastActivity(enrollment),
+      progress: Array.isArray(weeks)
+        ? getCurrentCourseCompletion(course.id, weeks, enrollment.watchedVideos).progress
+        : null
     };
 
     if (!byUser.has(studentId)) {
@@ -77,7 +86,7 @@ function renderOnlineCourseDetails(row) {
   const items = row.courses
     .map(
       (c) =>
-        `<li><strong>${escapeHtml(c.courseTitle)}</strong> / 마지막 활동 ${escapeHtml(c.lastActivity)}</li>`
+        `<li><strong>${escapeHtml(c.courseTitle)}</strong> / 학습 완료율 ${c.progress == null ? "확인 불가" : `${c.progress}%`} / 마지막 활동 ${escapeHtml(c.lastActivity)}</li>`
     )
     .join("");
   return `<ul class="instructor-student-detail-list">${items}</ul>`;
@@ -100,7 +109,7 @@ function populateEnrollmentGradeFilter() {
 function applyEnrollmentFilters() {
   state.filteredEnrollments = [...state.allEnrollments];
 
-  const keyword = dom.enrollmentSearch?.value.trim().toLowerCase() || "";
+  const keyword = state.appliedEnrollmentKeyword;
   if (keyword) {
     state.filteredEnrollments = state.filteredEnrollments.filter((row) => {
       const haystack = [
@@ -189,7 +198,6 @@ function renderEnrollmentsTable() {
     onPageChange: (nextPage) => {
       state.enrollmentsPage = nextPage;
       renderEnrollmentsTable();
-      dom.enrollmentsPagination?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }) || state.enrollmentsPage;
 }
@@ -202,13 +210,26 @@ export async function loadEnrollments() {
     state.uniqueOnlineStudentCount = 0;
     expandedOnlineStudentIds.clear();
 
-    const memberCourses = state.myCourses.filter(isMemberOnlyCourse);
-
-    if (memberCourses.length === 0) {
-      renderEmptyTable(dom.enrollmentTable, 6, "회원전용 온라인 강좌 수강 데이터가 없습니다.");
+    if (state.coursesLoadError) {
+      const errorMessage = formatListLoadError("강좌 목록 오류로 수강생 목록을 불러올 수 없습니다.", state.coursesLoadError);
+      renderEmptyTable(dom.enrollmentTable, 6, errorMessage);
       if (dom.courseInfoLoading) dom.courseInfoLoading.style.display = "none";
       if (dom.courseInfo) {
-        dom.courseInfo.textContent = "회원전용 강좌 수강 기록이 없습니다.";
+        setDashboardMessage(dom.courseInfo, errorMessage);
+        dom.courseInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
+      }
+      setDashboardText(dom.statEnrollments, "-");
+      return;
+    }
+
+    const enrollmentCourses = state.myCourses.filter(isEnrollmentManagedCourse);
+
+    if (enrollmentCourses.length === 0) {
+      renderEmptyTable(dom.enrollmentTable, 6, "수강생을 관리하는 온라인 강좌가 없습니다.");
+      if (dom.courseInfoLoading) dom.courseInfoLoading.style.display = "none";
+      if (dom.courseInfo) {
+        dom.courseInfo.textContent = "담당 강좌의 수강 기록이 없습니다.";
+        dom.courseInfo.hidden = false;
         dom.courseInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
       }
       setDashboardText(dom.statEnrollments, "0");
@@ -217,15 +238,26 @@ export async function loadEnrollments() {
 
     const rawRows = [];
 
-    for (const course of memberCourses) {
+    for (const course of enrollmentCourses) {
+      let weeks = course.weeks;
+      if (normalizeAccessType(course.accessType) === "approvalRequired") {
+        try {
+          const privateSnap = await getDoc(doc(db, "coursePrivateContent", course.id));
+          weeks = privateSnap.exists() ? privateSnap.data()?.weeks : null;
+        } catch (error) {
+          console.warn("[instructor-dashboard] protected course content unavailable", course.id, error);
+          weeks = null;
+        }
+      }
       const enrollmentsSnapshot = await getDocs(
         query(collection(db, "enrollments"), where("courseId", "==", course.id))
       );
 
       enrollmentsSnapshot.forEach((enrollDoc) => {
         const enrollment = { id: enrollDoc.id, ...enrollDoc.data() };
+        if (!isActiveCourseEnrollment(enrollment)) return;
         const studentId = String(enrollment.userId || "").trim();
-        rawRows.push({ enrollment, course, studentId });
+        rawRows.push({ enrollment, course, studentId, weeks });
       });
     }
 
@@ -236,7 +268,7 @@ export async function loadEnrollments() {
 
     if (dom.enrollmentCourseFilter) {
       dom.enrollmentCourseFilter.innerHTML = '<option value="">전체 강좌</option>';
-      memberCourses.forEach((course) => {
+      enrollmentCourses.forEach((course) => {
         const option = document.createElement("option");
         option.value = course.id;
         option.textContent = course.title || "제목 없는 강좌";
@@ -247,19 +279,20 @@ export async function loadEnrollments() {
     populateEnrollmentGradeFilter();
 
     if (dom.courseInfoLoading) dom.courseInfoLoading.style.display = "none";
-    if (dom.courseInfo) {
-      const enrollmentCount = rawRows.length;
-      dom.courseInfo.textContent = `수강 기록 ${enrollmentCount}건 / 고유 수강생 ${state.uniqueOnlineStudentCount}명`;
-      dom.courseInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
-    }
+    setDashboardMessage(dom.courseInfo, "");
+    dom.courseInfo?.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
 
     state.enrollmentsPage = 1;
     renderEnrollmentsTable();
   } catch (error) {
     handleError(error, "Load enrollment progress", { showToast: false, logError: true });
-    renderEmptyTable(dom.enrollmentTable, 6, "수강 데이터를 불러오지 못했습니다.");
+    const errorMessage = formatListLoadError("수강생 목록을 불러오지 못했습니다.", error);
+    renderEmptyTable(dom.enrollmentTable, 6, errorMessage);
     if (dom.courseInfoLoading) dom.courseInfoLoading.style.display = "none";
-    dom.courseInfo?.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
+    if (dom.courseInfo) {
+      setDashboardMessage(dom.courseInfo, errorMessage);
+      dom.courseInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
+    }
     setDashboardText(dom.statEnrollments, "-");
   }
 }
@@ -270,12 +303,10 @@ export function setupEnrollmentFilters() {
     renderEnrollmentsTable();
   };
 
-  if (dom.enrollmentSearch) {
-    dom.enrollmentSearch.addEventListener("input", () => {
-      if (state.searchDebounceTimer) clearTimeout(state.searchDebounceTimer);
-      state.searchDebounceTimer = setTimeout(rerender, 250);
-    });
-  }
+  bindCommittedSearch(dom.enrollmentSearch, dom.enrollmentSearchButton, (keyword) => {
+    state.appliedEnrollmentKeyword = keyword;
+    rerender();
+  });
 
   [dom.enrollmentCourseFilter, dom.enrollmentGradeFilter].forEach((el) => {
     el?.addEventListener("change", rerender);

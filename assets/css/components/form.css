@@ -57,3 +57,53 @@ html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] t
 }
 .admin-catalog-tag__input:hover { border-bottom-color: var(--border); }
 .admin-catalog-tag__input:focus { border-bottom-color: var(--brand); outline: 0; }
+.password-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-group > input {
+  width: 100%;
+  padding-right: 48px !important;
+}
+
+.password-input-group > .password-visibility-toggle {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
+  margin: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.password-input-group > .password-visibility-toggle:hover {
+  background: var(--hover);
+}
+
+.password-input-group > .password-visibility-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.password-visibility-toggle svg {
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
+.password-visibility-toggle [hidden] {
+  display: none;
+}

@@ -15,12 +15,15 @@ import {
 import { dom, state, escapeHtml, toMillis, toast } from "/assets/js/pages/student-dashboard/context.js";
 import { loadCourseReadOnlyContext } from "/assets/js/pages/student-dashboard/settings.js";
 import { updateCourseStatCounts } from "/assets/js/pages/student-dashboard/stats.js";
+import { getSubjectColorStyle } from "/assets/js/utils/subject-colors.js";
+import { getCurrentCourseCompletion } from "/assets/js/utils/course-completion.js";
 
 export const UNENROLL_CONFIRM_PHRASE = "수강취소하겠습니다";
 
 let pendingUnenroll = null;
 let unenrollInFlight = false;
 let unenrollModalBound = false;
+let unenrollReturnFocus = null;
 
 export function isMemberOnlyCourseRow(row) {
   const course = row?.course;
@@ -34,19 +37,9 @@ export async function deleteStudentEnrollment(enrollmentId) {
   await deleteDoc(doc(db, "enrollments", id));
 }
 
-function setMyCoursesMeta(text) {
-  if (!dom.myCoursesMeta) return;
-  dom.myCoursesMeta.textContent = text;
-}
-
-function getCourseProgress(enrollment) {
-  const parsed = Number(enrollment?.progress);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(0, Math.min(100, Math.round(parsed)));
-}
-
-function getCourseFilterKey(enrollment) {
-  const progress = getCourseProgress(enrollment);
+function getCourseFilterKey(row) {
+  const progress = row.completion?.progress;
+  if (progress == null) return "in-progress";
   if (progress >= 100) return "completed";
   if (progress <= 0) return "before-start";
   return "in-progress";
@@ -91,15 +84,18 @@ function renderMyCoursesCards(courseRows, legacyCount = 0, filterKey = "in-progr
   const cards = courseRows.map((row) => {
     const course = row.course;
     const enrollment = row.enrollment;
-    const progress = getCourseProgress(enrollment);
+    const progress = row.completion?.progress;
+    const progressText = progress == null ? "확인 불가" : `${progress}%`;
     const courseTitle = escapeHtml(course.title || "제목 없는 강좌");
     const instructorName = escapeHtml(course.instructorName || "강사 미정");
-    const subject = escapeHtml(course.subjectLabel || course.subject || "일반");
+    const subjectValue = course.subjectLabel || course.subject || "일반";
+    const subject = escapeHtml(subjectValue);
+    const subjectColorStyle = getSubjectColorStyle(subjectValue, state.subjectColorMap);
     const grade = escapeHtml(course.gradeLabel || course.grade || "학년 미정");
     const year = escapeHtml(course.year || "연도 미정");
     const canonicalCourseId = String(enrollment?.courseId || course.id || "").trim();
     const coursePath = `/members/students/course.html?courseId=${encodeURIComponent(canonicalCourseId)}`;
-    const detailPath = `/course-detail.html?courseId=${encodeURIComponent(canonicalCourseId)}`;
+    const detailPath = `/course-detail?courseId=${encodeURIComponent(canonicalCourseId)}`;
     const enrollmentId = escapeHtml(String(enrollment?.id || "").trim());
     const showUnenroll =
       isMemberOnlyCourseRow(row) &&
@@ -110,11 +106,18 @@ function renderMyCoursesCards(courseRows, legacyCount = 0, filterKey = "in-progr
       : "";
 
     return `
-      <article class="student-course-card">
+      <article class="student-course-card${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>
+        <div class="student-dashboard-card-badges">
+          <span class="student-dashboard-card-badge${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${subject}</span>
+          <span class="student-dashboard-card-badge">${grade}</span>
+          <span class="student-dashboard-card-badge">${year}</span>
+        </div>
         <h3>${courseTitle}</h3>
-        <p class="student-course-meta">${subject} | ${grade} | ${year}</p>
         <p class="student-course-meta">강사: ${instructorName}</p>
-        <p class="student-course-progress">학습 진도: ${progress}%</p>
+        <div class="student-course-progress" aria-label="학습 완료율 ${progressText}">
+          <div class="student-course-progress__head"><span>학습 완료율</span><strong>${progressText}</strong></div>
+          <div class="student-course-progress__track" aria-hidden="true"><span style="width:${progress ?? 0}%"></span></div>
+        </div>
         <div class="student-course-actions">
           <a class="btn primary sm" href="${coursePath}">강의 입장</a>
           <a class="btn sm" href="${detailPath}">상세 보기</a>
@@ -140,16 +143,14 @@ export function updateCourseFilterButtons() {
 
 export function applyCourseFilter() {
   const filteredRows = state.allMyCourseRows.filter(
-    (row) => getCourseFilterKey(row.enrollment) === state.currentCourseFilter
+    (row) => getCourseFilterKey(row) === state.currentCourseFilter
   );
   renderMyCoursesCards(filteredRows, state.latestLegacyCount, state.currentCourseFilter);
-  setMyCoursesMeta(`${getCourseFilterLabel(state.currentCourseFilter)} ${filteredRows.length}개 / 전체 ${state.allMyCourseRows.length}개`);
 }
 
 export async function loadMyCourses() {
   if (!state.user?.uid || !dom.myCoursesGrid) return;
 
-  setMyCoursesMeta("수강 강좌를 불러오는 중입니다.");
   dom.myCoursesGrid.innerHTML = `<p class="student-course-empty">수강 강좌를 불러오는 중입니다.</p>`;
 
   try {
@@ -187,7 +188,6 @@ export async function loadMyCourses() {
       state.latestLegacyCount = legacyWithoutCourseId;
       updateCourseStatCounts();
       renderMyCoursesEmpty("수강 중인 강좌가 없습니다.", legacyWithoutCourseId);
-      setMyCoursesMeta("아직 수강 신청한 강좌가 없습니다.");
       return;
     }
 
@@ -210,9 +210,26 @@ export async function loadMyCourses() {
           }
         );
         if (!isStudentCourseAvailable(normalized)) return { filteredUnsafe: true };
+        let weeks = normalized.weeks;
+        if (normalizeAccessType(normalized.accessType) === "approvalRequired") {
+          try {
+            const privateSnap = await getDoc(doc(db, "coursePrivateContent", courseId));
+            weeks = privateSnap.exists() ? privateSnap.data()?.weeks : null;
+          } catch (error) {
+            console.warn("[student-dashboard] protected course content unavailable", courseId, error);
+            weeks = null;
+          }
+        }
+        const enrollment = enrollmentByCourseId.get(courseId);
         return {
           filteredUnsafe: false,
-          row: { course: normalized, enrollment: enrollmentByCourseId.get(courseId) }
+          row: {
+            course: normalized,
+            enrollment,
+            completion: Array.isArray(weeks)
+              ? getCurrentCourseCompletion(courseId, weeks, enrollment.watchedVideos)
+              : null
+          }
         };
       } catch (error) {
         console.warn("[student-dashboard] failed to load course doc", courseId, error);
@@ -249,7 +266,6 @@ export async function loadMyCourses() {
     state.allMyCourseRows = [];
     updateCourseStatCounts();
     renderMyCoursesEmpty("수강 강좌를 불러오는 중 오류가 발생했습니다.");
-    setMyCoursesMeta("수강 강좌를 불러오지 못했습니다.");
   }
 }
 
@@ -276,10 +292,17 @@ function closeUnenrollModal() {
   if (dom.unenrollPhraseInput) dom.unenrollPhraseInput.value = "";
   setUnenrollStatus("");
   updateUnenrollConfirmButton();
+  if (unenrollReturnFocus?.isConnected) {
+    unenrollReturnFocus.focus({ preventScroll: true });
+  }
+  unenrollReturnFocus = null;
 }
 
 function openUnenrollModal(payload) {
   if (!dom.unenrollModal) return;
+  unenrollReturnFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
   pendingUnenroll = {
     enrollmentId: String(payload?.enrollmentId || "").trim(),
     courseId: String(payload?.courseId || "").trim(),
@@ -295,7 +318,7 @@ function openUnenrollModal(payload) {
   dom.unenrollModal.style.display = "flex";
   document.body.classList.add("modal-open");
   document.documentElement.classList.add("modal-open");
-  dom.unenrollPhraseInput?.focus();
+  dom.unenrollPhraseInput?.focus({ preventScroll: true });
 }
 
 async function confirmUnenroll() {
@@ -305,7 +328,7 @@ async function confirmUnenroll() {
     return;
   }
 
-  const { enrollmentId, courseId } = pendingUnenroll;
+  const { enrollmentId } = pendingUnenroll;
   unenrollInFlight = true;
   updateUnenrollConfirmButton();
   setUnenrollStatus("수강 취소 처리 중입니다...");
@@ -350,6 +373,12 @@ export function setupUnenrollModal() {
     confirmUnenroll();
   });
   dom.unenrollPhraseInput?.addEventListener("input", updateUnenrollConfirmButton);
+  dom.unenrollModal.addEventListener("click", (event) => {
+    if (event.target === dom.unenrollModal) closeUnenrollModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !dom.unenrollModal?.hidden) closeUnenrollModal();
+  });
 
   dom.myCoursesGrid?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-unenroll-course]");
@@ -372,6 +401,7 @@ export function bindUnenrollModal(elements, options = {}) {
 
   let localPending = null;
   let localInFlight = false;
+  let returnFocus = null;
 
   const setStatus = (message, isError = false) => {
     if (!refs.status) return;
@@ -396,9 +426,14 @@ export function bindUnenrollModal(elements, options = {}) {
     if (refs.phraseInput) refs.phraseInput.value = "";
     setStatus("");
     updateConfirm();
+    if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+    returnFocus = null;
   };
 
   const openModal = (payload) => {
+    returnFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     localPending = {
       enrollmentId: String(payload?.enrollmentId || "").trim(),
       courseId: String(payload?.courseId || "").trim(),
@@ -412,7 +447,7 @@ export function bindUnenrollModal(elements, options = {}) {
     refs.modal.style.display = "flex";
     document.body.classList.add("modal-open");
     document.documentElement.classList.add("modal-open");
-    refs.phraseInput?.focus();
+    refs.phraseInput?.focus({ preventScroll: true });
   };
 
   const confirm = async () => {
@@ -454,6 +489,12 @@ export function bindUnenrollModal(elements, options = {}) {
   refs.cancelBtn?.addEventListener("click", closeModal);
   refs.confirmBtn?.addEventListener("click", confirm);
   refs.phraseInput?.addEventListener("input", updateConfirm);
+  refs.modal?.addEventListener("click", (event) => {
+    if (event.target === refs.modal) closeModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !refs.modal?.hidden) closeModal();
+  });
 
   return { openModal, closeModal };
 }

@@ -73,29 +73,9 @@
   padding: 6px 10px;
 }
 
-.course-detail-page .hero-meta-row.subject-ko {
-  background: color-mix(in srgb, var(--sub-ko) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--sub-ko) 34%, var(--border));
-}
-
-.course-detail-page .hero-meta-row.subject-en {
-  background: color-mix(in srgb, var(--sub-en) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--sub-en) 34%, var(--border));
-}
-
-.course-detail-page .hero-meta-row.subject-ma {
-  background: color-mix(in srgb, var(--sub-ma) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--sub-ma) 34%, var(--border));
-}
-
-.course-detail-page .hero-meta-row.subject-sc {
-  background: color-mix(in srgb, var(--sub-sc) 18%, var(--card));
-  border-color: color-mix(in srgb, var(--sub-sc) 36%, var(--border));
-}
-
-.course-detail-page .hero-meta-row.subject-etc {
-  background: color-mix(in srgb, var(--sub-consult) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--sub-consult) 32%, var(--border));
+.course-detail-page .hero-meta-row.has-subject-color {
+  background: color-mix(in srgb, var(--subject-color) 16%, var(--card));
+  border-color: color-mix(in srgb, var(--subject-color) 36%, var(--border));
 }
 
 .course-detail-page .hero-title {
@@ -315,28 +295,8 @@
   margin: 4px 0 0;
 }
 
-.course-detail-page .instructor-profile-subject[data-subject="국어"] {
-  color: var(--sub-ko);
-}
-
-.course-detail-page .instructor-profile-subject[data-subject="영어"] {
-  color: var(--sub-en);
-}
-
-.course-detail-page .instructor-profile-subject[data-subject="수학"] {
-  color: var(--sub-ma);
-}
-
-.course-detail-page .instructor-profile-subject[data-subject="과학"] {
-  color: #b8860b;
-}
-
-.course-detail-page .instructor-profile-subject[data-subject="컨설팅"] {
-  color: var(--sub-consult);
-}
-
-.course-detail-page .instructor-profile-subject[data-subject="수리논술"] {
-  color: #0e7490;
+.course-detail-page .instructor-profile-subject.has-subject-color {
+  color: var(--subject-color);
 }
 
 .course-detail-page .instructor-extra-text {

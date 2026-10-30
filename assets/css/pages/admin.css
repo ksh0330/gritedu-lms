@@ -108,8 +108,33 @@ html[data-theme=dark] .admin-toolbar {
   flex:1 1 220px;
   max-width:min(100%,380px);
   min-height:40px;
-  padding:0 10px 0 12px;
+  padding:0 4px 0 12px;
   transition:border-color .2s ease,box-shadow .2s ease
+}
+.admin-toolbar__search-button {
+  align-items:center;
+  background:transparent;
+  border:0;
+  border-radius:6px;
+  color:var(--muted);
+  cursor:pointer;
+  display:inline-flex;
+  flex:0 0 auto;
+  justify-content:center;
+  min-height:32px;
+  min-width:32px;
+  padding:6px
+}
+.admin-toolbar__search-button:hover,
+.admin-toolbar__search-button:focus-visible {
+  background:var(--hover);
+  color:var(--brand);
+  outline:none
+}
+.admin-toolbar__search-button svg {
+  display:block;
+  height:18px;
+  width:18px
 }
 .admin-toolbar__search-wrap:focus-within {
   border-color:var(--brand);
@@ -170,6 +195,65 @@ html[data-theme=dark] .admin-toolbar {
   box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 18%,transparent);
   outline:none
 }
+.admin-list-page-size {
+  align-items:center;
+  color:var(--muted);
+  display:inline-flex;
+  flex:0 0 auto;
+  font-size:13px;
+  font-weight:700;
+  gap:6px;
+  white-space:nowrap
+}
+.admin-list-page-size .admin-toolbar__select {
+  min-width:76px
+}
+.admin-list-viewport {
+  height:clamp(430px,58vh,560px);
+  max-width:100%;
+  overflow:auto;
+  position:relative;
+  -webkit-overflow-scrolling:touch
+}
+.admin-list-viewport .admin-table {
+  height:auto;
+  margin-top:0;
+  overflow:visible
+}
+.admin-list-viewport .admin-table tbody tr {
+  height:auto
+}
+.admin-list-viewport .admin-table thead th {
+  background:color-mix(in srgb,var(--brand) 8%,var(--card));
+  position:sticky;
+  top:0;
+  z-index:2
+}
+@media (max-width:640px) {
+  .admin-toolbar.admin-toolbar--primary-list > .admin-toolbar__search-wrap {
+    flex:1 0 calc(100% - 86px);
+    max-width:none;
+    min-width:0;
+    order:-2;
+    width:auto
+  }
+  .admin-toolbar.admin-toolbar--primary-list > .admin-list-page-size {
+    flex:0 0 76px;
+    min-width:76px;
+    order:-1
+  }
+  .admin-toolbar.admin-toolbar--primary-list > .admin-list-page-size .admin-toolbar__select {
+    flex:0 0 76px;
+    max-width:76px;
+    min-width:76px;
+    padding-left:8px;
+    padding-right:8px;
+    width:76px
+  }
+  .admin-list-viewport {
+    height:clamp(400px,62vh,520px)
+  }
+}
 .form-group {
   margin-bottom:16px
 }
@@ -183,7 +267,7 @@ html[data-theme=dark] .admin-toolbar {
 .form-group .required {
   color:var(--brand)
 }
-.form-group input[type=email],.form-group input[type=file],.form-group input[type=password],.form-group input[type=text],.form-group select {
+.form-group input[type=email],.form-group input[type=file],.form-group input[type=password],.form-group input[type=text],.form-group input[type=url],.form-group select {
   background:var(--card);
   border:1px solid var(--border);
   border-radius:8px;
@@ -588,7 +672,81 @@ html[data-theme=dark] .admin-toolbar {
 .page-header-actions .btn {
   display:inline-flex;
   align-items:center;
-  gap:6px
+  gap:6px;
+  box-sizing:border-box;
+  min-height:36px;
+  padding:0 14px;
+  font-size:14px;
+  line-height:1.2
+}
+
+/* Export actions are scoped to administrator buttons only. */
+.admin-courses-page .admin-courses-head__actions .btn,
+.admin-offline-classes-page .admin-offline-classes-head__actions .btn {
+  font-size:14px;
+}
+.btn.admin-export-btn {
+  align-items:center;
+  background:#15803d;
+  border-color:#15803d;
+  border-radius:10px;
+  box-sizing:border-box;
+  color:#fff;
+  display:inline-flex;
+  font-size:14px;
+  font-weight:700;
+  justify-content:center;
+  line-height:1.2;
+  min-height:36px;
+  padding:0 14px;
+  white-space:nowrap;
+}
+.btn.admin-export-btn:is(:hover,:active,:focus-visible) {
+  background:#166534;
+  border-color:#166534;
+  color:#fff;
+  filter:none;
+}
+.btn.admin-export-btn:focus-visible {
+  box-shadow:0 0 0 3px color-mix(in srgb,#15803d 30%,transparent);
+}
+.btn.admin-export-btn:disabled {
+  background:#15803d;
+  border-color:#15803d;
+  color:#fff;
+  filter:none;
+}
+
+/* Admin list/status refresh button */
+.btn.admin-refresh-btn {
+  align-items: center;
+  background: var(--muted);
+  border-color: var(--muted);
+  color: #fff;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 36px;
+  justify-content: center;
+  line-height: 1.2;
+  min-width: 92px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.btn.admin-refresh-btn:is(:hover, :active, :focus-visible) {
+  background: var(--muted);
+  border-color: var(--muted);
+  color: #fff;
+  filter: brightness(1.06);
+}
+
+.btn.admin-refresh-btn:disabled,
+.btn.admin-refresh-btn[disabled] {
+  background: var(--muted);
+  border-color: var(--muted);
+  color: #fff;
+  opacity: 0.62;
 }
 /* 뒤로가기: components/dash-back.css (.dash-back) */
 /* 후기 내용 셀 스타일 */
@@ -649,4 +807,44 @@ html[data-theme=dark] .admin-toolbar {
 .toggle-switch input:disabled + .toggle-slider {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.admin-dashboard-page .dashboard-actions .btn[hidden],
+.admin-students-page .btn[hidden],
+.admin-members-body .page-header-actions .btn[hidden] {
+  display: none;
+}
+#statusMsg.admin-work-status {
+  width: min(420px, calc(100vw - 32px));
+  min-width: 0;
+  max-width: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--success-bg);
+  color: var(--success-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-line;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+#statusMsg.admin-work-status.is-visible {
+  opacity: 1;
+}
+
+#statusMsg.admin-work-status[hidden] {
+  display: none !important;
+}
+
+#statusMsg.admin-work-status.is-error {
+  background: var(--error-bg, #fdecea);
+  color: var(--error-color, #c62828);
+}
+
+@media (max-width: 640px) {
+  #statusMsg.admin-work-status {
+    top: max(16px, env(safe-area-inset-top));
+  }
 }

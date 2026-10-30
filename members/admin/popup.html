@@ -19,27 +19,24 @@
 
   <main class="grit-page-container">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        관리자 CMS로 돌아가기
       </a>
     </div>
     
     <div class="section-head page-header-row">
       <h1 class="page-title">팝업창 관리</h1>
       <div class="page-header-actions">
-        <button class="btn" onclick="location.reload()" title="페이지 새로고침">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>새로고침
-        </button>
-        <button class="btn primary" onclick="openAddPopupModal()">+ 팝업창 추가</button>
+        <button type="button" class="btn sm secondary admin-refresh-btn" id="refreshBtn" title="데이터 새로고침" data-admin-refresh-reload>새로고침</button>
+        <button type="button" class="btn primary sm" onclick="openAddPopupModal()">+ 팝업창 추가</button>
       </div>
     </div>
 
     <section class="grit-section">
       <p class="muted" style="margin-bottom:16px;">
-        홈 화면에 표시할 간단한 팝업을 관리합니다. 이미지는 로컬 WebP 파일을 준비하고, 문구와 노출 여부만 쉽게 설정합니다.
+        홈 화면 팝업의 이미지 URL, 문구와 노출 여부를 관리합니다. 운영 이미지는 R2 public URL의 JPG·PNG·WebP를 사용합니다.
       </p>
       
       <!-- 팝업 목록 -->
@@ -51,27 +48,16 @@
 
   <div data-include="footer"></div>
 
-  <div id="popupUnsavedConfirmModal" class="modal" style="display:none;z-index:100010;" role="dialog" aria-modal="true" aria-labelledby="popupUnsavedConfirmTitle">
-    <div class="modal-content" style="max-width:440px;">
-      <div class="modal-header"><h2 id="popupUnsavedConfirmTitle">변경사항 확인</h2><button type="button" class="modal-close" data-popup-confirm="cancel" aria-label="닫기">&times;</button></div>
-      <p style="line-height:1.6;margin:8px 0 22px;">저장하지 않은 변경사항이 있습니다. 편집을 종료하시겠습니까?</p>
-      <div class="form-actions" style="display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn" data-popup-confirm="cancel">계속 편집</button>
-        <button type="button" class="btn danger" data-popup-confirm="discard">변경사항 버리기</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 팝업 설정 모달 -->
-  <div id="popupEditModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width:1200px;max-height:95vh;overflow:hidden;display:flex;flex-direction:column;">
+  <div id="popupEditModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="popupModalTitle" style="display:none;">
+    <div class="modal-content">
       <div class="modal-header" style="flex-shrink:0;">
         <h2 id="popupModalTitle">팝업창 추가</h2>
-        <button class="modal-close" onclick="closePopupModal()">&times;</button>
+        <button type="button" class="modal-close admin-modal-close" onclick="closePopupModal()" aria-label="닫기">&times;</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;overflow:hidden;min-height:0;">
+      <div class="popup-edit-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;overflow:hidden;min-height:0;">
         <!-- 1단: 내용 수정 -->
-        <div style="overflow-y:auto;padding-right:10px;">
+        <div class="popup-edit-form-pane" style="overflow-y:auto;padding-right:10px;">
           <form id="popupEditForm" class="form-grid">
         <div id="popupModalAlert" class="admin-modal-alert" role="alert" hidden></div>
         <input type="hidden" name="popupId" id="popupEditId">
@@ -121,7 +107,7 @@
           <label>팝업 이미지 URL</label>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input type="text" name="imageUrl" id="popupEditImageUrl" placeholder="https://assets.gritedu.kr/public/popup/파일명.webp" style="flex:1;min-width:200px;">
-            <button type="button" class="btn sm" onclick="clearPopupImage()">이미지 제거</button>
+            <button type="button" class="btn sm danger" onclick="clearPopupImage()">이미지 제거</button>
           </div>
           <div style="margin-top:8px;">
             <label style="font-size:12px;color:var(--muted);">이미지 클릭 시 이동할 URL</label>
@@ -246,14 +232,14 @@
         </div>
 
         <div class="form-group form-actions form-full" style="border-top:2px solid var(--border);padding-top:20px;margin-top:20px;">
-          <button type="submit" class="btn primary">저장</button>
+          <button type="submit" class="btn primary" id="popupSaveBtn">저장</button>
           <button type="button" class="btn" onclick="closePopupModal()">취소</button>
         </div>
           </form>
         </div>
         
         <!-- 2단: 실시간 미리보기 -->
-        <div style="display:flex;flex-direction:column;overflow:hidden;border-left:2px solid var(--border);padding-left:20px;">
+        <div class="popup-edit-preview-pane" style="display:flex;flex-direction:column;overflow:hidden;border-left:2px solid var(--border);padding-left:20px;">
           <div style="margin:0 0 16px 0;flex-shrink:0;">
             <h3 style="margin:0 0 8px 0;font-size:16px;">실시간 미리보기</h3>
             <small class="form-hint" style="display:block;margin-top:4px;color:var(--muted);font-size:12px;">
@@ -284,6 +270,7 @@
       z-index: 10000;
       padding: 20px;
       box-sizing: border-box;
+      overflow-x: hidden;
       overflow-y: auto;
     }
     body.modal-open {
@@ -297,10 +284,13 @@
     #popupEditModal .modal-content {
       background: var(--card);
       border-radius: 8px;
+      box-sizing: border-box;
       padding: 24px;
       width: 100%;
-      max-width: 1200px;
-      max-height: calc(95vh);
+      max-width: min(1200px, calc(100vw - 40px));
+      max-height: calc(100vh - 40px);
+      max-height: calc(100dvh - 40px);
+      min-width: 0;
       margin: 0;
       border: 1px solid var(--border);
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -310,12 +300,12 @@
       flex-direction: column;
     }
     @media (max-width: 1200px) {
-      #popupEditModal .modal-content > div[style*="grid-template-columns"] {
+      #popupEditModal .popup-edit-layout {
         grid-template-columns: 1fr !important;
         overflow-y: auto !important;
         padding-right: 4px;
       }
-      #popupEditModal .modal-content > div[style*="grid-template-columns"] > div:last-child {
+      #popupEditModal .popup-edit-preview-pane {
         border-left: none !important;
         border-top: 2px solid var(--border) !important;
         padding-left: 0 !important;
@@ -328,7 +318,8 @@
         padding: 10px;
       }
       #popupEditModal .modal-content {
-        max-height: 90vh;
+        max-height: calc(100dvh - 20px);
+        max-width: calc(100vw - 20px);
         padding: 16px;
       }
       .popup-preview-stage {
@@ -368,30 +359,62 @@
       }
     }
     #popupEditModal .modal-header {
+      background: var(--card);
       display: flex;
+      flex: 0 0 auto;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
     }
     #popupEditModal .modal-header h2 {
       margin: 0;
       font-size: 20px;
       color: var(--text);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
-    #popupEditModal .modal-close {
-      background: none;
-      border: none;
-      font-size: 28px;
-      cursor: pointer;
-      color: var(--muted);
-      padding: 0;
-      width: 32px;
-      height: 32px;
-      line-height: 32px;
-      transition: color 0.2s;
+    #popupEditModal .modal-header .modal-close {
+      flex: 0 0 auto;
     }
-    #popupEditModal .modal-close:hover {
-      color: var(--text);
+    #popupEditModal .popup-edit-layout,
+    #popupEditModal .popup-edit-form-pane,
+    #popupEditModal .popup-edit-preview-pane,
+    #popupEditModal .popup-text-item-admin-grid > * {
+      min-width: 0;
+    }
+    @media (max-width: 640px) {
+      #popupEditModal .form-group > div[style*="grid-template-columns"],
+      #popupEditModal .popup-text-item-admin-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+      }
+      #popupEditImageUrl {
+        min-width: 0 !important;
+      }
+      .popup-text-item-admin-grid .btn {
+        width: 100%;
+      }
+    }
+    .popup-image-edit-dialog {
+      box-sizing: border-box;
+      min-width: 0;
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+    }
+    .popup-image-edit-dialog__header {
+      align-items: center;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      margin: -24px -24px 20px;
+      padding: 20px 24px 16px;
+      position: sticky;
+      top: -24px;
+      z-index: 5;
     }
     
     /* 팝업 카드 스타일 */
@@ -425,6 +448,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
       margin-bottom: 12px;
     }
     .popup-card-title {
@@ -436,6 +461,22 @@
     .popup-card-actions {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .popup-card-actions .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      min-height: 34px;
+      padding: 0 10px;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    .popup-card-actions .popup-order-btn {
+      min-width: 34px;
+      padding: 0;
     }
     .popup-card-body {
       display: grid;

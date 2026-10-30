@@ -16,7 +16,6 @@ import {
 const POPUP_STORAGE_KEY = "grit-popup-dismissed";
 const POPUP_CACHE_KEY = "grit-popup-cache";
 const POPUP_UPDATE_SIGNAL_KEY = "grit-popup-updated-at";
-const POPUP_CACHE_TTL_MS = 5 * 60 * 1000; // launch restore: keep popup setting changes reasonably fresh
 const ALLOWED_POSITIONS = new Set(["center", "top-left", "top-right", "bottom-left", "bottom-right", "custom"]);
 const STACK_POSITIONS = ["center", "top-left", "top-right", "bottom-left", "bottom-right"];
 let lastPopupUpdateSignal = localStorage.getItem(POPUP_UPDATE_SIGNAL_KEY) || "";

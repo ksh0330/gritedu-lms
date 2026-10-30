@@ -1,6 +1,7 @@
 import { db } from "/assets/js/firebase-init.js";
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -169,6 +170,40 @@ function createUnassignmentOperations(preview, keySet) {
   return operations;
 }
 
+function replaceMatchingKeysWithProfileId(values, keySet, profileDocId) {
+  if (!Array.isArray(values)) return values;
+  const nextValues = values.map((value) => (
+    keySet.has(normalizeKey(value)) ? profileDocId : value
+  ));
+  return [...new Set(nextValues.map(normalizeKey).filter(Boolean))];
+}
+
+// 계정 UID가 사라져도 동일한 강사 프로필 ID로 기존 배정을 계속 찾을 수 있게 정규화한다.
+function createPreservedAssignmentOperations(preview, keySet, profileDocId) {
+  const operations = [];
+
+  const addOperation = (item) => {
+    const payload = {
+      instructorId: profileDocId,
+      instructorUid: profileDocId
+    };
+    if (Array.isArray(item.data?.instructorUids)) {
+      payload.instructorUids = replaceMatchingKeysWithProfileId(
+        item.data.instructorUids,
+        keySet,
+        profileDocId
+      );
+    }
+    operations.push({ type: "update", ref: item.ref, payload });
+  };
+
+  (preview.assignments?.courses || []).forEach(addOperation);
+  (preview.assignments?.offlineClasses || []).forEach(addOperation);
+  (preview.assignments?.publicTimetableEntries || []).forEach(addOperation);
+
+  return operations;
+}
+
 function buildUnlinkPlan({ uid, canonicalInstructorId, existingProfileDocIds }) {
   const normalizedUid = normalizeKey(uid);
   const normalizedCanonicalId = normalizeKey(canonicalInstructorId);
@@ -203,25 +238,22 @@ function buildUnlinkPlan({ uid, canonicalInstructorId, existingProfileDocIds }) 
 }
 
 async function commitOperations(operations) {
-  let batch = writeBatch(db);
-  let pending = 0;
+  if (operations.length > BATCH_LIMIT) {
+    throw new Error(`정리 대상 쓰기가 ${BATCH_LIMIT}건을 초과합니다. 일부만 변경하지 않도록 작업을 중단했습니다.`);
+  }
+  const batch = writeBatch(db);
 
   for (const operation of operations) {
     if (operation.type === "update") {
       batch.update(operation.ref, operation.payload);
+    } else if (operation.type === "set") {
+      batch.set(operation.ref, operation.payload, { merge: operation.merge === true });
     } else if (operation.type === "delete") {
       batch.delete(operation.ref);
     }
-    pending += 1;
-
-    if (pending >= BATCH_LIMIT) {
-      await batch.commit();
-      batch = writeBatch(db);
-      pending = 0;
-    }
   }
 
-  if (pending > 0) {
+  if (operations.length > 0) {
     await batch.commit();
   }
 }
@@ -348,6 +380,7 @@ export async function executeInstructorAccountCleanup(preview) {
   const profileDocIds = [...new Set((preview.profileDocIds || []).map(normalizeKey).filter(Boolean))];
   profileDocIds.forEach((profileDocId) => {
     operations.push({ type: "delete", ref: doc(db, "instructors", profileDocId) });
+    operations.push({ type: "delete", ref: doc(db, "instructorPrivate", profileDocId) });
   });
 
   await commitOperations(operations);
@@ -377,32 +410,47 @@ export async function executeInstructorAccountUnlink(preview) {
   const keySet = new Set((preview.keys || []).map(normalizeKey).filter(Boolean));
   keySet.add(uid);
 
-  const operations = createUnassignmentOperations(preview, keySet);
+  const operations = createPreservedAssignmentOperations(preview, keySet, preserveProfileDocId);
   operations.push({ type: "delete", ref: doc(db, "instructorAccounts", uid) });
   operations.push({
     type: "update",
     ref: doc(db, "instructors", preserveProfileDocId),
     payload: {
-      uid: null,
-      pending: true,
-      email: "",
-      emailLower: "",
+      uid: deleteField(),
+      pending: deleteField(),
+      email: deleteField(),
+      emailLower: deleteField(),
+      phone: deleteField(),
+      note: deleteField(),
       updatedAt: serverTimestamp()
     }
+  });
+  operations.push({
+    type: "set",
+    ref: doc(db, "instructorPrivate", preserveProfileDocId),
+    payload: {
+      uid: "",
+      email: "",
+      emailLower: "",
+      pending: true,
+      updatedAt: serverTimestamp()
+    },
+    merge: true
   });
 
   const duplicateProfileDocIds = [...new Set((unlink.deleteProfileDocIds || []).map(normalizeKey).filter(Boolean))]
     .filter((profileDocId) => profileDocId !== preserveProfileDocId);
   duplicateProfileDocIds.forEach((profileDocId) => {
     operations.push({ type: "delete", ref: doc(db, "instructors", profileDocId) });
+    operations.push({ type: "delete", ref: doc(db, "instructorPrivate", profileDocId) });
   });
 
   await commitOperations(operations);
 
   return {
-    updatedCourses: preview.assignments?.courses?.length || 0,
-    updatedOfflineClasses: preview.assignments?.offlineClasses?.length || 0,
-    updatedPublicTimetableEntries: preview.assignments?.publicTimetableEntries?.length || 0,
+    preservedCourses: preview.assignments?.courses?.length || 0,
+    preservedOfflineClasses: preview.assignments?.offlineClasses?.length || 0,
+    preservedPublicTimetableEntries: preview.assignments?.publicTimetableEntries?.length || 0,
     deletedInstructorAccounts: 1,
     preservedInstructorProfile: preserveProfileDocId,
     deletedInstructorProfiles: duplicateProfileDocIds.length

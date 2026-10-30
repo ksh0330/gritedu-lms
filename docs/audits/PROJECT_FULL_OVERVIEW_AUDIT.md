@@ -4,6 +4,8 @@
 범위: 저장소 실제 코드/설정/문서 기반 전체 프로젝트 읽기 전용 발견 감사  
 수정 범위: 이 보고서 파일 1개만 신규 생성
 
+> 현재 상태 안내 (2026-08-25): 이 문서는 작성 시점의 과거 읽기 전용 감사 기록입니다. 일반 프로젝트 구조 설명 외의 배포 상태, Functions 수, cleanup 주기, Firestore read shape, 관리자 UI 검증 상태는 이후 변경으로 superseded되었습니다. 현재 운영 상태는 `PROJECT_STATE.md`, `ADMIN_CMS_STATE.md`, `docs/OPERATION_MANUAL.md`, `docs/MAINTENANCE_LOG.md`, 현재 보안·비용 판단은 `docs/audits/FIRESTORE_SECURITY_CRUD_MASTER_AUDIT.md`, `docs/FIREBASE_USAGE_AND_COST_AUDIT.md`를 기준으로 합니다. settings catalog의 최신 구조는 `md/DATABASE_SCHEMA.md`, `ADMIN_CMS_STATE.md`, `docs/audits/SETTINGS_VALUE_OWNERSHIP_AUDIT.md`를 따릅니다.
+
 ## 1. Executive Summary
 
 ### 확인된 사실
@@ -67,7 +69,7 @@
 - `check:rules`, `check:functions`: rules/functions readiness 확인
 - `ready:deploy`: strict prebuild, verify, rules, functions 체크 묶음
 - `deploy`: legacy Firebase Hosting deploy script. 현재 일반 운영에서는 사용 금지
-- `deploy:phase1-member`: Functions 2개와 Firestore rules 배포
+- `deploy:phase1-member`: 당시 회원 이메일 인증 Functions 2개와 Firestore Rules만 배포하도록 만든 legacy 범위 제한 스크립트(현재 production export 수를 뜻하지 않음)
 - `deploy:all`: legacy Hosting 포함 배포 script. 현재 일반 운영에서는 사용 금지
 - `convert-webp`: 일부 `/assets` 이미지 WebP 생성
 - `audit:firestore-fields`: 명시 확인 플래그가 필요한 Firestore 필드 센서스
@@ -203,7 +205,7 @@ Cloudflare Pages + Firestore Rules + Cloud Functions
 | `members/admin/timetable.html` | 공개 시간표 관리 | 시간표 항목 추가/수정/보관/삭제, 오프라인 반 정보 복사, 필터 카탈로그 저장 | `publicTimetableEntries`, `settings/timetableCatalog`, `offlineClasses`, `instructors` | 오프라인 반과 자동 동기화되지 않음 |
 | `members/admin/site.html` | 사이트 CMS | Story v2, 상담 문의, D-DAY, 강사진 노출 순서/숨김 | `pages`, `settings/instructorsMenu`, `instructors` | Story 이미지는 R2 public URL 기준 |
 | `members/admin/popup.html` | 홈 팝업 관리 | 팝업 추가/수정/삭제, 위치/크기/이미지/문구/링크 설정 | `settings/popups` | 이미지는 R2 public URL 또는 `/assets/popup/*.webp` rollback 경로 |
-| `members/admin/operation-tasks.html` | 운영 기록 정리 | 정리 대상 확인, 월 1회 수동 정리, 자동 정리 상태 확인 | `emailVerifications`, `signupAttempts`, `memberChildLinkAttempts`; legacy `operationTasks` | `scheduledRecordCleanup` 월간 자동 정리와 정책 동기화 필요 |
+| `members/admin/operation-tasks.html` | 운영 기록 정리 | 자동 정리 상태 확인 | `emailVerifications`, `signupAttempts`, `memberChildLinkAttempts`; legacy `operationTasks` | 현재 scheduler는 매일 03:00(Asia/Seoul), 저장된 `cleanupAt <= now`를 collection별 `limit(500)`로 조회 |
 | `members/admin/users/students.html` | 학생 관리 | 학생 목록, 상세, 기본정보 수정, 온라인/오프라인 연결 현황 | `students`, `enrollments`, `offlineClassMembers`, `courses`, `offlineClasses` | 삭제는 별도 계정 관리 페이지 중심 |
 | `members/admin/users/members.html` | 일반/학부모 회원 관리 | 회원 목록, 회원 상세, 수강/자녀 연동/시도 기록 조회 | `members`, `enrollments`, `studentParentLinks`, `memberChildLinkAttempts`, `students` | Auth 삭제는 자동화되지 않음 |
 | `members/admin/users/instructors.html` | 강사 관리 | 강사 프로필/계정 연결 상태, 공개 표시 섹션, 이미지/영상/커리큘럼 | `instructors`, `instructorAccounts`, `courses`, `offlineClasses`, `publicTimetableEntries`, `settings/instructorsMenu` | 이미지 파일 준비와 계정 unlink/delete preview 주의 |

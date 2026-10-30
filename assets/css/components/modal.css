@@ -173,7 +173,53 @@
     top:12px
   }
 }
-.admin-confirm-modal { align-items: center; display: flex; inset: 0; justify-content: center; position: fixed; z-index: 100100; }
-.admin-confirm-modal__content { max-width: 440px; width: min(440px, calc(100vw - 32px)); }
+.modal.admin-confirm-modal { align-items: center; display: flex; inset: 0; justify-content: center; position: fixed; z-index: 100100; }
+.modal.admin-confirm-modal .admin-confirm-modal__content { max-height: calc(100dvh - 32px); max-width: 440px; min-width: 0; overflow-x: hidden; overflow-y: auto; width: min(440px, calc(100vw - 32px)); }
 .admin-confirm-modal__message { line-height: 1.65; margin: 8px 0 22px; white-space: pre-line; }
-.admin-confirm-modal__actions { display: flex; gap: 8px; justify-content: flex-end; }
+.admin-confirm-modal__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 480px) {
+  .modal.admin-confirm-modal { padding: 8px; }
+  .modal.admin-confirm-modal .admin-confirm-modal__content { width: calc(100vw - 16px); }
+  .admin-confirm-modal__actions .btn { flex: 1 1 100%; width: 100%; }
+}
+
+/* 관리자 modal 닫기 버튼 공통 UI */
+.modal-close.admin-modal-close,
+.modal-close-btn.admin-modal-close {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 26px;
+  height: 36px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  position: static;
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  width: 36px;
+}
+
+.modal-close.admin-modal-close:hover,
+.modal-close-btn.admin-modal-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.modal-close.admin-modal-close:active,
+.modal-close-btn.admin-modal-close:active {
+  transform: scale(0.94);
+}
+
+.modal-close.admin-modal-close:focus-visible,
+.modal-close-btn.admin-modal-close:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}

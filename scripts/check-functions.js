@@ -129,6 +129,43 @@ function run() {
         }
       }
     }
+
+    const testScript = functionsPackage.scripts && functionsPackage.scripts.test;
+    if (!testScript) {
+      addWarning('functions test script is missing in package.json.');
+    } else {
+      const testResult = runCommand('npm', ['run', 'test'], functionsDir, {
+        shell: process.platform === 'win32'
+      });
+      if (testResult.status !== 0) {
+        const message = 'functions test script failed.';
+        if (STRICT_MODE) {
+          addError(message);
+        } else {
+          addWarning(message);
+        }
+
+        if (testResult.error) {
+          if (STRICT_MODE) {
+            addError(`test execution error: ${testResult.error}`);
+          } else {
+            addWarning(`test execution error: ${testResult.error}`);
+          }
+        }
+
+        const testOutput = [testResult.stdout.trim(), testResult.stderr.trim()]
+          .filter(Boolean)
+          .join('\n');
+        if (testOutput) {
+          const summary = testOutput.split('\n').slice(0, 20).join('\n');
+          if (STRICT_MODE) {
+            addError(summary);
+          } else {
+            addWarning(summary);
+          }
+        }
+      }
+    }
   }
 
   console.log('='.repeat(64));

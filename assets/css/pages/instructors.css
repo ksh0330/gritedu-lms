@@ -139,37 +139,17 @@ main.instructors .inst-subject-badge {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* 과목별 색상 — badge 자신의 data-subject만 사용 */
-main.instructors .inst-subject-badge[data-subject="국어"] {
-  background: rgba(233, 80, 69, 0.85);
-  border-color: rgba(233, 80, 69, 0.5);
+/* settings/instructorsMenu.subjectColorMap에서 주입되는 과목별 색상 */
+main.instructors .inst-subject-badge.has-subject-color {
+  background: var(--subject-color);
+  border-color: color-mix(in srgb, var(--subject-color) 72%, transparent);
+  color: var(--subject-contrast);
 }
 
-main.instructors .inst-subject-badge[data-subject="영어"] {
-  background: rgba(47, 122, 229, 0.85);
-  border-color: rgba(47, 122, 229, 0.5);
-}
-
-main.instructors .inst-subject-badge[data-subject="수학"] {
-  background: rgba(52, 168, 83, 0.85);
-  border-color: rgba(52, 168, 83, 0.5);
-}
-
-main.instructors .inst-subject-badge[data-subject="과학"] {
-  background: rgba(246, 196, 69, 0.85);
-  border-color: rgba(246, 196, 69, 0.5);
-  color: #202225;
-  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.5);
-}
-
-main.instructors .inst-subject-badge[data-subject="컨설팅"] {
-  background: rgba(142, 68, 173, 0.85);
-  border-color: rgba(142, 68, 173, 0.5);
-}
-
-main.instructors .inst-subject-badge[data-subject="수리논술"] {
-  background: rgba(14, 116, 144, 0.88);
-  border-color: rgba(14, 116, 144, 0.5);
+main.instructors .grit-filter button.has-subject-color.on {
+  background: var(--subject-color);
+  border-color: var(--subject-color);
+  color: var(--subject-contrast);
 }
 
 /* 이름 - 우측 상단 고정 */

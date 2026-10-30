@@ -4,6 +4,7 @@ import { signupState } from "/assets/js/features/signup/state.js";
 import { updateVerificationUI, startVerificationTimer } from "/assets/js/features/signup/verification-ui.js";
 import { step2Form, goToStep, showStatus, setupPhoneFormatting } from "./signup-common.js";
 import { loadSchoolCsvArrayBuffer } from "/assets/js/utils/school-csv.js";
+import { withAsyncTimeout } from "/assets/js/utils/async-timeout.js";
 
 const functions = getFunctions(app, "us-central1");
 const sendVerificationCodeFn = httpsCallable(functions, "sendVerificationCode");
@@ -31,6 +32,12 @@ function toFriendlyVerificationMessage(err, phase = "send") {
   const code = getCallableCode(err);
   const raw = formatCallableMessage(err);
 
+  if (code.includes("client/deadline-exceeded")) {
+    return phase === "send"
+      ? "인증 메일 발송 요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요."
+      : "인증번호 확인 요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
+  }
+
   if (phase === "send") {
     if (code.includes("already-exists")) {
       return "이미 가입된 이메일입니다. 로그인하거나 학원으로 문의해 주세요.";
@@ -46,6 +53,15 @@ function toFriendlyVerificationMessage(err, phase = "send") {
     }
     if (code.includes("unavailable")) {
       return "인증 메일 발송이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.";
+    }
+    if (code.includes("deadline-exceeded")) {
+      return "인증 메일 발송 요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
+    }
+    if (code.includes("network-request-failed") || globalThis.navigator?.onLine === false) {
+      return "네트워크에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.";
+    }
+    if (code.includes("internal") || code.includes("unknown")) {
+      return "인증 메일 서버에서 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
     }
     return raw || "인증번호 발송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   }
@@ -245,11 +261,13 @@ function syncStep2InteractionLock() {
 function setVerificationSending(isSending) {
   signupState.verification.isSending = isSending;
   syncStep2InteractionLock();
+  updateVerificationUI();
 }
 
 function setVerificationChecking(isChecking) {
   signupState.verification.isVerifying = isChecking;
   syncStep2InteractionLock();
+  updateVerificationUI();
 }
 
 function resetEmailVerificationState(options = {}) {
@@ -430,15 +448,19 @@ if (sendVerificationBtn) {
     sendVerificationBtn.disabled = true;
     if (sendBtnText) sendBtnText.textContent = "발송 중...";
     if (sendBtnSpinner) sendBtnSpinner.classList.remove("hidden");
-    setSendStatusMessage("인증번호를 발송하고 있습니다.", false);
+    setSendStatusMessage("인증번호를 발송하고 있습니다...", false);
     showStatus("", false);
 
     try {
-      await sendVerificationCodeFn({
-        email: normalizedEmail,
-        signupType,
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent || "unknown" : "unknown",
-      });
+      const sendResult = await withAsyncTimeout(
+        sendVerificationCodeFn({
+          email: normalizedEmail,
+          signupType,
+        })
+      );
+      const verificationSessionToken = String(
+        sendResult?.data?.verificationSessionToken || ""
+      );
 
       signupState.verifiedEmail = null;
       signupState.isEmailVerified = false;
@@ -453,7 +475,7 @@ if (sendVerificationBtn) {
         } catch (_) {}
       }
 
-      startVerificationTimer(normalizedEmail);
+      startVerificationTimer(normalizedEmail, verificationSessionToken);
 
       if (verificationStatus) {
         verificationStatus.textContent =
@@ -523,7 +545,11 @@ if (verifyCodeBtn) {
     let shouldAutoAdvance = false;
 
     try {
-      await verifyEmailCodeFn({ email, code });
+      await withAsyncTimeout(verifyEmailCodeFn({
+        email,
+        code,
+        verificationSessionToken: signupState.verification.sessionToken
+      }));
       signupState.verifiedEmail = email;
       signupState.isEmailVerified = true;
       signupState.setVerificationVerified();
@@ -1029,7 +1055,7 @@ function renderSearchResults(query, page = 1) {
   resultsContainer.querySelectorAll(".school-search-item").forEach((item, index) => {
     item.addEventListener("click", () => {
       const schoolName = item.getAttribute("data-school");
-      selectSchool(schoolName);
+      window.selectSchool(schoolName);
     });
 
     item.addEventListener("mouseenter", () => {
@@ -1079,19 +1105,19 @@ function initSchoolSearchModal() {
       if (selectedSchoolIndex >= 0 && items[selectedSchoolIndex]) {
         const schoolName = items[selectedSchoolIndex].getAttribute("data-school");
         if (schoolName) {
-          selectSchool(schoolName);
+          window.selectSchool(schoolName);
         }
       } else {
         const firstItem = items[0];
         if (firstItem) {
           const schoolName = firstItem.getAttribute("data-school");
           if (schoolName) {
-            selectSchool(schoolName);
+            window.selectSchool(schoolName);
           }
         }
       }
     } else if (e.key === "Escape") {
-      closeSchoolSearchModal();
+      window.closeSchoolSearchModal();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       if (items.length > 0) {
@@ -1173,7 +1199,7 @@ window.selectDirectInput = function () {
     input.removeAttribute("readonly");
     input.style.cursor = "text";
     input.focus();
-    closeSchoolSearchModal();
+    window.closeSchoolSearchModal();
   }
 };
 
@@ -1187,7 +1213,7 @@ window.selectSchool = function (schoolName) {
     input.removeAttribute("readonly");
     input.style.cursor = "text";
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    closeSchoolSearchModal();
+    window.closeSchoolSearchModal();
   }
 };
 

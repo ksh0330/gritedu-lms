@@ -1,4 +1,4 @@
-import { auth, getUserRole, getDashboardUrl, getCurrentUserWithWait } from "/assets/js/firebase-init.js";
+import { getUserRole, getDashboardUrl, getCurrentUserWithWait } from "/assets/js/firebase-init.js";
 
 (async () => {
   const user = await getCurrentUserWithWait(3000);

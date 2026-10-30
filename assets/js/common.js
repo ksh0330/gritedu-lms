@@ -3,8 +3,11 @@ import { auth, signOut, getUserRole, getDashboardUrl } from "/assets/js/firebase
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
 import { initKakaoChannelFloatingButton } from "/assets/js/utils/kakao-channel.js";
 import { getPublicSettingDoc } from "/assets/js/utils/settings-cache.js";
+import { initAdminReloadButtons } from "/assets/js/utils/admin-refresh.js";
 
 const THEME_KEY = "grit-theme";
+const MOBILE_NAV_MEDIA_QUERY =
+  "(max-width: 1440px), (hover: none) and (pointer: coarse)";
 const themeToggleHandler = new WeakMap();
 
 async function initFooterSettings() {
@@ -223,7 +226,7 @@ function updateAuthMenu(user) {
             body.classList.remove("nav-open");
           }
 
-          toast.success("로그아웃 되었습니다.", 2000);
+          window.toast.success("로그아웃 되었습니다.", 2000);
           setTimeout(() => {
             window.location.href = "/";
           }, 500);
@@ -261,7 +264,7 @@ function initRequiresLogin() {
   const requiresLoginLinks = document.querySelectorAll(".requires-login");
 
   if (requiresLoginLinks.length !== 0) {
-    requiresLoginLinks.forEach((link, index) => {
+    requiresLoginLinks.forEach((link) => {
       const existingHandler = requiresLoginHandlers.get(link);
       if (existingHandler) {
         link.removeEventListener("click", existingHandler, true);
@@ -273,8 +276,7 @@ function initRequiresLogin() {
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          const href = link.getAttribute("href");
-          toast.warning("로그인이 필요합니다.", 2000);
+          window.toast.warning("로그인이 필요합니다.", 2000);
           setTimeout(() => {
             window.location.href = "/members/login.html";
           }, 1000);
@@ -347,6 +349,8 @@ const mobileMenuInitialized = new WeakSet();
 
 /** 이전 모바일 메뉴에서 등록한 resize / nav 관찰자 (헤더 DOM 교체 시 누수 방지) */
 let mobileMenuResizeHandler = null;
+let mobileMenuMediaQuery = null;
+let mobileMenuMediaHandler = null;
 let navOpenClassObserver = null;
 
 let headerRebindScheduled = false;
@@ -379,6 +383,7 @@ function initMobileMenu() {
   const menuToggle = document.getElementById("menuToggle");
   const navUl = document.querySelector(".grit-nav > ul");
   const body = document.body;
+  const mobileNavMedia = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
 
   if (!menuToggle || !navUl || mobileMenuInitialized.has(menuToggle)) {
     return;
@@ -389,6 +394,15 @@ function initMobileMenu() {
   if (mobileMenuResizeHandler) {
     window.removeEventListener("resize", mobileMenuResizeHandler);
     mobileMenuResizeHandler = null;
+  }
+  if (mobileMenuMediaQuery && mobileMenuMediaHandler) {
+    if (typeof mobileMenuMediaQuery.removeEventListener === "function") {
+      mobileMenuMediaQuery.removeEventListener("change", mobileMenuMediaHandler);
+    } else {
+      mobileMenuMediaQuery.removeListener(mobileMenuMediaHandler);
+    }
+    mobileMenuMediaQuery = null;
+    mobileMenuMediaHandler = null;
   }
   if (navOpenClassObserver) {
     navOpenClassObserver.disconnect();
@@ -428,7 +442,7 @@ function initMobileMenu() {
   }
 
   function handleResize() {
-    if (window.innerWidth <= 1440) {
+    if (mobileNavMedia.matches) {
       menuToggle.style.display = "flex";
       if (!navUl.querySelector(".only-mobile.auth-slot")) {
         createMobileAuthSlot();
@@ -460,7 +474,7 @@ function initMobileMenu() {
   }
 
   function shouldUseMobileNav() {
-    return window.innerWidth <= 1440;
+    return mobileNavMedia.matches;
   }
 
   function handleMobileNavLinkNavigate(link) {
@@ -616,12 +630,19 @@ function initMobileMenu() {
     handleResize();
     mobileMenuResizeHandler = handleResize;
     window.addEventListener("resize", mobileMenuResizeHandler);
+    mobileMenuMediaQuery = mobileNavMedia;
+    mobileMenuMediaHandler = handleResize;
+    if (typeof mobileMenuMediaQuery.addEventListener === "function") {
+      mobileMenuMediaQuery.addEventListener("change", mobileMenuMediaHandler);
+    } else {
+      mobileMenuMediaQuery.addListener(mobileMenuMediaHandler);
+    }
 
     menuToggle.addEventListener("click", () => {
       if (navUl.classList.contains("open")) {
         closeMobileNav();
       } else {
-        if (window.innerWidth <= 1440 && !navUl.querySelector(".only-mobile.auth-slot")) {
+        if (shouldUseMobileNav() && !navUl.querySelector(".only-mobile.auth-slot")) {
           createMobileAuthSlot();
         }
         navUl.classList.add("open");
@@ -749,6 +770,7 @@ function bootstrapCommonUi() {
   initIncludes();
   setupHeaderIncludeObserver();
   initKakaoChannelFloatingButton();
+  initAdminReloadButtons();
 }
 
 if (document.readyState === "loading") {

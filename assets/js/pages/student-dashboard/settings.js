@@ -1,10 +1,14 @@
 import { auth, db } from "/assets/js/firebase-init.js";
-import { getDoc, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { getSettingDoc } from "/assets/js/utils/settings-cache.js";
 import { createCourseLabelMaps } from "/assets/js/utils/course-readonly.js";
-import { loadStudentProfile } from "/assets/js/utils/student-profile.js";
+import { loadStudentProfile } from "/assets/js/utils/student-profile.js?v=20260913-grade-tracking";
 import { dom, state } from "/assets/js/pages/student-dashboard/context.js";
-import { normalizeGrade } from "/assets/js/utils/grade.js";
+import { getAutomaticGradePromotion } from "/assets/js/utils/grade.js?v=20260913-grade-tracking";
+import {
+  getSubjectColorMapFromSettings,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 export { loadStudentProfile as loadStudentProfileCanonicalFirst };
 
@@ -30,23 +34,30 @@ export async function resolveStudentDisplayName(uid, authUser = null) {
 
 export async function loadCourseReadOnlyContext() {
   try {
-    const [catalogResult, coursesMenuResult] = await Promise.all([
+    const [catalogResult, coursesMenuResult, instructorsMenuResult, subjectColorsResult] = await Promise.all([
       getSettingDoc("courseCatalog"),
-      getSettingDoc("coursesMenu")
+      getSettingDoc("coursesMenu"),
+      getSettingDoc("instructorsMenu"),
+      getSettingDoc("subjectColors")
     ]);
     state.courseLabelMaps = createCourseLabelMaps(catalogResult.exists ? catalogResult.data : {});
     const hiddenList = coursesMenuResult.exists ? coursesMenuResult.data?.hidden : [];
     state.hiddenCourseIds = new Set(Array.isArray(hiddenList) ? hiddenList : []);
     state.instructorsByUid = {};
+    state.subjectColorMap = mergeSubjectColorMap({
+      ...getSubjectColorMapFromSettings(instructorsMenuResult.exists ? instructorsMenuResult.data : {}),
+      ...getSubjectColorMapFromSettings(subjectColorsResult.exists ? subjectColorsResult.data : {}),
+    });
   } catch (error) {
     console.warn("[student-dashboard] failed to load course context", error);
     state.courseLabelMaps = createCourseLabelMaps({});
     state.hiddenCourseIds = new Set();
     state.instructorsByUid = {};
+    state.subjectColorMap = mergeSubjectColorMap({});
   }
 }
 
-export async function setWelcomeMessage() {
+export async function setWelcomeMessage(studentProfile = undefined) {
   if (!dom.welcomeMsg) return;
   let currentUser = state.user;
   if (!currentUser?.uid) {
@@ -54,7 +65,16 @@ export async function setWelcomeMessage() {
     currentUser = auth.currentUser;
   }
 
-  const displayName = await resolveStudentDisplayName(currentUser.uid, currentUser);
+  let displayName = "";
+  if (studentProfile !== undefined) {
+    displayName = String(studentProfile?.name || "").trim();
+    const authDisplayName = String(currentUser.displayName || "").trim();
+    if (!displayName && authDisplayName && !isEmailLike(authDisplayName)) {
+      displayName = authDisplayName;
+    }
+  } else {
+    displayName = await resolveStudentDisplayName(currentUser.uid, currentUser);
+  }
   const label = displayName || "회원";
 
   if (displayName) {
@@ -66,42 +86,48 @@ export async function setWelcomeMessage() {
 }
 
 export async function updateGradeIfNeeded() {
-  if (!state.user?.uid) return;
+  if (!state.user?.uid) return null;
   try {
-    const studentDoc = await getDoc(doc(db, "students", state.user.uid));
-    if (!studentDoc.exists()) return;
+    const studentRef = doc(db, "students", state.user.uid);
+    const currentYear = new Date().getFullYear();
 
-    const studentData = studentDoc.data();
-    if (studentData.gradeManualOverride === true) return;
+    return await runTransaction(db, async (transaction) => {
+      const studentDoc = await transaction.get(studentRef);
+      if (!studentDoc.exists()) return null;
 
-    const currentGrade = normalizeGrade(studentData.grade);
-    if (!currentGrade) return;
+      const studentData = studentDoc.data();
+      const profile = { uid: studentDoc.id, ...studentData };
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const currentDay = now.getDate();
-    if (currentMonth < 0 || (currentMonth === 0 && currentDay < 1)) return;
+      const createdAt = studentData.createdAt;
+      let createdDate = null;
+      if (createdAt?.toDate) createdDate = createdAt.toDate();
+      else if (createdAt instanceof Date) createdDate = createdAt;
+      else if (createdAt?.seconds) createdDate = new Date(createdAt.seconds * 1000);
 
-    const createdAt = studentData.createdAt;
-    let createdDate = null;
-    if (createdAt?.toDate) createdDate = createdAt.toDate();
-    else if (createdAt instanceof Date) createdDate = createdAt;
-    else if (createdAt?.seconds) createdDate = new Date(createdAt.seconds * 1000);
-    if (!createdDate) return;
+      const promotion = getAutomaticGradePromotion({
+        grade: studentData.grade,
+        createdYear: createdDate?.getFullYear(),
+        lastPromotionYear: studentData.lastAutoPromotionYear,
+        currentYear,
+      });
+      if (!promotion.shouldPromote && !promotion.shouldInitialize) return profile;
 
-    const thisYearJan1 = new Date(currentYear, 0, 1);
-    const createdDateObj = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
-    if (createdDateObj >= thisYearJan1) return;
+      const updateData = {
+        lastAutoPromotionYear: promotion.promotionYear,
+        updatedAt: serverTimestamp(),
+      };
+      if (promotion.shouldPromote) updateData.grade = promotion.grade;
+      if (studentData.gradeManualOverride === true) updateData.gradeManualOverride = false;
 
-    const gradeNumber = parseInt(currentGrade, 10);
-    const newGrade = gradeNumber >= 1 && gradeNumber < 7 ? String(gradeNumber + 1) : "";
-    if (!newGrade || newGrade === currentGrade) return;
-
-    const updateData = { grade: newGrade, updatedAt: serverTimestamp() };
-
-    await updateDoc(doc(db, "students", state.user.uid), updateData);
+      transaction.update(studentRef, updateData);
+      return {
+        ...profile,
+        ...(promotion.shouldPromote ? { grade: promotion.grade } : {}),
+        lastAutoPromotionYear: promotion.promotionYear,
+      };
+    });
   } catch (error) {
     console.error("학년 업데이트 실패:", error);
+    return null;
   }
 }

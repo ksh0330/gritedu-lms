@@ -2,9 +2,7 @@ import { app } from "/assets/js/firebase-init.js";
 import {
   getFirestore,
   collection,
-  getDocs,
-  doc,
-  getDoc
+  getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { getPublicSettingDoc } from "/assets/js/utils/settings-cache.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
@@ -107,13 +105,6 @@ function renderHomeInstructors() {
   setupInstructorMarquee();
 }
 
-function toWebP(url) {
-  if (url && url.includes("/instructors/profile/")) {
-    return url;
-  }
-  return url ? url.replace(/\.(png|jpg|jpeg)$/i, ".webp") : url;
-}
-
 function cardHTML(inst, index = 0) {
   const rawPhoto = (inst.photo || inst.profilePhoto || inst.imageUrl || "").trim();
   const photo = resolveInstructorProfileImageUrl(rawPhoto);
@@ -152,7 +143,7 @@ function wireCardEvents(container) {
     const id = card.getAttribute("data-id");
     if (id) {
       console.log("[home-instructors] 강사 상세 페이지로 이동, id:", id);
-      location.href = `/instructor-details.html?doc=${encodeURIComponent(id)}`;
+      location.href = `/instructor-details?doc=${encodeURIComponent(id)}`;
     } else {
       console.warn("[home-instructors] 카드에 id가 없음:", card);
     }

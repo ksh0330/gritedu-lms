@@ -23,26 +23,6 @@
   padding: 4px 10px;
 }
 
-.student-offline-class-page .student-offline-class-label[data-subject="국어"] {
-  background: var(--sub-ko);
-}
-
-.student-offline-class-page .student-offline-class-label[data-subject="영어"] {
-  background: var(--sub-en);
-}
-
-.student-offline-class-page .student-offline-class-label[data-subject="수학"] {
-  background: var(--sub-ma);
-}
-
-.student-offline-class-page .student-offline-class-label[data-subject="과학"] {
-  background: var(--sub-sc);
-}
-
-.student-offline-class-page .student-offline-class-label[data-subject="컨설팅"] {
-  background: var(--sub-consult);
-}
-
 .student-offline-class-page .student-offline-class-meta {
   color: var(--muted);
   font-size: clamp(13px, 1.9vw, 14px);
@@ -75,21 +55,29 @@
 }
 
 .student-offline-class-page .student-offline-sessions-head {
-  margin-bottom: 8px;
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
 .student-offline-class-page .student-offline-sessions-head .section-title {
-  margin: 0 0 2px;
+  margin: 0;
 }
 
 .student-offline-class-page .student-offline-sessions-head .home-subdesc {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
   margin: 0;
+  white-space: nowrap;
 }
 
 .student-offline-class-page .student-offline-sessions-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
 .student-offline-class-page .student-offline-sessions-empty {
@@ -103,27 +91,38 @@
 .student-offline-class-page .student-offline-session-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .student-offline-class-page .student-offline-session-card.is-open {
-  border-color: color-mix(in srgb, var(--brand, #ff7a00) 40%, var(--border));
+  border-color: color-mix(in srgb, var(--brand, #ff7a00) 30%, var(--border));
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.07);
 }
 
 .student-offline-class-page .student-offline-session-toggle {
   align-items: center;
-  background: transparent;
+  background: var(--card);
   border: 0;
   color: inherit;
   cursor: pointer;
   display: flex;
   gap: 8px;
   justify-content: space-between;
-  min-height: 44px;
-  padding: 8px 10px;
+  min-height: 58px;
+  padding: 12px 14px;
   text-align: left;
   width: 100%;
+}
+
+.student-offline-class-page .student-offline-session-toggle:hover {
+  background: color-mix(in srgb, var(--muted) 4%, var(--card));
+}
+
+.student-offline-class-page .student-offline-session-card.is-open .student-offline-session-toggle {
+  background: color-mix(in srgb, var(--brand, #ff7a00) 4%, var(--card));
 }
 
 .student-offline-class-page .student-offline-session-toggle:focus-visible {
@@ -135,29 +134,34 @@
   align-items: center;
   display: flex;
   flex: 1;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
 
 .student-offline-class-page .student-offline-session-no {
+  background: color-mix(in srgb, var(--brand, #ff7a00) 10%, transparent);
+  border-radius: 999px;
   color: var(--brand, #ff7a00);
   flex-shrink: 0;
-  font-size: clamp(12px, 1.8vw, 13px);
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1;
+  padding: 5px 8px;
 }
 
 .student-offline-class-page .student-offline-session-date {
   color: var(--muted);
   flex-shrink: 0;
-  font-size: clamp(11px, 1.7vw, 12px);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .student-offline-class-page .student-offline-session-title {
   flex: 1;
-  font-size: clamp(13px, 1.9vw, 14px);
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -168,13 +172,18 @@
   align-items: center;
   display: inline-flex;
   flex-shrink: 0;
-  gap: 6px;
+  gap: 9px;
 }
 
 .student-offline-class-page .student-offline-session-video-count {
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 999px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 8px;
   white-space: nowrap;
 }
 
@@ -182,10 +191,10 @@
   border-bottom: 2px solid currentColor;
   border-right: 2px solid currentColor;
   flex-shrink: 0;
-  height: 7px;
+  height: 8px;
   transform: rotate(45deg);
   transition: transform 0.15s ease;
-  width: 7px;
+  width: 8px;
 }
 
 .student-offline-class-page .student-offline-session-card.is-open .student-offline-session-toggle__icon {
@@ -195,7 +204,8 @@
 
 .student-offline-class-page .student-offline-session-panel {
   border-top: 1px solid var(--border);
-  padding: 6px 10px 10px;
+  background: color-mix(in srgb, var(--bg) 48%, var(--card));
+  padding: 14px 16px 16px;
 }
 
 .student-offline-class-page .student-offline-session-panel[hidden] {
@@ -204,15 +214,20 @@
 
 .student-offline-class-page .student-offline-session-desc {
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+
+.student-offline-class-page .student-offline-session-empty {
+  margin-bottom: 0;
+  padding: 4px 0;
 }
 
 .student-offline-class-page .student-offline-video-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -220,25 +235,41 @@
 
 .student-offline-class-page .student-offline-video-link {
   align-items: center;
-  background: color-mix(in srgb, var(--brand, #ff7a00) 8%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--brand, #ff7a00) 28%, var(--border));
-  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   color: var(--text);
   display: flex;
   font-size: 13px;
-  font-weight: 600;
-  gap: 8px;
+  font-weight: 700;
+  gap: 10px;
   justify-content: space-between;
-  min-height: 36px;
-  padding: 8px 10px;
+  min-height: 44px;
+  padding: 9px 12px;
   text-decoration: none;
   transition: background 0.15s ease, border-color 0.15s ease;
   width: 100%;
 }
 
-.student-offline-class-page .student-offline-video-link:hover {
-  background: color-mix(in srgb, var(--brand, #ff7a00) 14%, var(--card));
-  border-color: var(--brand, #ff7a00);
+.student-offline-class-page .student-offline-video-link:hover,
+.student-offline-class-page .student-offline-video-link:focus-visible {
+  background: color-mix(in srgb, var(--brand, #ff7a00) 4%, var(--card));
+  border-color: color-mix(in srgb, var(--brand, #ff7a00) 48%, var(--border));
+  outline: none;
+}
+
+.student-offline-class-page .student-offline-video-link__icon {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand, #ff7a00) 11%, transparent);
+  border-radius: 50%;
+  color: var(--brand, #ff7a00);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 9px;
+  height: 26px;
+  justify-content: center;
+  padding-left: 1px;
+  width: 26px;
 }
 
 .student-offline-class-page .student-offline-video-link__title {
@@ -250,7 +281,7 @@
 }
 
 .student-offline-class-page .student-offline-video-link__go {
-  color: var(--brand, #ff7a00);
+  color: var(--muted);
   flex-shrink: 0;
   font-size: 14px;
   line-height: 1;
@@ -317,12 +348,36 @@
 }
 
 @media (max-width: 640px) {
+  .student-offline-class-page .student-offline-sessions-head {
+    margin-bottom: 10px;
+  }
+
   .student-offline-class-page .student-offline-session-toggle {
-    min-height: 40px;
-    padding: 7px 8px;
+    min-height: 52px;
+    padding: 10px 11px;
   }
 
   .student-offline-class-page .student-offline-session-toggle__row {
-    gap: 4px;
+    gap: 6px;
+  }
+
+  .student-offline-class-page .student-offline-session-title {
+    font-size: 13px;
+  }
+
+  .student-offline-class-page .student-offline-session-video-count {
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
+
+  .student-offline-class-page .student-offline-session-panel {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .student-offline-class-page .student-offline-session-date {
+    display: none;
   }
 }

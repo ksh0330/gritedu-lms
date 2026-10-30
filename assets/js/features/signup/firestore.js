@@ -104,7 +104,7 @@ export async function saveStudent(uid, data) {
   const createdAt = serverTimestamp();
   const grade = normalizeGrade(data.grade);
   const studentData = {
-    name: data.name,
+    name: String(data.name || "").trim(),
     email: data.email,
     school: data.school,
     grade,

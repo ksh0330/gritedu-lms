@@ -15,16 +15,15 @@
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/pages/admin-students.css">
 </head>
-<body>
+<body class="admin-students-page">
   <div data-include="header"></div>
 
   <main class="grit-page-container">
     <div class="dash-back">
-      <a href="/members/admin/dashboard.html" class="btn sm">
+      <a href="/members/admin/dashboard.html" class="btn sm dash-back__link" aria-label="관리자 CMS로 돌아가기" title="관리자 CMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        관리자 CMS로 돌아가기
       </a>
     </div>
     
@@ -37,10 +36,10 @@
         <button class="btn primary sm" id="loadStudentsStatus" onclick="loadStudentStatus()" title="학생 현황 불러오기">
           현황 불러오기
         </button>
-        <button class="btn primary sm" id="refreshStudentsBtn" onclick="refreshStudents()" title="학생 목록 새로고침" hidden disabled>
+        <button type="button" class="btn sm secondary admin-refresh-btn" id="refreshBtn" title="데이터 새로고침" hidden disabled>
           새로고침
         </button>
-        <button class="btn sm" id="dlStudents">
+        <button type="button" class="btn sm admin-export-btn" id="dlStudents" title="학생 현황을 불러온 뒤 다운로드할 수 있습니다" disabled>
           엑셀
         </button>
       </div>
@@ -69,20 +68,27 @@
           </div>
         </div>
       </div>
-      <div class="admin-toolbar">
+      <div class="admin-toolbar admin-toolbar--primary-list">
         <label class="sr-only" for="searchStudents">학생 검색</label>
         <div class="admin-toolbar__search-wrap">
-          <span class="admin-toolbar__search-icon" aria-hidden="true">
+          <button type="button" id="studentsSearchButton" class="admin-toolbar__search-button" aria-label="학생 검색 실행" title="검색">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.25"/><path d="M20 20l-3.5-3.5"/></svg>
-          </span>
+          </button>
           <input type="text" id="searchStudents" class="admin-toolbar__search-input" placeholder="이름, 학교, 전화번호, 이메일 검색" autocomplete="off">
         </div>
+        <label class="admin-list-page-size" for="studentsPageSize">
+          <select id="studentsPageSize" class="admin-toolbar__select" aria-label="학생 목록 표시 개수">
+            <option value="10">10개</option>
+            <option value="20">20개</option>
+            <option value="50">50개</option>
+          </select>
+        </label>
         <select id="filterRole" class="admin-toolbar__select" title="역할 필터" style="display:none;" aria-hidden="true">
           <option value="student">학생</option>
         </select>
       </div>
 
-      <div class="admin-table-wrap admin-students-table-wrap">
+      <div class="admin-table-wrap admin-students-table-wrap admin-list-viewport">
         <table class="admin-table" id="tblStudents">
         <thead>
           <tr>
@@ -103,16 +109,16 @@
       <div id="paginationContainer"></div>
 
       <!-- Toast 메시지 (항상 고정 위치) -->
-      <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:10000;min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
+      <div id="statusMsg" style="position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:300px;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity 0.3s ease;"></div>
     </section>
   </main>
 
   <!-- 학생 상세 모달 -->
-  <div id="enrollmentDetailModal" class="modal" style="display:none;">
+  <div id="enrollmentDetailModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="enrollmentDetailTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>학생 상세 정보</h2>
-        <button class="modal-close" onclick="closeEnrollmentDetailModal()">&times;</button>
+        <h2 id="enrollmentDetailTitle">학생 상세 정보</h2>
+        <button class="modal-close admin-modal-close" onclick="closeEnrollmentDetailModal()" aria-label="닫기">&times;</button>
       </div>
       <div id="enrollmentDetailContent">
         <div class="muted" style="padding:8px;">로딩 중...</div>
@@ -125,7 +131,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>학생 기본 정보 수정</h2>
-        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        <button class="modal-close admin-modal-close" onclick="closeEditModal()" aria-label="닫기">&times;</button>
       </div>
       <form id="editUserForm">
         <div class="form-group">

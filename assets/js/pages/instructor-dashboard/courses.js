@@ -2,11 +2,11 @@
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
 import { handleError } from "/assets/js/utils/error-handler.js";
+import { getSubjectColorStyle } from "/assets/js/utils/subject-colors.js";
 import {
   normalizeCourseForReadOnly,
   normalizeAccessType,
   normalizeCourseFormat,
-  getAccessTypeBadgeLabel,
   getCourseFormatBadgeLabel
 } from "/assets/js/utils/course-readonly.js";
 import {
@@ -16,6 +16,8 @@ import {
   renderEmptyTable,
   renderListPagination,
   formatInstructorGrade,
+  getInstructorCourseAccessLabel,
+  formatListLoadError,
   setDashboardText
 } from "/assets/js/pages/instructor-dashboard/context.js";
 
@@ -25,7 +27,8 @@ function getAssignedInstructorIds(course) {
   const ids = [
     course?.instructorUid,
     course?.instructorId,
-    ...(Array.isArray(course?.instructorUids) ? course.instructorUids : [])
+    ...(Array.isArray(course?.instructorUids) ? course.instructorUids : []),
+    ...(Array.isArray(course?.instructorIds) ? course.instructorIds : [])
   ];
   return ids.map((id) => String(id || "").trim()).filter(Boolean);
 }
@@ -60,9 +63,11 @@ function courseMatchesFilters(course) {
   if (keyword) {
     const haystack = [
       course.title,
+      course.subjectLabel,
+      course.subject,
       course.year,
       formatInstructorGrade(course.gradeLabel || course.grade),
-      getAccessTypeBadgeLabel(course.accessType),
+      getInstructorCourseAccessLabel(course.accessType),
       getCourseFormatBadgeLabel(course.courseFormat)
     ].map((v) => String(v || "").toLowerCase()).join(" ");
     if (!haystack.includes(keyword)) return false;
@@ -114,19 +119,27 @@ function renderCoursesTable() {
 
   dom.coursesTable.innerHTML = pageRows.map((course) => {
     const accessKey = normalizeAccessType(course.accessType);
-    const accessLabel = escapeHtml(getAccessTypeBadgeLabel(accessKey));
+  const accessLabel = escapeHtml(getInstructorCourseAccessLabel(accessKey));
     const formatLabel = escapeHtml(getCourseFormatBadgeLabel(course.courseFormat));
     const title = escapeHtml(course.title || "제목 없는 강좌");
+    const subjectValue = String(course.subjectLabel || course.subject || "일반").trim();
+    const subject = escapeHtml(subjectValue);
+    const subjectColorStyle = getSubjectColorStyle(subjectValue, state.subjectColorMap);
     const year = escapeHtml(course.year || "-");
     const grade = escapeHtml(formatInstructorGrade(course.gradeLabel || course.grade));
     const courseId = escapeHtml(course.id);
 
     return `
       <tr>
-        <td class="instructor-table-title">${title}</td>
+        <td class="instructor-table-title">
+          <div class="instructor-table-title__content">
+            <span class="instructor-subject-badge${subjectColorStyle ? " has-subject-color" : ""}" data-subject="${subject}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${subject}</span>
+            <span>${title}</span>
+          </div>
+        </td>
         <td>${year}</td>
         <td>${grade}</td>
-        <td><span class="instructor-course-badge instructor-course-badge--${accessKey === "memberOnly" ? "member" : "public"}">${accessLabel}</span></td>
+        <td><span class="instructor-course-badge instructor-course-badge--${accessKey === "public" ? "public" : "member"}">${accessLabel}</span></td>
         <td><span class="instructor-course-badge instructor-course-badge--format">${formatLabel}</span></td>
         <td class="instructor-table-actions">
           <button type="button" class="btn primary sm" onclick="viewCourseDetail('${courseId}')">강좌 보기</button>
@@ -142,7 +155,6 @@ function renderCoursesTable() {
     onPageChange: (nextPage) => {
       state.coursesPage = nextPage;
       renderCoursesTable();
-      dom.coursesPagination?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }) || state.coursesPage;
 }
@@ -175,6 +187,7 @@ export async function loadMyCourses() {
   if (!dom.coursesTable) return;
 
   try {
+    state.coursesLoadError = null;
     renderEmptyTable(dom.coursesTable, 6, "강좌를 불러오는 중입니다...");
     const currentUserId = state.user?.uid || auth.currentUser?.uid;
     if (!currentUserId) {
@@ -193,6 +206,7 @@ export async function loadMyCourses() {
         courseQueries.push(
           query(collection(db, "courses"), where("instructorUid", "==", state.instructorProfileId)),
           query(collection(db, "courses"), where("instructorUids", "array-contains", state.instructorProfileId)),
+          query(collection(db, "courses"), where("instructorIds", "array-contains", state.instructorProfileId)),
           query(collection(db, "courses"), where("instructorId", "==", state.instructorProfileId))
         );
       }
@@ -200,7 +214,12 @@ export async function loadMyCourses() {
     } catch (queryError) {
       if (queryError.code === "failed-precondition" || queryError.code === "unimplemented") {
         console.warn("[instructor-dashboard] assigned course query requires index/configuration", queryError);
-        renderEmptyTable(dom.coursesTable, 6, "담당 강좌 조회 설정을 확인해야 합니다. 관리자에게 문의해 주세요.");
+        state.coursesLoadError = queryError;
+        renderEmptyTable(
+          dom.coursesTable,
+          6,
+          formatListLoadError("담당 강좌 조회 설정을 확인해야 합니다. 관리자에게 문의해 주세요.", queryError)
+        );
         setDashboardText(dom.statCourses, "-");
         return;
       } else {
@@ -235,7 +254,8 @@ export async function loadMyCourses() {
     renderCoursesTable();
   } catch (error) {
     handleError(error, "Load instructor courses", { showToast: false, logError: true });
-    renderEmptyTable(dom.coursesTable, 6, "강좌 목록을 불러오지 못했습니다.");
+    state.coursesLoadError = error;
+    renderEmptyTable(dom.coursesTable, 6, formatListLoadError("강좌 목록을 불러오지 못했습니다.", error));
     setDashboardText(dom.statCourses, "-");
   }
 }

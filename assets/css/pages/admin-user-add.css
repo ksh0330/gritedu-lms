@@ -67,10 +67,43 @@
       font-size: 12px;
       color: var(--muted);
     }
+    .subject-choice-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .subject-choice-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      user-select: none;
+    }
+    .subject-choice-chip:hover {
+      border-color: var(--brand);
+    }
+    .subject-choice-chip.is-checked {
+      border-color: var(--brand);
+      background: rgba(255, 122, 0, 0.12);
+      color: var(--brand);
+    }
+    .subject-choice-chip input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--brand);
+    }
     #statusMsg {
       /* 고정 위치로 항상 화면 상단에 위치하므로 margin-top 불필요 */
       font-weight: 700;
-      z-index: 11050 !important;
     }
     .page-header-row .page-title {
       margin: 0;
@@ -162,32 +195,32 @@
       background: var(--card);
       font-weight: 700;
     }
-    .btn {
+    .admin-user-add-page .admin-table .btn {
       background: var(--card);
       color: var(--text);
       border: 1px solid var(--border);
     }
-    .btn:hover {
+    .admin-user-add-page .admin-table .btn:hover {
       background: var(--hover);
       transform: translateY(-1px);
     }
-    .btn.sm {
+    .admin-user-add-page .admin-table .btn.sm {
       padding: 4px 8px;
       font-size: 12px;
       background: var(--card);
       color: var(--text);
       border: 1px solid var(--border);
     }
-    .btn.sm:hover {
+    .admin-user-add-page .admin-table .btn.sm:hover {
       background: var(--hover);
       transform: translateY(-1px);
     }
-    .btn.warning {
+    .admin-user-add-page .btn.warning {
       background: #f59e0b;
       border-color: #f59e0b;
       color: #fff;
     }
-    .btn.warning:hover {
+    .admin-user-add-page .btn.warning:hover {
       background: #d97706;
       border-color: #d97706;
     }
@@ -240,8 +273,10 @@
     }
     .cleanup-dialog {
       width: min(760px, 100%);
-      max-height: 90vh;
-      overflow: auto;
+      max-height: calc(100dvh - 40px);
+      min-width: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
       position: relative;
       padding: 24px;
       border: 1px solid var(--border);
@@ -251,12 +286,21 @@
       box-shadow: 0 24px 80px rgba(0,0,0,.25);
     }
     .cleanup-dialog__close {
-      position: absolute;
-      top: 14px;
-      right: 14px;
+      flex: 0 0 auto;
+      position: static;
     }
     .cleanup-dialog__header {
-      margin: 0 40px 16px 0;
+      align-items: flex-start;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      margin: -24px -24px 16px;
+      padding: 20px 24px 16px;
+      position: sticky;
+      top: -24px;
+      z-index: 5;
     }
     .cleanup-dialog__header h2 {
       margin: 0;
@@ -404,6 +448,35 @@
         display: grid;
       }
     }
+
+    #studentCleanupModal,
+    #memberCleanupModal,
+    #instructorCleanupModal {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 480px) {
+      #studentCleanupModal,
+      #memberCleanupModal,
+      #instructorCleanupModal {
+        padding: 8px !important;
+      }
+      .cleanup-dialog {
+        max-height: calc(100dvh - 16px);
+        padding: 16px;
+        width: calc(100vw - 16px);
+      }
+      .cleanup-dialog__header {
+        margin: -16px -16px 16px;
+        padding: 14px 16px;
+        top: -16px;
+      }
+      .cleanup-dialog__footer .btn {
+        flex: 1 1 100%;
+        width: 100%;
+      }
+    }
     .modal {
       position: fixed;
       top: 0;
@@ -496,6 +569,21 @@
       .account-user-toolbar input,
       .account-user-toolbar select {
         font-size: 16px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .account-user-list-head {
+        align-items: flex-start !important;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .account-user-list-stats {
+        flex-wrap: wrap;
+        gap: 8px !important;
+        max-width: 100%;
+        width: 100%;
       }
     }
   

@@ -1,5 +1,6 @@
 import { db } from "/assets/js/firebase-init.js";
 import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+import { showAdminToast } from "/assets/js/utils/admin-toast.js";
 import {
   STORY_V2_DEFAULTS,
   isStoryV2Document,
@@ -12,25 +13,7 @@ import {
 const $ = (selector, root = document) => root.querySelector(selector);
 
 function toast(msg, err = false) {
-  const statusMsg = $("#statusMsg");
-  if (!statusMsg) {
-    console[err ? "error" : "log"](msg);
-    return;
-  }
-  statusMsg.textContent = msg;
-  statusMsg.style.color = err ? "var(--error-color)" : "var(--success-color)";
-  statusMsg.style.background = err ? "var(--error-bg)" : "var(--success-bg)";
-  statusMsg.style.padding = "12px";
-  statusMsg.style.borderRadius = "8px";
-  statusMsg.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-  statusMsg.style.opacity = "1";
-  statusMsg.style.pointerEvents = "auto";
-  setTimeout(() => {
-    if (statusMsg.textContent === msg) {
-      statusMsg.style.opacity = "0";
-      statusMsg.style.pointerEvents = "none";
-    }
-  }, 3000);
+  showAdminToast(msg, err);
 }
 
 export async function loadStoryContent() {

@@ -352,12 +352,10 @@ export function resolveScheduleGroupLabel(groupId, groups) {
 
 /**
  * @param {ScheduleGroup[] | unknown} groups
- * @param {{ entryCounts?: Record<string, number> }} [options]
  * @returns {{ ok: true, groups: ScheduleGroup[] } | { ok: false, message: string }}
  */
-export function validateScheduleGroups(groups, options = {}) {
+export function validateScheduleGroups(groups) {
   const normalized = normalizeScheduleGroups(groups);
-  const entryCounts = options.entryCounts || {};
 
   if (!normalized.length) {
     return { ok: false, message: "시간표 그룹이 1개 이상 필요합니다." };
@@ -607,7 +605,16 @@ export function mergeGroupCatalogIntoStore(existingGroupCatalogs, groupId, draft
 }
 
 /** Unused legacy keys written outside the current CMS; removed on admin save. */
-export const LEGACY_TIMETABLE_CATALOG_FIELD_KEYS = ["subjectMeta", "subjectColorMap", "version"];
+export const LEGACY_TIMETABLE_CATALOG_FIELD_KEYS = [
+  "subjects",
+  "grades",
+  "schools",
+  "classrooms",
+  "scheduleImages",
+  "subjectMeta",
+  "subjectColorMap",
+  "version",
+];
 
 /**
  * @param {Record<string, unknown>} payload
@@ -630,20 +637,18 @@ export function applyLegacyTimetableCatalogFieldRemovals(payload, deleteFieldFn)
  *   deleteFieldFn?: () => unknown,
  * }} options
  */
-export function buildTimetableCatalogSavePayload({ groupCatalogs, groupId, fields, updatedBy, deleteFieldFn }) {
+export function buildTimetableCatalogSavePayload({
+  groupCatalogs,
+  groupId: _groupId,
+  fields: _fields,
+  updatedBy,
+  deleteFieldFn,
+}) {
   /** @type {Record<string, unknown>} */
   const payload = {
     groupCatalogs,
     updatedBy,
   };
-
-  if (groupId === REGULAR_SCHEDULE_GROUP_ID) {
-    payload.subjects = fields.subjects;
-    payload.grades = fields.grades;
-    payload.schools = fields.schools;
-    payload.classrooms = fields.classrooms;
-    payload.scheduleImages = fields.scheduleImages;
-  }
 
   applyLegacyTimetableCatalogFieldRemovals(payload, deleteFieldFn);
   return payload;
@@ -658,13 +663,6 @@ export function applyTimetableCatalogMergeToStored(stored, merged) {
     ...(isObj(stored) ? stored : {}),
     groupCatalogs: merged.groupCatalogs,
   };
-  if (merged.groupId === REGULAR_SCHEDULE_GROUP_ID) {
-    next.subjects = merged.fields.subjects;
-    next.grades = merged.fields.grades;
-    next.schools = merged.fields.schools;
-    next.classrooms = merged.fields.classrooms;
-    next.scheduleImages = merged.fields.scheduleImages;
-  }
   LEGACY_TIMETABLE_CATALOG_FIELD_KEYS.forEach((key) => {
     delete next[key];
   });
@@ -702,14 +700,6 @@ export function buildTimetableCatalogBaselineUpdateFields(groupId, fields, { upd
     updatedBy,
   };
 
-  if (id === REGULAR_SCHEDULE_GROUP_ID) {
-    updates.subjects = fields.subjects;
-    updates.grades = fields.grades;
-    updates.schools = fields.schools;
-    updates.classrooms = fields.classrooms;
-    updates.scheduleImages = fields.scheduleImages;
-  }
-
   applyLegacyTimetableCatalogFieldRemovals(updates, deleteFieldFn);
   return updates;
 }
@@ -729,14 +719,6 @@ export function buildTimetableCatalogBaselineCreatePayload(groupId, fields, sche
       [id]: fields,
     },
   };
-
-  if (id === REGULAR_SCHEDULE_GROUP_ID) {
-    payload.subjects = fields.subjects;
-    payload.grades = fields.grades;
-    payload.schools = fields.schools;
-    payload.classrooms = fields.classrooms;
-    payload.scheduleImages = fields.scheduleImages;
-  }
 
   return payload;
 }

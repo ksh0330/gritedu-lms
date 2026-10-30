@@ -1,6 +1,6 @@
 ﻿// /assets/js/pages/admin-popup.js
 // 팝업창 관리 페이지 (여러 팝업 지원)
-import { auth, db, requireRole, app } from "/assets/js/firebase-init.js";
+import { db, requireRole } from "/assets/js/firebase-init.js";
 import {
   doc, setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
@@ -8,9 +8,9 @@ import { getSettingDoc, invalidateSetting } from "/assets/js/utils/settings-cach
 import { escapeHtml } from "/assets/js/utils/html.js";
 import {
   clearModalAlert,
-  ensureAdminToastHost,
   setModalAlert,
 } from "/assets/js/utils/admin-modal-alert.js";
+import { showAdminToast } from "/assets/js/utils/admin-toast.js";
 import {
   PUBLIC_IMAGE_FIELD,
   normalizePublicImageUrl,
@@ -46,7 +46,8 @@ import {
 })();
 
 const $ = (s, r = document) => typeof s === 'string' ? r.querySelector(s) : s;
-const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+let popupModalTrigger = null;
+let isPopupSaving = false;
 
 function setPopupModalAlert(message = "", isError = false) {
   setModalAlert($("#popupModalAlert"), message, isError);
@@ -58,37 +59,10 @@ function reportPopupError(message) {
 }
 
 function toast(msg, err = false) {
-  let el = $("#statusMsg");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "statusMsg";
-    document.body.appendChild(el);
-  }
-  ensureAdminToastHost(el);
-  el.style.color = err ? "var(--error-color)" : "var(--success-color)";
-  el.style.background = err ? "var(--error-bg)" : "var(--success-bg)";
-  el.style.padding = "12px";
-  el.style.borderRadius = "8px";
-  el.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-  el.textContent = msg;
-  el.style.opacity = "1";
-  el.style.pointerEvents = "auto";
+  showAdminToast(msg, err);
   if (err && $("#popupEditModal")?.style.display === "flex") {
     setPopupModalAlert(msg, true);
   }
-  setTimeout(() => { 
-    if (el.textContent === msg) {
-      el.style.opacity = "0";
-      el.style.pointerEvents = "none";
-      setTimeout(() => {
-        if (el.textContent === msg) {
-          el.textContent = "";
-          el.style.background = "";
-          el.style.boxShadow = "";
-        }
-      }, 300);
-    }
-  }, 3000);
 }
 
 let allPopups = [];
@@ -212,7 +186,7 @@ function renderPopupTextItemsEditor(items = []) {
               <input type="checkbox" id="popup-text-item-${index}-enabled" ${item.enabled !== false ? "checked" : ""}>
               사용
             </label>
-            <button type="button" class="btn sm" data-popup-text-action="remove" data-text-index="${index}">삭제</button>
+            <button type="button" class="btn sm danger" data-popup-text-action="remove" data-text-index="${index}">삭제</button>
           </div>
         </div>
         <label for="popup-text-item-${index}-text">문구</label>
@@ -437,10 +411,6 @@ function setPopupImagePathStatus(message, ok = null) {
   }
 }
 
-function getPopupLocalPreviewMessage() {
-  return "선택한 이미지 미리보기입니다. 실제 홈페이지 반영은 파일 배치 및 배포 후 가능합니다.";
-}
-
 function getPopupMissingPathMessage() {
   return "이미지 URL을 불러올 수 없습니다. R2 public URL 또는 rollback용 /assets/popup/*.webp 경로를 확인하세요.";
 }
@@ -480,6 +450,8 @@ async function loadPopups() {
   } catch (error) {
     console.error("팝업 목록 로드 실패:", error);
     toast("팝업 목록 로드 실패: " + error.message, true);
+    const container = $("#popupListContainer");
+    if (container) container.innerHTML = '<p role="alert" class="muted">팝업 목록을 불러오지 못했습니다. 새로고침으로 다시 시도해 주세요.</p>';
   }
 }
 
@@ -515,13 +487,13 @@ function renderPopupList() {
             <h3 class="popup-card-title">${escapeHtml(displayTitle)}</h3>
           </div>
           <div class="popup-card-actions">
-            <button class="btn sm" onclick="movePopup(${index}, -1)" ${canMoveUp ? "" : "disabled"} title="위로 이동">위</button>
-            <button class="btn sm" onclick="movePopup(${index}, 1)" ${canMoveDown ? "" : "disabled"} title="아래로 이동">아래</button>
+            <button type="button" class="btn sm popup-order-btn" onclick="movePopup(${index}, -1)" ${canMoveUp ? "" : "disabled"} title="위로 이동" aria-label="${escapeHtml(displayTitle)} 위로 이동">↑</button>
+            <button type="button" class="btn sm popup-order-btn" onclick="movePopup(${index}, 1)" ${canMoveDown ? "" : "disabled"} title="아래로 이동" aria-label="${escapeHtml(displayTitle)} 아래로 이동">↓</button>
             <button class="btn sm ${enabled ? 'secondary' : 'primary'}" onclick="togglePopupEnabled(${index}, ${enabled})" title="${enabled ? '비활성화' : '활성화'}">
               ${enabled ? '비활성화' : '활성화'}
             </button>
             <button class="btn sm" onclick="openEditPopupModal(${index})">수정</button>
-            <button class="btn sm warning" onclick="deletePopup(${index})">삭제</button>
+            <button class="btn sm danger" onclick="deletePopup(${index})">삭제</button>
           </div>
         </div>
         <div class="popup-card-body">
@@ -620,7 +592,7 @@ function initPopupDragAndDrop() {
       card.style.opacity = '0.5';
     });
     
-    card.addEventListener('dragend', (e) => {
+    card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
       card.style.opacity = '1';
       // 드롭 표시 제거
@@ -645,7 +617,7 @@ function initPopupDragAndDrop() {
       card.classList.add('drag-over');
     });
     
-    card.addEventListener('dragleave', (e) => {
+    card.addEventListener('dragleave', () => {
       card.classList.remove('drag-over');
     });
     
@@ -659,7 +631,7 @@ function initPopupDragAndDrop() {
       // 새로운 순서 계산
       const newOrder = [];
       const cardElements = Array.from(container.querySelectorAll('.popup-card'));
-      cardElements.forEach((cardEl, idx) => {
+      cardElements.forEach((cardEl) => {
         const oldIndex = parseInt(cardEl.getAttribute('data-popup-index'));
         newOrder.push(allPopups[oldIndex]);
       });
@@ -695,31 +667,10 @@ function getDragAfterElement(container, y) {
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-let popupFormDirty = false;
-
-function requestDiscardPopupChanges() {
-  const modal = $("#popupUnsavedConfirmModal");
-  if (!modal) return Promise.resolve(false);
-  modal.style.display = "flex";
-  return new Promise((resolve) => {
-    const finish = (discard) => {
-      modal.style.display = "none";
-      modal.removeEventListener("click", onClick);
-      resolve(discard);
-    };
-    const onClick = (event) => {
-      const action = event.target.closest("[data-popup-confirm]")?.dataset.popupConfirm;
-      if (action === "discard") finish(true);
-      else if (action === "cancel" || event.target === modal) finish(false);
-    };
-    modal.addEventListener("click", onClick);
-  });
-}
-
 // 팝업 추가 모달 열기
 window.openAddPopupModal = function() {
   currentPopup = null;
-  openEditPopupModal();
+  window.openEditPopupModal();
 };
 
 // 팝업 수정 모달 열기
@@ -727,6 +678,7 @@ window.openEditPopupModal = function(index) {
   const modal = $("#popupEditModal");
   const form = $("#popupEditForm");
   if (!modal || !form) return;
+  popupModalTrigger = document.activeElement;
   clearModalAlert($("#popupModalAlert"));
   if (index !== undefined && index !== null) {
     currentPopup = { ...allPopups[index], index };
@@ -797,16 +749,16 @@ window.openEditPopupModal = function(index) {
   }
   
   // 미리보기 업데이트
-  updatePopupPreview();
-  popupFormDirty = false;
+  window.updatePopupPreview();
   
   document.body.classList.add("modal-open");
   modal.style.display = "flex";
+  $(".modal-close", modal)?.focus();
 };
 
 // 모달 닫기
-window.closePopupModal = async function(force = false) {
-  if (!force && popupFormDirty && !(await requestDiscardPopupChanges())) return;
+window.closePopupModal = function() {
+  if (isPopupSaving) return;
   clearTimeout(popupImagePreviewTimer);
   clearTimeout(previewUpdateTimer);
   popupImagePreviewTimer = 0;
@@ -821,28 +773,18 @@ window.closePopupModal = async function(force = false) {
   clearModalAlert($("#popupModalAlert"));
   clearPreparedPopupPreview();
   currentPopup = null;
-  popupFormDirty = false;
+  if (popupModalTrigger?.isConnected) popupModalTrigger.focus();
+  popupModalTrigger = null;
 };
 
-const popupDirtyForm = $("#popupEditForm");
-if (popupDirtyForm && popupDirtyForm.dataset.dirtyTrackingBound !== "1") {
-  popupDirtyForm.dataset.dirtyTrackingBound = "1";
-  const markDirty = (event) => { if (event.isTrusted) popupFormDirty = true; };
-  popupDirtyForm.addEventListener("input", markDirty);
-  popupDirtyForm.addEventListener("change", markDirty);
-  popupDirtyForm.addEventListener("click", (event) => {
-    if (event.isTrusted && event.target.closest("[data-popup-text-action], #popupAddTextItemBtn")) popupFormDirty = true;
-  });
-}
-
 // 위치 선택 변경 시 사용자 지정 옵션 표시/숨김
-$("#popupEditPosition")?.addEventListener("change", (e) => {
+$("#popupEditPosition")?.addEventListener("change", () => {
   const positionCustomGroup = $("#positionCustomGroup");
   if (positionCustomGroup) {
     positionCustomGroup.style.display = "none";
     positionCustomGroup.hidden = true;
   }
-  updatePopupPreview();
+  window.updatePopupPreview();
 });
 
 // 이미지 미리보기 업데이트
@@ -1027,8 +969,7 @@ function initPopupImageResize(imgElement) {
       const savePath = imgElement.getAttribute('data-save-path') || imgElement.getAttribute('data-image-path') || '';
       const gridContainer = imgElement.closest('[data-image-grid]');
       const totalImages = gridContainer ? gridContainer.querySelectorAll('img').length : 1;
-      const imageIndex = parseInt(imgElement.getAttribute('data-image-index') || '0');
-      showPopupImageEditModal(imgElement, null, savePath, totalImages);
+      window.showPopupImageEditModal(imgElement, null, savePath, totalImages);
     });
   }
   
@@ -1045,7 +986,7 @@ function initPopupImageResize(imgElement) {
       const savePath = imgElement.getAttribute('data-save-path') || imgElement.getAttribute('data-image-path') || '';
       const gridContainer = imgElement.closest('[data-image-grid]');
       const totalImages = gridContainer ? gridContainer.querySelectorAll('img').length : 1;
-      showPopupImageEditModal(imgElement, null, savePath, totalImages);
+      window.showPopupImageEditModal(imgElement, null, savePath, totalImages);
     });
   }
 }
@@ -1064,13 +1005,13 @@ window.showPopupImageEditModal = function(imgElement, webpFile, defaultPath, tot
   // 모달 생성
   const modal = document.createElement('div');
   modal.className = 'modal-overlay popup-image-edit-modal';
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001;';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:16px;box-sizing:border-box;overflow-y:auto;';
   
   modal.innerHTML = `
-    <div style="background:var(--card);padding:24px;border-radius:12px;max-width:500px;width:90%;border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div class="popup-image-edit-dialog" style="background:var(--card);padding:24px;border-radius:12px;max-width:500px;width:90%;border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+      <div class="popup-image-edit-dialog__header">
         <h3 style="margin:0;color:var(--text);">이미지 설정${totalImages > 1 ? ` (${imageIndex}/${totalImages})` : ''}</h3>
-        <button class="modal-close-btn" style="background:none;border:none;font-size:28px;cursor:pointer;color:var(--muted);padding:0;width:32px;height:32px;line-height:32px;" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+        <button class="modal-close-btn admin-modal-close" aria-label="닫기" onclick="this.closest('.modal-overlay').remove()">&times;</button>
       </div>
       
       <div style="margin-bottom:20px;text-align:center;">
@@ -1195,7 +1136,7 @@ function initPopupEditorImages() {
         const gridContainer = img.closest('[data-image-grid]');
         const totalImages = gridContainer ? gridContainer.querySelectorAll('img').length : 1;
         // webpFile은 없을 수 있으므로 null로 전달
-        showPopupImageEditModal(img, null, savePath, totalImages);
+        window.showPopupImageEditModal(img, null, savePath, totalImages);
       });
     }
   });
@@ -1204,6 +1145,7 @@ function initPopupEditorImages() {
 // 폼 제출
 $("#popupEditForm")?.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (isPopupSaving) return;
   
   const enabled = $("#popupEditEnabled")?.checked || false;
   const title = $("#popupEditTitle")?.value.trim() || "";
@@ -1303,6 +1245,15 @@ $("#popupEditForm")?.addEventListener("submit", async (e) => {
     return;
   }
   
+  isPopupSaving = true;
+  const saveButton = $("#popupSaveBtn");
+  const popupsBeforeSave = allPopups.slice();
+  let saved = false;
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "저장 중...";
+    saveButton.setAttribute("aria-busy", "true");
+  }
   try {
     const popupData = {
       id: currentPopup?.id || createPopupId(),
@@ -1351,10 +1302,11 @@ $("#popupEditForm")?.addEventListener("submit", async (e) => {
       popups: allPopups,
       updatedAt: serverTimestamp()
     }, { merge: true });
+    saved = true;
     invalidateSetting("popups");
     clearHomePopupCache();
 
-    const imageAvailable = await checkPopupAssetPathAvailable(imageUrl);
+    const imageAvailable = await checkPopupAssetPathAvailable(imageUrl).catch(() => false);
     const isR2Image = isRemotePublicImageUrl(imageUrl);
     toast(
       imageUrl && !imageAvailable && !isR2Image
@@ -1363,11 +1315,20 @@ $("#popupEditForm")?.addEventListener("submit", async (e) => {
           ? "팝업 설정이 저장되었습니다. R2 public URL은 배포 없이 공개 사이트에 반영됩니다."
           : "팝업 설정이 저장되었습니다."
     );
-    closePopupModal(true);
+    isPopupSaving = false;
+    window.closePopupModal();
     await loadPopups();
   } catch (error) {
+    if (!saved) allPopups = popupsBeforeSave;
     console.error("팝업 설정 저장 실패:", error);
     reportPopupError("팝업 설정 저장 실패: " + error.message);
+  } finally {
+    isPopupSaving = false;
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "저장";
+      saveButton.removeAttribute("aria-busy");
+    }
   }
 });
 
@@ -1413,18 +1374,29 @@ window.deletePopup = async function(index) {
   }
 };
 
-// 모달 외부 클릭 시 닫기 방지 (닫기 버튼이나 X만 닫기 가능)
-$("#popupEditModal")?.addEventListener("click", (e) => {
-  // 모달 외부 클릭 시 닫지 않음 (닫기 버튼이나 X만 닫기 가능)
-  // if (e.target.id === "popupEditModal") {
-  //   closePopupModal();
-  // }
-});
-
 // ESC 키로 모달 닫기 (확인 후)
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && $("#popupEditModal")?.style.display === "flex") {
-    closePopupModal();
+  const modal = $("#popupEditModal");
+  if (modal?.style.display !== "flex") return;
+  const imageModal = $(".popup-image-edit-modal");
+  if (e.key === "Escape") {
+    e.preventDefault();
+    if (imageModal) imageModal.querySelector(".modal-close-btn")?.click();
+    else window.closePopupModal();
+    return;
+  }
+  if (e.key !== "Tab" || imageModal) return;
+  const focusable = [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')]
+    .filter((element) => element.getClientRects().length > 0);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
   }
 });
 
@@ -1514,7 +1486,7 @@ let previewUpdateTimer = null;
 function debounceUpdatePreview() {
   if (previewUpdateTimer) clearTimeout(previewUpdateTimer);
   previewUpdateTimer = setTimeout(() => {
-    updatePopupPreview();
+    window.updatePopupPreview();
   }, 300);
 }
 window.debounceUpdatePreview = debounceUpdatePreview;
@@ -1522,7 +1494,7 @@ window.debounceUpdatePreview = debounceUpdatePreview;
 // 즉시 미리보기 업데이트
 function immediateUpdatePreview() {
   if (previewUpdateTimer) clearTimeout(previewUpdateTimer);
-  updatePopupPreview();
+  window.updatePopupPreview();
 }
 
 $("#popupContent")?.addEventListener("input", debounceUpdatePreview);

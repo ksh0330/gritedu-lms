@@ -2,6 +2,7 @@ let activeDialog = null;
 
 function removeDialog(dialog, result) {
   if (!dialog) return;
+  dialog._cleanup?.();
   dialog.remove();
   if (activeDialog === dialog) activeDialog = null;
   dialog._resolve?.(result);
@@ -10,14 +11,14 @@ function removeDialog(dialog, result) {
 export function openAdminConfirm(options = {}) {
   if (activeDialog) removeDialog(activeDialog, false);
   const dialog = document.createElement("div");
-  dialog.className = "modal admin-confirm-modal is-open";
+  dialog.className = "modal admin-confirm-modal active is-open";
   dialog.setAttribute("role", "dialog");
   dialog.setAttribute("aria-modal", "true");
   const title = String(options.title || "확인");
   const message = String(options.message || "계속 진행하시겠습니까?");
   dialog.innerHTML = `
     <div class="modal-content admin-confirm-modal__content">
-      <div class="modal-header"><h2></h2><button type="button" class="modal-close" data-admin-confirm="cancel" aria-label="닫기">&times;</button></div>
+      <div class="modal-header"><h2></h2><button type="button" class="modal-close admin-modal-close" data-admin-confirm="cancel" aria-label="닫기">&times;</button></div>
       <p class="admin-confirm-modal__message"></p>
       <div class="admin-confirm-modal__actions">
         <button type="button" class="btn" data-admin-confirm="cancel"></button>
@@ -31,12 +32,33 @@ export function openAdminConfirm(options = {}) {
   document.body.appendChild(dialog);
   activeDialog = dialog;
   const promise = new Promise((resolve) => { dialog._resolve = resolve; });
-  dialog.addEventListener("click", (event) => {
-    const action = event.target.closest("[data-admin-confirm]")?.dataset.adminConfirm;
-    if (action === "ok") removeDialog(dialog, true);
-    else if (action === "cancel" || event.target === dialog) removeDialog(dialog, false);
+  const confirmButton = dialog.querySelector('[data-admin-confirm="ok"]');
+  const cancelButtons = Array.from(dialog.querySelectorAll('[data-admin-confirm="cancel"]'));
+  const onKeyDown = (event) => {
+    if (event.key === "Escape" && activeDialog === dialog) finish(false);
+  };
+  const finish = (result) => {
+    if (!dialog.isConnected) return;
+    removeDialog(dialog, result);
+  };
+  dialog._cleanup = () => document.removeEventListener("keydown", onKeyDown);
+  confirmButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    finish(true);
   });
-  dialog.querySelector('[data-admin-confirm="ok"]')?.focus();
+  cancelButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      finish(false);
+    });
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) finish(false);
+  });
+  document.addEventListener("keydown", onKeyDown);
+  confirmButton?.focus();
   return promise;
 }
 

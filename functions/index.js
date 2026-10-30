@@ -23,7 +23,25 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const { runRecordCleanup } = require("./record-cleanup");
-const { runOfflineSessionCleanup } = require("./offline-session-cleanup");
+const {
+  SIGNUP_RATE_LIMIT_POLICY,
+  evaluateSignupRateLimit,
+} = require("./signup-rate-limit-policy");
+const {
+  EMAIL_VERIFICATION_POLICY,
+  evaluateEmailVerificationAttempt,
+  generateVerificationCode,
+  generateVerificationSessionToken,
+  hashVerificationSessionToken,
+} = require("./email-verification-policy");
+const {
+  LEGACY_STUDENT_NAME_FALLBACK_LIMIT,
+  evaluateMemberChildLinkRateLimit,
+  getMemberChildAttemptRetentionDays,
+  getStudentNameFallbackPrefixes,
+  normalizeStudentName,
+  studentNamesMatch,
+} = require("./member-child-link-policy");
 
 const MEMBER_CHILD_LINK_FAILURE_MESSAGE = "입력한 학생 정보를 확인해 주세요.";
 
@@ -33,36 +51,15 @@ const MEMBER_CHILD_RELATION_LABELS = {
   guardian: "보호자",
 };
 
-const MEMBER_CHILD_LINK_RATE_LIMIT_MESSAGE = "연동 시도 횟수가 많습니다. 잠시 후 다시 시도해 주세요.";
-
-function resolveRequestIp(data, context) {
-  const forwardedFor = context?.rawRequest?.headers?.["x-forwarded-for"];
-  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
-    return forwardedFor.split(",")[0].trim();
-  }
-
+function resolveRequestIp(context) {
   const requestIp = context?.rawRequest?.ip;
   if (typeof requestIp === "string" && requestIp.trim()) {
     return requestIp.trim();
   }
 
-  const fallbackIp = data?.ip;
-  if (typeof fallbackIp === "string" && fallbackIp.trim()) {
-    return fallbackIp.trim();
-  }
-
-  return "unknown";
-}
-
-function resolveUserAgent(data, context) {
-  const forwardedUa = context?.rawRequest?.headers?.["user-agent"];
-  if (typeof forwardedUa === "string" && forwardedUa.trim()) {
-    return forwardedUa.trim();
-  }
-
-  const fallbackUa = data?.userAgent;
-  if (typeof fallbackUa === "string" && fallbackUa.trim()) {
-    return fallbackUa.trim();
+  const forwardedFor = context?.rawRequest?.headers?.["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+    return forwardedFor.split(",")[0].trim();
   }
 
   return "unknown";
@@ -86,39 +83,6 @@ function toLoggableError(error) {
   };
 }
 
-function timestampToMillis(value) {
-  if (!value) return null;
-  if (typeof value.toMillis === "function") return value.toMillis();
-  const date = value instanceof Date ? value : new Date(value);
-  const millis = date.getTime();
-  return Number.isFinite(millis) ? millis : null;
-}
-
-function latestBlockedUntilMillis(snapshot, nowMillis) {
-  let latest = null;
-  snapshot.docs.forEach((doc) => {
-    const millis = timestampToMillis(doc.data()?.blockedUntil);
-    if (millis != null && millis > nowMillis && (latest == null || millis > latest)) {
-      latest = millis;
-    }
-  });
-  return latest;
-}
-
-function countAttemptsSince(snapshot, cutoffMillis) {
-  return snapshot.docs.reduce((count, doc) => {
-    const millis = timestampToMillis(doc.data()?.timestamp);
-    return millis != null && millis > cutoffMillis ? count + 1 : count;
-  }, 0);
-}
-
-function countCreatedAttemptsSince(snapshot, cutoffMillis) {
-  return snapshot.docs.reduce((count, doc) => {
-    const millis = timestampToMillis(doc.data()?.createdAt);
-    return millis != null && millis > cutoffMillis ? count + 1 : count;
-  }, 0);
-}
-
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
@@ -134,7 +98,7 @@ function getPhoneLast4(value) {
 
 function normalizeGrade(value) {
   const compact = String(value || "").trim().replace(/\s+/g, "");
-  if (/^[1-6]$/.test(compact)) return compact;
+  if (/^[1-7]$/.test(compact)) return compact;
 
   const directMap = {
     중1: "1",
@@ -161,6 +125,9 @@ function normalizeGrade(value) {
     고등3: "6",
     고등학교3학년: "6",
     고3학년: "6",
+    졸업: "7",
+    N수: "7",
+    졸업N수: "7",
   };
 
   return directMap[compact] || compact;
@@ -169,18 +136,43 @@ function normalizeGrade(value) {
 function getSafeAttemptInput(data = {}) {
   const relationLabel = String(data?.relationLabel || "").trim();
   return {
-    studentName: normalizeText(data?.studentName),
-    school: normalizeText(data?.school),
-    grade: normalizeGrade(data?.grade),
-    phoneLast4: getPhoneLast4(data?.studentPhone),
-    relationLabel: Object.prototype.hasOwnProperty.call(MEMBER_CHILD_RELATION_LABELS, relationLabel)
-      ? relationLabel
-      : relationLabel,
+    providedFields: [
+      normalizeStudentName(data?.studentName) ? "studentName" : "",
+      normalizeText(data?.school) ? "school" : "",
+      normalizeGrade(data?.grade) ? "grade" : "",
+      normalizePhoneDigits(data?.studentPhone) ? "studentPhone" : "",
+      relationLabel ? "relationLabel" : "",
+    ].filter(Boolean),
   };
 }
 
+function getSubmittedMemberChildInput(data = {}) {
+  return {
+    studentName: normalizeStudentName(data?.studentName),
+    school: normalizeText(data?.school),
+    grade: normalizeGrade(data?.grade),
+    studentPhone: normalizePhoneDigits(data?.studentPhone),
+    relationLabel: String(data?.relationLabel || "").trim(),
+  };
+}
+
+function getInvalidMemberChildInputFields(data = {}) {
+  const invalidFields = [];
+  const relationLabel = String(data?.relationLabel || "").trim();
+  if (!normalizeStudentName(data?.studentName)) invalidFields.push("studentName");
+  if (!normalizeText(data?.school)) invalidFields.push("school");
+  if (!/^[1-7]$/.test(normalizeGrade(data?.grade))) invalidFields.push("grade");
+  if (normalizePhoneDigits(data?.studentPhone).length < 7) {
+    invalidFields.push("studentPhone");
+  }
+  if (!Object.prototype.hasOwnProperty.call(MEMBER_CHILD_RELATION_LABELS, relationLabel)) {
+    invalidFields.push("relationLabel");
+  }
+  return invalidFields;
+}
+
 function validateMemberChildLinkInput(data = {}) {
-  const studentName = normalizeText(data?.studentName);
+  const studentName = normalizeStudentName(data?.studentName);
   const school = normalizeText(data?.school);
   const grade = normalizeGrade(data?.grade);
   const studentPhoneDigits = normalizePhoneDigits(data?.studentPhone);
@@ -189,7 +181,7 @@ function validateMemberChildLinkInput(data = {}) {
   if (
     !studentName ||
     !school ||
-    !/^[1-6]$/.test(grade) ||
+    !/^[1-7]$/.test(grade) ||
     studentPhoneDigits.length < 7 ||
     !Object.prototype.hasOwnProperty.call(MEMBER_CHILD_RELATION_LABELS, relationLabel)
   ) {
@@ -209,7 +201,7 @@ function validateMemberChildLinkInput(data = {}) {
 
 function buildSafeStudentSnapshot(student = {}) {
   return {
-    name: normalizeText(student.name),
+    name: normalizeStudentName(student.name),
     school: normalizeText(student.school),
     grade: normalizeGrade(student.grade),
     phoneLast4: getPhoneLast4(student.phone),
@@ -226,20 +218,18 @@ function buildSafeMemberSnapshot(member = {}) {
 
 async function recordMemberChildLinkAttempt({
   memberUid,
-  input,
   result,
   matchCount = 0,
   matchedStudentUid = null,
   linkId = null,
-  debug = null,
+  submittedInput = null,
+  diagnostics = null,
 }) {
   if (!memberUid) return;
   const createdAt = admin.firestore.Timestamp.now();
-  const successfulResults = new Set(["success", "linked", "alreadyLinked", "ok", "completed"]);
-  const retentionDays = successfulResults.has(String(result || "")) ? 180 : 90;
+  const retentionDays = getMemberChildAttemptRetentionDays(result);
   const attempt = {
     memberUid,
-    input,
     result,
     matchCount,
     createdAt,
@@ -256,8 +246,12 @@ async function recordMemberChildLinkAttempt({
     attempt.linkId = linkId;
   }
 
-  if (debug && typeof debug === "object") {
-    attempt.debug = debug;
+  if (submittedInput && typeof submittedInput === "object") {
+    attempt.submittedInput = submittedInput;
+  }
+
+  if (diagnostics && typeof diagnostics === "object") {
+    attempt.diagnostics = diagnostics;
   }
 
   try {
@@ -269,87 +263,85 @@ async function recordMemberChildLinkAttempt({
 
 async function enforceMemberChildLinkRateLimit(memberUid) {
   const now = admin.firestore.Timestamp.now();
-  const tenMinutesAgoMillis = now.toMillis() - 10 * 60 * 1000;
-  const oneDayAgoMillis = now.toMillis() - 24 * 60 * 60 * 1000;
   const attemptsSnap = await db
     .collection("memberChildLinkAttempts")
     .where("memberUid", "==", memberUid)
     .get();
-  const tenMinuteCount = countCreatedAttemptsSince(attemptsSnap, tenMinutesAgoMillis);
-  const oneDayCount = countCreatedAttemptsSince(attemptsSnap, oneDayAgoMillis);
-
-  if (tenMinuteCount >= 3) {
-    return {
-      allowed: false,
-      reason: "too-many-attempts-10m",
-      tenMinuteCount,
-      oneDayCount,
-    };
-  }
-
-  if (oneDayCount >= 10) {
-    return {
-      allowed: false,
-      reason: "too-many-attempts-24h",
-      tenMinuteCount,
-      oneDayCount,
-    };
-  }
-
-  return {
-    allowed: true,
-    tenMinuteCount,
-    oneDayCount,
-  };
+  return evaluateMemberChildLinkRateLimit({
+    attempts: attemptsSnap.docs.map((attemptDoc) => attemptDoc.data() || {}),
+    nowMillis: now.toMillis(),
+  });
 }
 
-async function findMatchingStudents(input) {
-  const studentsSnap = await db.collection("students").get();
-
-  const matches = [];
-  studentsSnap.forEach((studentDoc) => {
+function matchStudentCandidates(studentDocs, input) {
+  const candidates = studentDocs.map((studentDoc) => {
     const student = studentDoc.data() || {};
-    const normalizedStudent = {
-      name: normalizeText(student.name),
+    return {
+      row: {
+        ...student,
+        uid: studentDoc.id,
+        id: studentDoc.id,
+      },
+      name: normalizeStudentName(student.name),
       school: normalizeText(student.school),
       grade: normalizeGrade(student.grade),
       phone: normalizePhoneDigits(student.phone),
     };
-
-    if (
-      normalizedStudent.name === input.studentName &&
-      normalizedStudent.school === input.school &&
-      normalizedStudent.grade === input.grade &&
-      normalizedStudent.phone === input.studentPhoneDigits
-    ) {
-      matches.push({
-        uid: studentDoc.id,
-        id: studentDoc.id,
-        ...student,
-      });
-    }
   });
 
-  return matches;
+  let remaining = candidates.filter((candidate) =>
+    studentNamesMatch(candidate.name, input.studentName)
+  );
+  if (!remaining.length) {
+    return {matches: [], mismatchFields: ["studentName"]};
+  }
+
+  const checks = [
+    ["school", input.school],
+    ["grade", input.grade],
+    ["studentPhone", input.studentPhoneDigits, "phone"],
+  ];
+
+  for (const [field, expected, candidateField = field] of checks) {
+    const matched = remaining.filter((candidate) =>
+      candidate[candidateField] === expected
+    );
+    if (!matched.length) {
+      return {matches: [], mismatchFields: [field]};
+    }
+    remaining = matched;
+  }
+
+  return {matches: remaining.map((candidate) => candidate.row), mismatchFields: []};
 }
 
-async function recomputeMemberLinkedChildrenCount(memberUid) {
-  const linksSnap = await db
-    .collection("studentParentLinks")
-    .where("memberUid", "==", memberUid)
+async function findMatchingStudents(input) {
+  const studentsRef = db.collection("students");
+  const exactSnap = await studentsRef
+    .where("name", "==", input.studentName)
     .get();
-  let activeCount = 0;
-  linksSnap.forEach((linkDoc) => {
-    if ((linkDoc.data() || {}).status === "active") activeCount += 1;
+  const exactResult = matchStudentCandidates(exactSnap.docs, input);
+  if (exactResult.matches.length) return exactResult;
+
+  const fallbackSnaps = await Promise.all(
+    getStudentNameFallbackPrefixes(input.studentName).map((prefix) =>
+      studentsRef
+        .where("name", ">=", prefix)
+        .where("name", "<=", `${prefix}\uf8ff`)
+        .limit(LEGACY_STUDENT_NAME_FALLBACK_LIMIT)
+        .get()
+    )
+  );
+  const candidateDocsById = new Map();
+  exactSnap.docs.forEach((studentDoc) => {
+    candidateDocsById.set(studentDoc.id, studentDoc);
   });
-
-  await db.collection("members").doc(memberUid).set({
-    hasLinkedChildren: activeCount > 0,
-    linkedChildrenCount: activeCount,
-    updatedAt: admin.firestore.Timestamp.now(),
-  }, { merge: true });
-
-  return activeCount;
+  fallbackSnaps.forEach((snapshot) => {
+    snapshot.docs.forEach((studentDoc) => {
+      candidateDocsById.set(studentDoc.id, studentDoc);
+    });
+  });
+  return matchStudentCandidates([...candidateDocsById.values()], input);
 }
 
 function getEmailCandidates(rawEmail, normalizedEmail) {
@@ -463,106 +455,54 @@ async function assertSignupTypeEnabled(signupType) {
   }
 }
 
-async function enforceSignupSendRateLimit({ email, ip, userAgent }) {
+async function enforceSignupSendRateLimit({email, ip}) {
   const normalizedEmail = String(email || "").toLowerCase().trim();
   const normalizedIp = String(ip || "unknown").trim() || "unknown";
-  const normalizedUserAgent = String(userAgent || "unknown").trim() || "unknown";
 
   if (!normalizedEmail) {
     throw new functions.https.HttpsError("invalid-argument", "email 필드는 필수입니다.");
   }
 
   const now = admin.firestore.Timestamp.now();
-  const oneHourAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 60 * 60 * 1000);
-  const oneWeekAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 7 * 24 * 60 * 60 * 1000);
   const signupAttemptsRef = db.collection("signupAttempts");
-  const nowMillis = now.toMillis();
-  const oneHourAgoMillis = oneHourAgo.toMillis();
-  const oneWeekAgoMillis = oneWeekAgo.toMillis();
 
-  // Use single-field queries and filter timestamp/blockedUntil in memory to
+  // Use single-field queries and filter the rolling window in memory to
   // avoid requiring composite indexes during signup.
   const emailAttempts = await signupAttemptsRef
     .where("email", "==", normalizedEmail)
     .get();
 
-  const blockedEmailUntil = latestBlockedUntilMillis(emailAttempts, nowMillis);
-  if (blockedEmailUntil != null) {
-    const remainingMs = blockedEmailUntil - nowMillis;
-    const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
-    throw new functions.https.HttpsError(
-      "resource-exhausted",
-      `요청이 너무 많아 ${remainingDays}일 동안 인증번호 발송이 제한되었습니다. 잠시 후 다시 시도해 주세요.`
-    );
-  }
-
+  let ipAttempts = {docs: []};
   if (normalizedIp !== "unknown") {
-    const ipAttempts = await signupAttemptsRef
+    ipAttempts = await signupAttemptsRef
       .where("ip", "==", normalizedIp)
       .get();
-
-    const blockedIpUntil = latestBlockedUntilMillis(ipAttempts, nowMillis);
-    if (blockedIpUntil != null) {
-      const remainingMs = blockedIpUntil - nowMillis;
-      const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
-      throw new functions.https.HttpsError(
-        "resource-exhausted",
-        `요청이 너무 많아 ${remainingDays}일 동안 인증번호 발송이 제한되었습니다. 잠시 후 다시 시도해 주세요.`
-      );
-    }
-
-    const hourlyIpAttemptCount = countAttemptsSince(ipAttempts, oneHourAgoMillis);
-    if (hourlyIpAttemptCount >= 5) {
-      const blockedUntil = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7 * 24 * 60 * 60 * 1000);
-      await signupAttemptsRef.add({
-        email: normalizedEmail,
-        ip: normalizedIp,
-        timestamp: now,
-        userAgent: normalizedUserAgent,
-        blockedUntil,
-        cleanupAt: admin.firestore.Timestamp.fromMillis(blockedUntil.toMillis() + 7 * 24 * 60 * 60 * 1000),
-        reason: "too-many-attempts-per-ip-hourly",
-      });
-      throw new functions.https.HttpsError(
-        "resource-exhausted",
-        "인증번호 요청이 너무 많습니다. 1주일 후 다시 시도해 주세요."
-      );
-    }
-
-    const weeklyIpAttemptCount = countAttemptsSince(ipAttempts, oneWeekAgoMillis);
-    if (weeklyIpAttemptCount >= 20) {
-      const blockedUntil = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7 * 24 * 60 * 60 * 1000);
-      await signupAttemptsRef.add({
-        email: normalizedEmail,
-        ip: normalizedIp,
-        timestamp: now,
-        userAgent: normalizedUserAgent,
-        blockedUntil,
-        cleanupAt: admin.firestore.Timestamp.fromMillis(blockedUntil.toMillis() + 7 * 24 * 60 * 60 * 1000),
-        reason: "too-many-attempts-per-ip-weekly",
-      });
-      throw new functions.https.HttpsError(
-        "resource-exhausted",
-        "인증번호 요청이 너무 많습니다. 1주일 후 다시 시도해 주세요."
-      );
-    }
   }
 
-  const recentEmailAttemptCount = countAttemptsSince(emailAttempts, oneHourAgoMillis);
-  if (recentEmailAttemptCount >= 3) {
-    const blockedUntil = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7 * 24 * 60 * 60 * 1000);
-    await signupAttemptsRef.add({
-      email: normalizedEmail,
-      ip: normalizedIp,
-      timestamp: now,
-      userAgent: normalizedUserAgent,
-      blockedUntil,
-      cleanupAt: admin.firestore.Timestamp.fromMillis(blockedUntil.toMillis() + 7 * 24 * 60 * 60 * 1000),
-      reason: "too-many-attempts-per-email",
-    });
+  const decision = evaluateSignupRateLimit({
+    emailAttempts: emailAttempts.docs.map((attemptDoc) =>
+      attemptDoc.data() || {}
+    ),
+    ipAttempts: ipAttempts.docs.map((attemptDoc) => attemptDoc.data() || {}),
+    nowMillis: now.toMillis(),
+    hasUsableIp: normalizedIp !== "unknown",
+  });
+
+  if (!decision.allowed) {
+    const retryMinutes = Math.max(
+      1,
+      Math.ceil(Number(decision.retryAfterSeconds || 60) / 60)
+    );
+    const message = decision.reason === "too-many-attempts-per-ip-hourly"
+      ? `현재 네트워크의 인증번호 발송 요청이 많습니다. 약 ${retryMinutes}분 후 다시 시도해 주세요. 공용 Wi-Fi라면 다른 네트워크를 이용해 주세요.`
+      : `이 이메일의 인증번호 발송 요청이 많습니다. 약 ${retryMinutes}분 후 다시 시도해 주세요.`;
     throw new functions.https.HttpsError(
       "resource-exhausted",
-      "인증번호 요청이 너무 많습니다. 1주일 후 다시 시도해 주세요."
+      message,
+      {
+        reason: decision.reason,
+        retryAfterSeconds: decision.retryAfterSeconds,
+      }
     );
   }
 
@@ -570,8 +510,9 @@ async function enforceSignupSendRateLimit({ email, ip, userAgent }) {
     email: normalizedEmail,
     ip: normalizedIp,
     timestamp: now,
-    cleanupAt: admin.firestore.Timestamp.fromMillis(now.toMillis() + 30 * 24 * 60 * 60 * 1000),
-    userAgent: normalizedUserAgent,
+    cleanupAt: admin.firestore.Timestamp.fromMillis(
+      now.toMillis() + SIGNUP_RATE_LIMIT_POLICY.attemptRetentionMs
+    ),
   });
 }
 
@@ -582,9 +523,30 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
   }
 
   const attemptInput = getSafeAttemptInput(data);
+  const submittedInput = getSubmittedMemberChildInput(data);
 
   try {
     const memberRef = db.collection("members").doc(memberUid);
+    const rateLimit = await enforceMemberChildLinkRateLimit(memberUid);
+    if (!rateLimit.allowed) {
+      const retryMinutes = Math.max(
+        1,
+        Math.ceil(Number(rateLimit.retryAfterSeconds || 60) / 60)
+      );
+      const retryLabel = retryMinutes >= 60
+        ? `약 ${Math.ceil(retryMinutes / 60)}시간 후`
+        : `약 ${retryMinutes}분 후`;
+      return {
+        ok: false,
+        success: false,
+        code: "rateLimited",
+        result: "rateLimited",
+        message: `연동 시도 횟수가 많습니다. ${retryLabel} 다시 시도해 주세요.`,
+        rateLimitReason: rateLimit.reason,
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+      };
+    }
+
     const memberSnap = await memberRef.get();
     const member = memberSnap.exists ? (memberSnap.data() || {}) : null;
     const memberStatus = String(member?.status || "").trim();
@@ -593,7 +555,6 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
     if (!member) {
       await recordMemberChildLinkAttempt({
         memberUid,
-        input: attemptInput,
         result: "notMember",
         matchCount: 0,
       });
@@ -609,9 +570,9 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
     if (memberStatus && memberStatus !== "active") {
       await recordMemberChildLinkAttempt({
         memberUid,
-        input: attemptInput,
         result: "inactiveMember",
         matchCount: 0,
+        diagnostics: {memberStatus: memberStatus || "missing"},
       });
       return {
         ok: false,
@@ -622,37 +583,12 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
       };
     }
 
-    const rateLimit = await enforceMemberChildLinkRateLimit(memberUid);
-    if (!rateLimit.allowed) {
-      await recordMemberChildLinkAttempt({
-        memberUid,
-        input: attemptInput,
-        result: "rateLimited",
-        matchCount: 0,
-        debug: {
-          reason: rateLimit.reason || "rate-limited",
-          tenMinuteCount: rateLimit.tenMinuteCount || 0,
-          oneDayCount: rateLimit.oneDayCount || 0,
-          memberStatus: memberStatus || "missing",
-          memberPurpose: memberPurpose || "missing",
-        },
-      });
-      return {
-        ok: false,
-        success: false,
-        code: "rateLimited",
-        result: "rateLimited",
-        message: MEMBER_CHILD_LINK_RATE_LIMIT_MESSAGE,
-      };
-    }
-
     if (memberPurpose !== "parent") {
       await recordMemberChildLinkAttempt({
         memberUid,
-        input: attemptInput,
         result: "notParent",
         matchCount: 0,
-        debug: {
+        diagnostics: {
           memberStatus: memberStatus || "missing",
           memberPurpose: memberPurpose || "missing",
         },
@@ -670,61 +606,55 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
     if (!input) {
       await recordMemberChildLinkAttempt({
         memberUid,
-        input: attemptInput,
         result: "invalidInput",
         matchCount: 0,
+        submittedInput,
+        diagnostics: {
+          ...attemptInput,
+          mismatchFields: getInvalidMemberChildInputFields(data),
+        },
       });
       return {
         ok: false,
         success: false,
         code: "invalidInput",
         result: "invalidInput",
-        message: MEMBER_CHILD_LINK_FAILURE_MESSAGE,
+        message: "입력 형식을 확인해 주세요. 이름·학교·학년·전화번호와 관계를 모두 입력해야 합니다.",
       };
     }
 
-    const matches = await findMatchingStudents(input);
+    const {matches, mismatchFields} = await findMatchingStudents(input);
     if (matches.length === 0) {
       await recordMemberChildLinkAttempt({
         memberUid,
-        input: {
-          studentName: input.studentName,
-          school: input.school,
-          grade: input.grade,
-          phoneLast4: input.phoneLast4,
-          relationLabel: input.relationLabel,
-        },
         result: "notFound",
         matchCount: 0,
+        submittedInput,
+        diagnostics: {mismatchFields},
       });
       return {
         ok: false,
         success: false,
         code: "notFound",
         result: "notFound",
-        message: MEMBER_CHILD_LINK_FAILURE_MESSAGE,
+        message: "일치하는 학생 정보를 찾지 못했습니다. 학생의 등록 정보와 입력값을 다시 확인해 주세요.",
       };
     }
 
     if (matches.length > 1) {
       await recordMemberChildLinkAttempt({
         memberUid,
-        input: {
-          studentName: input.studentName,
-          school: input.school,
-          grade: input.grade,
-          phoneLast4: input.phoneLast4,
-          relationLabel: input.relationLabel,
-        },
         result: "ambiguous",
         matchCount: matches.length,
+        submittedInput,
+        diagnostics: {mismatchFields: []},
       });
       return {
         ok: false,
         success: false,
         code: "ambiguous",
         result: "ambiguous",
-        message: MEMBER_CHILD_LINK_FAILURE_MESSAGE,
+        message: "같은 정보의 학생이 여러 명 확인됩니다. 안전한 연동을 위해 학원으로 문의해 주세요.",
       };
     }
 
@@ -734,21 +664,48 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
     const linkRef = db.collection("studentParentLinks").doc(linkId);
     const now = admin.firestore.Timestamp.now();
     const studentSnapshot = buildSafeStudentSnapshot(student);
-    const memberSnapshot = buildSafeMemberSnapshot(member);
     let alreadyLinked = false;
+    let linkedChildrenCount = 0;
 
     await db.runTransaction(async (transaction) => {
-      const currentLinkSnap = await transaction.get(linkRef);
-      const currentLink = currentLinkSnap.exists ? (currentLinkSnap.data() || {}) : null;
+      const [transactionMemberSnap, memberLinksSnap] = await Promise.all([
+        transaction.get(memberRef),
+        transaction.get(
+          db.collection("studentParentLinks").where("memberUid", "==", memberUid)
+        ),
+      ]);
+      const transactionMember = transactionMemberSnap.exists
+        ? (transactionMemberSnap.data() || {})
+        : null;
+      if (!transactionMember) {
+        throw new functions.https.HttpsError("failed-precondition", MEMBER_CHILD_LINK_FAILURE_MESSAGE);
+      }
+      if (
+        String(transactionMember.status || "").trim() !== "active" ||
+        String(transactionMember.memberPurpose || "").trim() !== "parent"
+      ) {
+        throw new functions.https.HttpsError("failed-precondition", MEMBER_CHILD_LINK_FAILURE_MESSAGE);
+      }
+
+      const currentLinkSnap = memberLinksSnap.docs.find(
+        (linkDoc) => linkDoc.id === linkId
+      );
+      const currentLink = currentLinkSnap ? (currentLinkSnap.data() || {}) : null;
       alreadyLinked = currentLink?.status === "active";
+      linkedChildrenCount = memberLinksSnap.docs.reduce((count, linkDoc) =>
+        (linkDoc.data() || {}).status === "active" ? count + 1 : count, 0
+      );
 
       if (alreadyLinked) {
         transaction.set(memberRef, {
           hasLinkedChildren: true,
+          linkedChildrenCount,
           updatedAt: now,
         }, { merge: true });
         return;
       }
+
+      linkedChildrenCount += 1;
 
       transaction.set(linkRef, {
         studentUid,
@@ -759,7 +716,7 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
         linkedBy: "autoMatch",
         matchMethod: "name_school_grade_phone",
         studentSnapshot,
-        memberSnapshot,
+        memberSnapshot: buildSafeMemberSnapshot(transactionMember),
         createdAt: currentLink?.createdAt || now,
         updatedAt: now,
         revokedAt: null,
@@ -767,25 +724,19 @@ exports.linkMemberChild = functions.https.onCall(async (data, context) => {
 
       transaction.set(memberRef, {
         hasLinkedChildren: true,
+        linkedChildrenCount,
         updatedAt: now,
       }, { merge: true });
     });
 
-    const linkedChildrenCount = await recomputeMemberLinkedChildrenCount(memberUid);
     const result = alreadyLinked ? "alreadyLinked" : "linked";
     await recordMemberChildLinkAttempt({
       memberUid,
-      input: {
-        studentName: input.studentName,
-        school: input.school,
-        grade: input.grade,
-        phoneLast4: input.phoneLast4,
-        relationLabel: input.relationLabel,
-      },
       result,
       matchCount: 1,
       matchedStudentUid: studentUid,
       linkId,
+      submittedInput,
     });
 
     return {
@@ -868,68 +819,64 @@ exports.sendVerificationCode = functions
       currentStage = "rate-limit-check-start";
       await enforceSignupSendRateLimit({
         email,
-        ip: resolveRequestIp(data, context),
-        userAgent: resolveUserAgent(data, context),
+        ip: resolveRequestIp(context),
       });
       currentStage = "rate-limit-check-passed";
 
       const colRef = db.collection("emailVerifications");
       const verificationDocRef = colRef.doc(email);
       const now = admin.firestore.Timestamp.now();
-
-      currentStage = "verification-doc-cooldown-check-start";
-      const existingDocSnap = await verificationDocRef.get();
-      if (existingDocSnap.exists) {
-        const existingData = existingDocSnap.data() || {};
-        const createdAtMs = existingData.createdAt?.toMillis?.();
-        const isUsed = existingData.used === true;
-        if (!isUsed && createdAtMs) {
-          const elapsedMs = now.toMillis() - createdAtMs;
-          const cooldownMs = 60 * 1000;
-          if (elapsedMs < cooldownMs) {
-            const remainingSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
-            throw new functions.https.HttpsError(
-              "resource-exhausted",
-              `인증번호 재발송은 1분 간격으로 가능합니다. ${remainingSeconds}초 후 다시 시도해 주세요.`
-            );
-          }
-        }
-      }
-      currentStage = "verification-doc-cooldown-check-passed";
-
-      currentStage = "previous-verification-invalidation-start";
-      const existingSnap = await colRef
-        .where("email", "==", email)
-        .where("used", "==", false)
-        .get();
-
-      if (!existingSnap.empty) {
-        const batch = db.batch();
-        existingSnap.docs.forEach((doc) => {
-          batch.update(doc.ref, { used: true, invalidatedAt: admin.firestore.Timestamp.now() });
-        });
-        await batch.commit();
-      }
-      currentStage = "previous-verification-invalidation-end";
-
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 5 * 60 * 1000);
-      const cleanupAt = admin.firestore.Timestamp.fromMillis(expiresAt.toMillis() + 24 * 60 * 60 * 1000);
+      const verificationSessionToken = generateVerificationSessionToken();
+      const sessionTokenHash = hashVerificationSessionToken(
+        verificationSessionToken
+      );
+      let code;
 
       try {
-        currentStage = "verification-doc-write-start";
-        await verificationDocRef.set({
-          email,
-          code,
-          createdAt: now,
-          expiresAt,
-          cleanupAt,
-          used: false,
-          failedAttempts: 0,
-          lastFailedAt: null,
-        }, { merge: false });
-        currentStage = "verification-doc-write-end";
+        currentStage = "verification-doc-transaction-start";
+        code = await db.runTransaction(async (transaction) => {
+          const existingDocSnap = await transaction.get(verificationDocRef);
+          const existingData = existingDocSnap.exists
+            ? (existingDocSnap.data() || {})
+            : {};
+          const createdAtMs = existingData.createdAt?.toMillis?.();
+          const isUsed = existingData.used === true;
+          if (!isUsed && createdAtMs) {
+            const elapsedMs = now.toMillis() - createdAtMs;
+            const cooldownMs = 60 * 1000;
+            if (elapsedMs < cooldownMs) {
+              const remainingSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
+              throw new functions.https.HttpsError(
+                "resource-exhausted",
+                `인증번호 재발송은 1분 간격으로 가능합니다. ${remainingSeconds}초 후 다시 시도해 주세요.`
+              );
+            }
+          }
+
+          const nextCode = generateVerificationCode(existingData.code);
+          const expiresAt = admin.firestore.Timestamp.fromMillis(
+            now.toMillis() + EMAIL_VERIFICATION_POLICY.codeTtlMs
+          );
+          const cleanupAt = admin.firestore.Timestamp.fromMillis(
+            expiresAt.toMillis() + EMAIL_VERIFICATION_POLICY.cleanupGraceMs
+          );
+          transaction.set(verificationDocRef, {
+            email,
+            signupType,
+            code: nextCode,
+            sessionTokenHash,
+            createdAt: now,
+            expiresAt,
+            cleanupAt,
+            used: false,
+            failedAttempts: 0,
+            lastFailedAt: null,
+          }, { merge: false });
+          return nextCode;
+        });
+        currentStage = "verification-doc-transaction-end";
       } catch (firestoreError) {
+        if (isHttpsError(firestoreError)) throw firestoreError;
         console.error("Firestore 저장 실패:", {
           code: getErrorCode(firestoreError),
           message: firestoreError?.message,
@@ -1007,7 +954,7 @@ ${code}
         currentStage = "email-send-start";
         await transporter.sendMail(mailOptions);
         currentStage = "email-send-success";
-        return { success: true };
+        return {success: true, verificationSessionToken};
       } catch (mailError) {
         currentStage = "email-send-failure";
         console.error("이메일 전송 실패:", {
@@ -1019,14 +966,16 @@ ${code}
           message: mailError?.message,
         });
         try {
-          await verificationDocRef.set(
-            {
+          await db.runTransaction(async (transaction) => {
+            const currentSnap = await transaction.get(verificationDocRef);
+            const currentData = currentSnap.exists ? (currentSnap.data() || {}) : {};
+            if (currentData.sessionTokenHash !== sessionTokenHash) return;
+            transaction.set(verificationDocRef, {
               used: true,
               invalidatedAt: admin.firestore.Timestamp.now(),
               invalidationReason: "email-send-failed",
-            },
-            { merge: true }
-          );
+            }, {merge: true});
+          });
         } catch (invalidateError) {
           console.error("인증코드 무효화 실패:", invalidateError);
         }
@@ -1054,84 +1003,112 @@ exports.verifyEmailCode = functions.https.onCall(async (data, _context) => {
     const rawEmail = data?.email ? String(data.email).trim() : "";
     const email = rawEmail.toLowerCase();
     const code = data?.code ? String(data.code).trim() : "";
+    const verificationSessionToken = data?.verificationSessionToken
+      ? String(data.verificationSessionToken).trim()
+      : "";
 
-    if (!email || !code) {
-      throw new functions.https.HttpsError("invalid-argument", "email과 code는 필수입니다.");
+    if (!email || !code || !verificationSessionToken) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "email, code, verificationSessionToken은 필수입니다."
+      );
     }
 
     if (!/^\d{6}$/.test(code)) {
       throw new functions.https.HttpsError("invalid-argument", "인증번호는 6자리 숫자여야 합니다.");
     }
 
+    if (!/^[a-f0-9]{64}$/i.test(verificationSessionToken)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "인증 세션이 올바르지 않습니다. 인증번호를 다시 발송해 주세요."
+      );
+    }
+
     const now = admin.firestore.Timestamp.now();
     const docRef = db.collection("emailVerifications").doc(email);
-    const docSnap = await docRef.get();
+    const outcome = await db.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      if (!docSnap.exists) return {status: "not-found"};
 
-    if (!docSnap.exists) {
+      const verification = docSnap.data() || {};
+      const evaluation = evaluateEmailVerificationAttempt({
+        verification,
+        submittedCode: code,
+        verificationSessionToken,
+        nowMillis: now.toMillis(),
+      });
+
+      if (evaluation.status === "expired") {
+        transaction.update(docRef, {
+          used: true,
+          invalidatedAt: now,
+          invalidationReason: "expired",
+        });
+      } else if (evaluation.status === "wrong-code") {
+        transaction.update(docRef, {
+          failedAttempts: evaluation.failedAttempts,
+          lastFailedAt: now,
+        });
+      } else if (evaluation.status === "too-many-failures") {
+        transaction.update(docRef, {
+          used: true,
+          failedAttempts: evaluation.failedAttempts,
+          lastFailedAt: now,
+          invalidatedAt: now,
+          invalidationReason: "too-many-invalid-code-attempts",
+        });
+      } else if (evaluation.status === "verified") {
+        transaction.update(docRef, {
+          used: true,
+          verifiedAt: now,
+          failedAttempts: evaluation.failedAttempts,
+        });
+      }
+
+      return evaluation;
+    });
+
+    if (outcome.status === "not-found") {
       throw new functions.https.HttpsError(
         "not-found",
         "인증번호를 찾을 수 없습니다. 다시 발송해 주세요."
       );
     }
-
-    const dataDoc = docSnap.data();
-
-    if (dataDoc.used === true) {
+    if (outcome.status === "invalid-session") {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "인증 세션이 올바르지 않습니다. 인증번호를 다시 발송해 주세요."
+      );
+    }
+    if (outcome.status === "used") {
       throw new functions.https.HttpsError(
         "failed-precondition",
         "인증번호가 이미 사용되었거나 무효화되었습니다. 다시 발송해 주세요."
       );
     }
-
-    if (!dataDoc.expiresAt || dataDoc.expiresAt.toMillis() < now.toMillis()) {
-      await docRef.update({ used: true });
+    if (outcome.status === "expired") {
       throw new functions.https.HttpsError(
         "deadline-exceeded",
         "인증번호가 만료되었습니다. 다시 발송해 주세요."
       );
     }
-
-    if (dataDoc.code !== code) {
-      const currentFailedAttempts = Number.isFinite(dataDoc.failedAttempts)
-        ? Number(dataDoc.failedAttempts)
-        : 0;
-      const nextFailedAttempts = currentFailedAttempts + 1;
-
-      if (nextFailedAttempts >= 5) {
-        await docRef.update({
-          used: true,
-          failedAttempts: nextFailedAttempts,
-          lastFailedAt: now,
-          invalidatedAt: now,
-          invalidationReason: "too-many-invalid-code-attempts",
-        });
-        throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "인증번호 입력 오류가 5회 누적되었습니다. 보안을 위해 인증번호를 다시 발송해 주세요."
-        );
-      }
-
-      await docRef.update({
-        failedAttempts: nextFailedAttempts,
-        lastFailedAt: now,
-      });
-
-      const remainingAttempts = 5 - nextFailedAttempts;
+    if (outcome.status === "too-many-failures") {
+      throw new functions.https.HttpsError(
+        "resource-exhausted",
+        "인증번호 입력 오류가 5회 누적되었습니다. 보안을 위해 인증번호를 다시 발송해 주세요."
+      );
+    }
+    if (outcome.status === "wrong-code") {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        `인증번호가 일치하지 않습니다. ${remainingAttempts}회 더 시도할 수 있습니다.`
+        `인증번호가 일치하지 않습니다. ${outcome.remainingAttempts}회 더 시도할 수 있습니다.`
       );
     }
 
-    await docRef.update({
-      used: true,
-      verifiedAt: now,
-      failedAttempts: dataDoc.failedAttempts || 0,
-    });
-
-    return { success: true };
+    return {success: true};
   } catch (error) {
-    console.error("verifyEmailCode 오류:", error);
+    console.error("verifyEmailCode 오류:", toLoggableError(error));
     if (isHttpsError(error)) {
       throw error;
     }
@@ -1143,22 +1120,14 @@ exports.scheduledRecordCleanup = functions.pubsub
   .schedule("0 3 * * *")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
-    const seoulDay = Number(new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Seoul",
-      day: "numeric",
-    }).format(new Date()));
-    const includeLegacy = seoulDay === 1;
     const { results, totalDeleted, hasMore } = await runRecordCleanup(db, {
       perCollectionLimit: 500,
-      includeLegacy,
     });
-    const offlineSummary = await runOfflineSessionCleanup(db);
     await db.collection("settings").doc("retentionPolicy").set({
       recordCleanupLastRunAt: admin.firestore.FieldValue.serverTimestamp(),
       recordCleanupLastRunSummary: {
         totalDeleted,
         hasMore,
-        includeLegacy,
         results: results.map((result) => ({
           collectionName: result.collectionName,
           scannedCount: result.scannedCount,
@@ -1177,6 +1146,5 @@ exports.scheduledRecordCleanup = functions.pubsub
         deletedCount: result.deletedCount
       }))
     });
-    console.log("[scheduledRecordCleanup] 오프라인 수업 정리 완료", offlineSummary);
     return null;
   });

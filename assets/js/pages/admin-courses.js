@@ -14,12 +14,32 @@ import {
   orderBy,
   where,
   serverTimestamp,
-  setDoc
+  runTransaction,
+  limit,
+  startAfter,
+  documentId
 } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
+import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+import { adminXlsxFilename, writeAdminXlsx } from "/assets/js/utils/admin-xlsx.js";
+import { showAdminToast } from "/assets/js/utils/admin-toast.js";
+import { accountUidByInstructorId } from "/assets/js/utils/instructor-privacy.js";
 import { handleError, createErrorUI } from "/assets/js/utils/error-handler.js";
-import { confirmDiscardIfDirty, createFormDirtyTracker } from "/assets/js/utils/admin-dialog.js";
 import { getSettingDoc, invalidateSetting } from "/assets/js/utils/settings-cache.js";
+import { normalizeVideoUrl } from "/assets/js/utils/video-url.js";
+import { getCurrentCourseCompletion } from "/assets/js/utils/course-completion.js";
+import { filterApprovalRequests, toApprovalPublicCourse } from "/assets/js/utils/approval-course.js";
+import {
+  MANUAL_ENROLLMENT_SEARCH_LIMIT,
+  classifyEnrollmentSearch,
+  toEnrollmentCandidates,
+  getSelectedEnrollmentCandidate
+} from "/assets/js/utils/approval-enrollment-search.js";
+import {
+  bindCommittedSearch,
+  normalizeListPageSize,
+  renderListPagination,
+} from "/assets/js/utils/list-controls.js";
 import {
   mergeCourseCatalog,
   buildLabelMaps,
@@ -52,11 +72,19 @@ import {
   normalizeAccessType,
   normalizeCourseFormat,
   getCourseFormatBadgeLabel,
-  getAccessTypeBadgeLabel,
-  getSubjectAccentClass,
   getSubjectLabel,
   getGradeLabel
 } from "/assets/js/utils/course-readonly.js";
+import {
+  SUBJECT_COLOR_SETTINGS_KEY,
+  areSubjectColorMapsEqual,
+  buildSubjectColorSettingsPayload,
+  ensureSubjectColorMap,
+  getSubjectColorMapFromSettings,
+  getSubjectColorStyle,
+  loadSharedSubjectColorMap,
+  mergeSubjectColorMap,
+} from "/assets/js/utils/subject-colors.js";
 
 (async () => {
   try {
@@ -66,7 +94,6 @@ import {
 })();
 
 const $ = (s, r = document) => r.querySelector(s);
-const contentFormDirty = createFormDirtyTracker(document.querySelector("#contentEditForm"));
 const tbody = $("#tblContents tbody");
 const searchEl = $("#adminContentSearch");
 const gradeFilterEl = $("#adminFilterGrade");
@@ -95,6 +122,14 @@ const legacyRemove = {
   thumbnail: deleteField(),
   coverImage: deleteField(),
   image: deleteField(),
+  body: deleteField(),
+  instructor: deleteField(),
+  videoUrl: deleteField(),
+  lectureContent: deleteField(),
+  learningContent: deleteField(),
+  kind: deleteField(),
+  month: deleteField(),
+  schoolYear: deleteField(),
   classId: deleteField(),
   classIds: deleteField(),
   classes: deleteField(),
@@ -110,26 +145,46 @@ let mergedCourseCatalog = mergeCourseCatalog({});
 let instructors = new Map();
 let rows = [];
 let viewRows = [];
+let coursesLoaded = false;
+function setCourseExportReady() {
+  const button = $("#dlCourses");
+  if (!button) return;
+  button.disabled = !coursesLoaded || !viewRows.length;
+  button.title = !coursesLoaded
+    ? "강좌 목록을 불러온 뒤 다운로드할 수 있습니다"
+    : (viewRows.length ? "현재 필터 결과 전체를 엑셀로 다운로드" : "다운로드할 강좌가 없습니다");
+}
 let page = 1;
 let weeksState = [];
 let activeEnrollmentCourseId = "";
+let approvalRequestRows = [];
+let approvalRequestCursor = null;
+let approvalRequestHasMore = false;
+let approvalRequestSearch = "";
+let approvalListInProgress = false;
+let approvalActionInProgress = false;
+let manualEnrollmentSearch = { status: "idle", results: [], selectedKey: "", message: "", truncated: false };
+let manualEnrollmentSearchRequestId = 0;
+let manualEnrollmentSearchTerm = "";
 let activeEnrollmentRows = [];
+let adminCoursePreviewRequestId = 0;
 let deleteBlockedState = {
   courseId: "",
   course: null,
-  enrollments: []
+  enrollments: [],
+  inventory: null
 };
 let noEnrollmentDeleteState = {
   courseId: "",
-  course: null
+  course: null,
+  inventory: null
 };
 let enrollmentRemovalState = {
   courseId: "",
   enrollment: null
 };
 
-const PAGE_SIZE = 20;
-const PAGINATION_GROUP_SIZE = 5;
+let pageSize = 10;
 const GRADE_PRESET_FALLBACK = ["중1", "중2", "중3", "고1", "고2", "고3"];
 let catalogGrades = GRADE_PRESET_FALLBACK.slice();
 let catalogYears = [];
@@ -140,6 +195,9 @@ let courseSubjectDraft = [];
 let courseGradeDraft = [];
 /** @type {string[]} */
 let courseYearDraft = [];
+let subjectColorMap = mergeSubjectColorMap({});
+let courseSubjectColorSourceMap = mergeSubjectColorMap({});
+let persistedCourseSubjectColorMap = {};
 
 function syncCourseSubjectDraftFromDom() {
   const editor = $("#courseCatalogSubjectEditor");
@@ -152,14 +210,19 @@ function syncCourseSubjectDraftFromDom() {
 }
 
 function renderCourseCatalogPanel() {
+  subjectColorMap = ensureSubjectColorMap(
+    courseSubjectDraft.map((item) => item.label),
+    subjectColorMap
+  );
   const editor = $("#courseCatalogSubjectEditor");
   if (editor) {
     editor.innerHTML = courseSubjectDraft
       .map((item, index) => {
         const isFirst = index === 0;
         const isLast = index === courseSubjectDraft.length - 1;
+        const colorStyle = getSubjectColorStyle(item.label, subjectColorMap);
         return `
-      <div class="admin-catalog-tag course-catalog-subject-row">
+      <div class="admin-catalog-tag course-catalog-subject-row${colorStyle ? " has-subject-color" : ""}"${colorStyle ? ` style="${colorStyle}"` : ""}>
         <div class="admin-catalog-tag__moves">
           <button type="button" class="admin-catalog-tag__move" data-subject-move="up" data-subject-code="${escapeHtml(item.value)}"${isFirst ? " disabled" : ""} aria-label="위로" title="위로">↑</button>
           <button type="button" class="admin-catalog-tag__move" data-subject-move="down" data-subject-code="${escapeHtml(item.value)}"${isLast ? " disabled" : ""} aria-label="아래로" title="아래로">↓</button>
@@ -282,6 +345,7 @@ function buildSubjectQuick(selectedSubject = "") {
     emptyLabel: "과목 선택"
   });
   applyCourseSubjectSelectValue(quick, raw, selectedSubject, subjectOptions);
+  applyCourseSubjectColorToSelect();
 
   if (quick.dataset.ready === "1") return;
   quick.dataset.ready = "1";
@@ -291,6 +355,7 @@ function buildSubjectQuick(selectedSubject = "") {
       raw.value = "";
       raw.focus();
     }
+    applyCourseSubjectColorToSelect();
     updateLivePreview();
   });
   raw.addEventListener("input", () => updateLivePreview());
@@ -342,19 +407,46 @@ async function saveCourseCatalogDraft() {
 
   try {
     const settingsRef = doc(db, "settings", "courseCatalog");
-    const settingsSnap = await getDoc(settingsRef);
-    const existing = settingsSnap.exists() ? settingsSnap.data() : {};
     const uid = auth.currentUser?.uid || "";
-    await setDoc(
+    const colorSettingsPayload = buildSubjectColorSettingsPayload(
+      courseSubjectDraft.map((item) => item.label),
+      courseSubjectColorSourceMap
+    );
+    const shouldWriteSubjectColors = !areSubjectColorMapsEqual(
+      colorSettingsPayload.subjectColorMap,
+      persistedCourseSubjectColorMap
+    );
+    const batch = writeBatch(db);
+    batch.set(
       settingsRef,
       {
-        ...existing,
         chipGroups: mergedCourseCatalog.chipGroups,
+        instructorSubjectChips: deleteField(),
+        subjectColorMap: deleteField(),
+        subjectMeta: deleteField(),
         updatedAt: serverTimestamp(),
         ...(uid ? { updatedBy: uid } : {})
       },
       { merge: true }
     );
+    if (shouldWriteSubjectColors) {
+      batch.set(
+        doc(db, "settings", SUBJECT_COLOR_SETTINGS_KEY),
+        {
+          ...colorSettingsPayload,
+          updatedAt: serverTimestamp(),
+          ...(uid ? { updatedBy: uid } : {}),
+        },
+        { merge: true }
+      );
+    }
+    await batch.commit();
+    subjectColorMap = colorSettingsPayload.subjectColorMap;
+    courseSubjectColorSourceMap = { ...colorSettingsPayload.subjectColorMap };
+    if (shouldWriteSubjectColors) {
+      persistedCourseSubjectColorMap = { ...colorSettingsPayload.subjectColorMap };
+      invalidateSetting(SUBJECT_COLOR_SETTINGS_KEY);
+    }
     invalidateSetting("courseCatalog");
     applyCourseCatalogToPage();
     toast("강좌 목록을 저장했습니다.");
@@ -576,8 +668,9 @@ function getAdminCourseStatusLabel(status) {
 
 function getAdminAccessTypeLabel(accessType) {
   const raw = String(accessType || "public").trim();
-  if (raw === "public") return "공개 강좌";
-  if (raw === "memberOnly") return "회원전용 강좌";
+  if (raw === "public") return "공개";
+  if (raw === "memberOnly" || raw === "member") return "회원 전용";
+  if (raw === "approvalRequired") return "회원 전용(유료)";
   if (raw === "paid") return "유료 / 미사용";
   return "확인 필요";
 }
@@ -637,10 +730,12 @@ function setSelectValue(selectEl, value, fallback = "") {
   selectEl.value = nextValue;
 }
 
-function normalizeInstructorProfile(docSnap) {
+function normalizeInstructorProfile(docSnap, accountUidByProfileId = new Map()) {
   const data = docSnap.data() || {};
   const instructorId = String(docSnap.id || "").trim();
-  const authUid = typeof data.uid === "string" ? data.uid.trim() : "";
+  const authUid = accountUidByProfileId.get(instructorId) ||
+    accountUidByProfileId.get(String(data.instructorId || "").trim()) ||
+    (typeof data.uid === "string" ? data.uid.trim() : "");
   const name = String(data.name || data.displayName || "").trim();
   if (!instructorId || !authUid || !name) return null;
   return {
@@ -651,28 +746,41 @@ function normalizeInstructorProfile(docSnap) {
   };
 }
 
-function findInstructorForRecord(record = {}) {
-  const instructorUid = String(record.instructorUid || "").trim();
-  if (instructorUid && instructors.has(instructorUid)) return instructors.get(instructorUid);
-
-  const instructorId = String(record.instructorId || "").trim();
-  if (instructorId) {
-    const byProfileId = Array.from(instructors.values()).find((inst) => inst.instructorId === instructorId);
-    if (byProfileId) return byProfileId;
-  }
-
-  if (instructorUid) {
-    const byLegacyProfileUid = Array.from(instructors.values()).find((inst) => inst.instructorId === instructorUid);
-    if (byLegacyProfileUid) return byLegacyProfileUid;
-  }
-
-  return null;
+function getInstructorSelectValues(record = {}) {
+  const rawValues = [
+    ...(Array.isArray(record.instructorUids) ? record.instructorUids : []),
+    ...(Array.isArray(record.instructorIds) ? record.instructorIds : []),
+    record.instructorUid,
+    record.instructorId
+  ];
+  const values = [];
+  rawValues.forEach((rawValue) => {
+    const value = String(rawValue || "").trim();
+    if (!value) return;
+    const matched = instructors.get(value) ||
+      Array.from(instructors.values()).find((inst) => inst.instructorId === value);
+    const selectValue = matched?.uid || value;
+    if (!values.includes(selectValue)) values.push(selectValue);
+  });
+  return values;
 }
 
-function getInstructorSelectValue(record = {}) {
-  const matched = findInstructorForRecord(record);
-  if (matched) return matched.uid;
-  return String(record.instructorUid || record.instructorId || "").trim();
+function getCourseSubjectDisplayName(subjectValue) {
+  const value = String(subjectValue || "").trim();
+  const option = catalogCourseSubjects.find((item) => String(item.value || "") === value);
+  return String(option?.label || value).trim();
+}
+
+function applyCourseSubjectColorToSelect() {
+  const quick = $("#contentEditSubjectQuick");
+  if (!quick) return;
+  const subjectName = quick.value === "__custom__"
+    ? ""
+    : getCourseSubjectDisplayName(quick.value);
+  const colorStyle = getSubjectColorStyle(subjectName, subjectColorMap);
+  quick.classList.toggle("has-subject-color", Boolean(colorStyle));
+  if (colorStyle) quick.setAttribute("style", colorStyle);
+  else quick.removeAttribute("style");
 }
 
 function getInstructorMatchKeys(selectedValue) {
@@ -681,27 +789,32 @@ function getInstructorMatchKeys(selectedValue) {
   return new Set([value, inst?.uid, inst?.authUid, inst?.instructorId].filter(Boolean));
 }
 
-function getSelectedInstructor(existingCourse = {}) {
-  const instructorUid = $("#contentEditInstructorUid")?.value.trim() || "";
-  if (!instructorUid) {
-    return {
-      instructorUid: String(existingCourse.instructorUid || "").trim(),
-      instructorId: String(existingCourse.instructorId || "").trim(),
-      instructorName: String(existingCourse.instructorName || "").trim()
-    };
-  }
-  const selected = instructors.get(instructorUid);
-  if (!selected) {
-    return {
-      instructorUid: String(existingCourse.instructorUid || "").trim(),
-      instructorId: String(existingCourse.instructorId || "").trim(),
-      instructorName: String(existingCourse.instructorName || "").trim()
-    };
-  }
+function getSelectedInstructors() {
+  const selectedInputs = Array.from(
+    $("#contentEditInstructorUid")?.querySelectorAll('input[type="checkbox"]:checked') || []
+  );
+  const selectedValues = selectedInputs
+    .map((input) => String(input.value || "").trim())
+    .filter(Boolean);
+  const selectedRows = selectedValues.map((uid) => instructors.get(uid)).filter(Boolean);
+  const fallbackNames = selectedValues
+    .filter((uid) => !instructors.has(uid))
+    .map((uid) => {
+      const input = selectedInputs.find((item) => item.value === uid);
+      return String(input?.dataset.instructorName || uid).trim();
+    });
+  const instructorUids = selectedRows.map((row) => row.uid).concat(
+    selectedValues.filter((uid) => !instructors.has(uid))
+  );
+  const instructorIds = selectedRows.map((row) => row.instructorId).filter(Boolean);
+  const instructorNames = selectedRows.map((row) => row.name).concat(fallbackNames).filter(Boolean);
   return {
-    instructorUid: String(selected.uid || "").trim(),
-    instructorId: String(selected.instructorId || "").trim(),
-    instructorName: String(selected.name || "").trim()
+    instructorUid: instructorUids[0] || "",
+    instructorId: instructorIds[0] || "",
+    instructorName: instructorNames[0] || "",
+    instructorUids,
+    instructorIds,
+    instructorNames
   };
 }
 
@@ -737,21 +850,21 @@ function updateLivePreview() {
   const accessType = normalizeAccessType($("#contentEditAccessType")?.value || "public");
   const courseFormat = normalizeCourseFormat($("#contentEditCourseFormat")?.value || "single", weeksState.length);
   const previewVideoUrl = $("#contentEditPreviewVideoUrl")?.value.trim() || "";
-  const { instructorName } = getSelectedInstructor();
+  const { instructorNames } = getSelectedInstructors();
 
   const excerptRaw = cardContentRaw || "강좌 카드 내용을 입력하세요";
   const excerpt = excerptRaw.length > PREVIEW_EXCERPT_MAX
     ? `${excerptRaw.slice(0, PREVIEW_EXCERPT_MAX)}...`
     : excerptRaw;
-  const subjectClass = getSubjectAccentClass(subjectCode, subjectLabel);
-  const accessBadge = getAccessTypeBadgeLabel(accessType);
+  const subjectColorStyle = getSubjectColorStyle(subjectLabel || subjectCode, subjectColorMap);
+  const accessBadge = getAdminAccessTypeLabel(accessType);
   const formatBadge = getCourseFormatBadgeLabel(courseFormat);
   const accessBadgeClass = accessType === "memberOnly" ? " is-member" : "";
   const previewStatus = previewVideoUrl ? "미리보기 영상 있음" : "미리보기 영상 없음";
   const curriculumStatus = getPreviewCurriculumStatus(courseFormat);
 
   root.innerHTML = `
-    <article class="course-card course-card--public course-card--admin-preview ${subjectClass}">
+    <article class="course-card course-card--public course-card--admin-preview${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>
       <div class="admin-course-card-preview__badges">
         <span class="admin-course-card-preview__badge admin-course-card-preview__badge--access${accessBadgeClass}">${escapeHtml(accessBadge)}</span>
         <span class="admin-course-card-preview__badge admin-course-card-preview__badge--format">${escapeHtml(formatBadge)}</span>
@@ -763,7 +876,7 @@ function updateLivePreview() {
         <span class="course-card__meta-sep" aria-hidden="true">|</span>
         <span class="course-card__meta-item course-card__meta-item--subject">${toPreviewDisplayValue(subjectLabel)}</span>
         <span class="course-card__meta-sep" aria-hidden="true">|</span>
-        <span class="course-card__meta-item">${toPreviewDisplayValue(instructorName, "미배정")}</span>
+        <span class="course-card__meta-item">${toPreviewDisplayValue(instructorNames.join(", "), "미배정")}</span>
       </div>
       <div class="course-card__content-block">
         <h3 class="course-card__title">${escapeHtml(titleRaw)}</h3>
@@ -787,18 +900,25 @@ function bindLivePreview() {
 }
 
 function toast(msg, err = false) {
-  let el = $("#statusMsg");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "statusMsg";
-    el.style.cssText = "position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:10000;padding:10px 14px;border-radius:8px;opacity:0;transition:opacity .2s";
-    document.body.appendChild(el);
+  showAdminToast(msg, err);
+  if (err && $("#contentEditModal")?.classList.contains("is-open") && $("#contentEditFeedback")?.hidden) showCourseFormError(msg);
+}
+
+function showCourseFormError(message, field = null) {
+  const feedback = $("#contentEditFeedback");
+  if (feedback) {
+    feedback.textContent = message;
+    feedback.hidden = !message;
   }
-  el.textContent = msg;
-  el.style.color = err ? "var(--error-color)" : "var(--success-color)";
-  el.style.background = err ? "var(--error-bg)" : "var(--success-bg)";
-  el.style.opacity = "1";
-  setTimeout(() => { if (el.textContent === msg) el.style.opacity = "0"; }, 2200);
+  $("#contentEditForm")?.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute("aria-invalid"));
+  $("#contentEditForm")?.querySelectorAll(".course-field-error").forEach((el) => el.remove());
+  if (field) {
+    field.setAttribute("aria-invalid", "true");
+    const detail = document.createElement("p");
+    detail.className = "course-field-error";
+    detail.textContent = message;
+    field.insertAdjacentElement("afterend", detail);
+  }
 }
 
 function getCourseRow(courseId) {
@@ -809,14 +929,33 @@ function getCourseTitle(courseId) {
   return getCourseRow(courseId)?.title || "선택한 강좌";
 }
 
+function showCourseModal(modal) {
+  if (!modal) return;
+  modal.hidden = false;
+  modal.classList.remove("active");
+  modal.classList.add("is-open");
+}
+
+function hideCourseModal(modal) {
+  if (!modal) return;
+  modal.classList.remove("is-open", "active");
+  modal.hidden = true;
+}
+
+function resetCourseModalState() {
+  document.querySelectorAll(".admin-courses-modal").forEach(hideCourseModal);
+  document.body.classList.remove("modal-open");
+  document.documentElement.classList.remove("modal-open");
+}
+
 function openSupportModal(modalId) {
-  $(`#${modalId}`)?.classList.add("is-open");
+  showCourseModal($(`#${modalId}`));
   document.body.classList.add("modal-open");
   document.documentElement.classList.add("modal-open");
 }
 
 function closeSupportModal(modalId) {
-  $(`#${modalId}`)?.classList.remove("is-open");
+  hideCourseModal($(`#${modalId}`));
   const hasOpenModal = Boolean(document.querySelector(".admin-courses-modal.is-open"));
   if (!hasOpenModal) {
     document.body.classList.remove("modal-open");
@@ -882,6 +1021,7 @@ function getEnrollmentStatusLabel(status) {
   if (raw === "cancelled" || raw === "canceled") return "취소됨";
   if (raw === "completed") return "완료";
   if (raw === "paused" || raw === "blocked") return "중지";
+  if (raw === "revoked") return "해제됨";
   return "확인 필요";
 }
 
@@ -903,7 +1043,153 @@ async function loadCourseEnrollments(courseId) {
     .sort((a, b) => getTimestampMillis(b.enrolledAt) - getTimestampMillis(a.enrolledAt));
 }
 
-function renderEnrollmentTable(enrollments, { showActions = true } = {}) {
+async function loadCourseDeleteInventory(courseId) {
+  // Stay within one atomic batch. Larger courses need a separately reviewed deletion plan.
+  const [enrollments, requests, privateSnap, courseSnap] = await Promise.all([
+    getDocs(query(collection(db, "enrollments"), where("courseId", "==", courseId), limit(450))),
+    getDocs(query(collection(db, "courses", courseId, "enrollmentRequests"), limit(450))),
+    getDoc(doc(db, "coursePrivateContent", courseId)),
+    getDoc(doc(db, "courses", courseId))
+  ]);
+  if (!courseSnap.exists()) throw new Error("강좌를 찾을 수 없습니다.");
+  const inventory = {
+    enrollments: enrollments.docs.map(normalizeEnrollment),
+    requests: requests.docs.map((entry) => entry.id),
+    hasPrivateContent: privateSnap.exists()
+  };
+  if (inventory.enrollments.length + inventory.requests.length + Number(inventory.hasPrivateContent) + 1 > 450
+      || enrollments.size === 450 || requests.size === 450) {
+    throw new Error("연결 기록이 한 번에 안전하게 삭제할 수 있는 범위를 넘습니다. 강좌를 보관하고 별도 삭제 계획을 확인해 주세요.");
+  }
+  return inventory;
+}
+
+function deleteInventoryKey(inventory) {
+  return JSON.stringify([
+    inventory.enrollments.map((row) => row.id).sort(),
+    inventory.requests.slice().sort(), inventory.hasPrivateContent
+  ]);
+}
+
+function isApprovalCourseRow(courseId) {
+  return normalizeAccessType(rows.find((row) => row.id === courseId)?.accessType) === "approvalRequired";
+}
+
+async function loadApprovalRequests(courseId, { append = false } = {}) {
+  if (!append) {
+    approvalRequestRows = [];
+    approvalRequestCursor = null;
+  }
+  const parts = [where("status", "==", "pending"), limit(30)];
+  if (append && approvalRequestCursor) parts.push(startAfter(approvalRequestCursor));
+  const snap = await getDocs(query(collection(db, "courses", courseId, "enrollmentRequests"), ...parts));
+  approvalRequestCursor = snap.docs.at(-1) || null;
+  approvalRequestHasMore = snap.docs.length === 30;
+  const next = snap.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+  const profiles = new Map();
+  for (const [learnerType, collectionName] of [["student", "students"], ["member", "members"]]) {
+    const ids = next.filter((item) => item.learnerType === learnerType).map((item) => item.userId);
+    for (let start = 0; start < ids.length; start += 10) {
+      const batch = await getDocs(query(collection(db, collectionName), where(documentId(), "in", ids.slice(start, start + 10))));
+      batch.forEach((entry) => profiles.set(entry.id, entry.data() || {}));
+    }
+  }
+  approvalRequestRows = approvalRequestRows.concat(next.map((item) => ({
+    ...item,
+    profile: profiles.get(item.userId) || null
+  })));
+}
+
+function renderApprovalRequests() {
+  const visibleRequests = filterApprovalRequests(approvalRequestRows, approvalRequestSearch);
+  const rowsHtml = visibleRequests.map((item) => {
+    const profile = item.profile;
+    const identity = profile
+      ? `${escapeHtml(profile.name || "이름 없음")} · ${escapeHtml(profile.email || item.userId)}`
+      : `${escapeHtml(item.userId)} · 계정 확인 필요`;
+    const eligible = profile && (item.learnerType === "student" || (item.learnerType === "member" && profile.memberPurpose === "general"));
+    const uidAttribute = escapeHtml(item.userId).replace(/"/g, "&quot;");
+    return `<div class="admin-courses-enrollment-summary"><span>${identity} (${item.learnerType === "student" ? "학생" : "일반회원"} · 대기)</span><span><button type="button" class="btn sm" data-approve-request="${uidAttribute}" ${eligible ? "" : "disabled"}>승인</button> <button type="button" class="btn sm" data-reject-request="${uidAttribute}">거절</button></span></div>`;
+  }).join("");
+  const empty = approvalRequestSearch ? "현재 불러온 신청 중 검색 결과가 없습니다." : "대기 중인 신청이 없습니다.";
+  const searchAttribute = escapeHtml(approvalRequestSearch).replace(/"/g, "&quot;");
+  return `<section aria-label="수강신청 대기"><h3>승인 대기 ${approvalRequestRows.length}건${approvalRequestHasMore ? " 이상" : ""}</h3><form id="approvalRequestSearchForm"><label for="approvalRequestSearch">신청자 검색 · 현재 불러온 목록</label><div class="form-row"><input id="approvalRequestSearch" type="search" value="${searchAttribute}" placeholder="이름, 이메일, UID"><button type="submit" class="btn sm">검색</button><button type="button" class="btn sm" data-clear-request-search="1">초기화</button></div></form>${rowsHtml || `<p class="muted">${empty}</p>`}${approvalRequestHasMore ? '<button type="button" class="btn sm" data-more-requests="1">신청 더 보기</button>' : ""}${renderManualEnrollmentSection()}</section>`;
+}
+
+function renderManualEnrollmentResults() {
+  const { status, results, selectedKey, truncated } = manualEnrollmentSearch;
+  if (status === "loading") return '<p class="admin-courses-manual-message" role="status">계정을 조회하는 중...</p>';
+  if (status === "empty") return '<p class="admin-courses-manual-message" role="status">검색 결과가 없습니다. 이름이나 이메일을 확인해 주세요.</p>';
+  if (status === "search-error") return '<p class="admin-courses-manual-message is-error" role="alert">계정 조회에 실패했습니다. 다시 검색해 주세요.</p>';
+  if (!results.length) return '<p class="admin-courses-manual-message muted">이름 2자 이상 또는 계정 이메일로 검색하세요.</p>';
+  const rows = results.map((item) => {
+    const key = `${item.type}:${item.id}`;
+    const parent = item.type === "member" && item.memberPurpose !== "general";
+    const label = item.type === "student" ? "학생" : (parent ? "학부모 · 등록 불가" : "일반회원");
+    const details = item.type === "student" ? [item.school, item.grade].filter(Boolean).join(" · ") : "";
+    return `<label class="admin-courses-manual-candidate${parent ? " is-disabled" : ""}"><input type="radio" name="manualApprovalCandidate" value="${escapeHtml(key).replace(/"/g, "&quot;")}" ${selectedKey === key ? "checked" : ""} ${parent ? "disabled" : ""}><span><strong>${escapeHtml(item.name || "이름 없음")}</strong><span>${escapeHtml(item.email || "이메일 없음")}</span><small>${escapeHtml(label)}${details ? ` · ${escapeHtml(details)}` : ""} · 계정 ID ${escapeHtml(item.id)}</small></span></label>`;
+  }).join("");
+  return `<p class="admin-courses-manual-message" role="status">검색 결과 ${results.length}명${truncated ? " 이상 · 더 구체적으로 검색해 주세요" : ""}</p><div class="admin-courses-manual-results" role="radiogroup" aria-label="등록할 회원 선택">${rows}</div>`;
+}
+
+function parseManualCandidateKey(key) {
+  const separator = String(key || "").indexOf(":");
+  return separator < 0 ? ["", ""] : [key.slice(0, separator), key.slice(separator + 1)];
+}
+
+function renderManualEnrollmentSection() {
+  const selected = getSelectedEnrollmentCandidate(manualEnrollmentSearch.results, ...parseManualCandidateKey(manualEnrollmentSearch.selectedKey));
+  const feedback = ["success", "duplicate", "save-error", "selection-error"].includes(manualEnrollmentSearch.status);
+  return `<section class="admin-courses-manual-enrollment" aria-label="관리자 직접 등록"><h3>관리자 직접 등록</h3><form id="manualApprovalSearchForm"><label for="manualApprovalSearchInput">학생·일반회원 검색</label><div class="form-row"><input id="manualApprovalSearchInput" type="search" autocomplete="off" value="${escapeHtml(manualEnrollmentSearchTerm).replace(/"/g, "&quot;")}" placeholder="이름 또는 계정 이메일"><button type="submit" class="btn sm" ${manualEnrollmentSearch.status === "loading" ? "disabled" : ""}>검색</button><button type="button" class="btn sm" data-clear-manual-search="1">초기화</button></div></form><div id="manualApprovalSearchResults" aria-live="polite">${renderManualEnrollmentResults()}</div><div class="admin-courses-manual-actions"><button type="button" class="btn primary sm" id="manualApprovalRegisterBtn" data-register-manual="1" ${selected && !approvalActionInProgress ? "" : "disabled"}>등록</button><span class="muted">선택한 계정만 등록합니다. 학부모는 제외됩니다.</span></div><p id="manualApprovalFeedback" class="admin-courses-manual-feedback${manualEnrollmentSearch.status === "success" ? " is-success" : ""}" role="${feedback ? "alert" : "status"}" ${feedback ? "" : "hidden"}>${feedback ? escapeHtml(manualEnrollmentSearch.message) : ""}</p></section>`;
+}
+
+function updateManualEnrollmentSection() {
+  const section = $(".admin-courses-manual-enrollment");
+  if (!section) return;
+  const fresh = document.createElement("div");
+  fresh.innerHTML = renderManualEnrollmentSection();
+  section.replaceWith(fresh.firstElementChild);
+}
+
+async function searchManualEnrollment(courseId, raw) {
+  const requestId = ++manualEnrollmentSearchRequestId;
+  const term = classifyEnrollmentSearch(raw);
+  manualEnrollmentSearchTerm = String(raw || "").trim();
+  manualEnrollmentSearch = { status: "loading", results: [], selectedKey: "", message: "", truncated: false };
+  updateManualEnrollmentSection();
+  const input = $("#manualApprovalSearchInput");
+  if (input) input.value = String(raw || "").trim();
+  if (!term) {
+    manualEnrollmentSearch = { ...manualEnrollmentSearch, status: "selection-error", message: "이름은 2자 이상, 이메일은 전체 주소를 입력해 주세요." };
+    updateManualEnrollmentSection();
+    return;
+  }
+  try {
+    const parts = term.field === "name"
+      ? [where("name", ">=", term.value), where("name", "<=", `${term.value}\uf8ff`), limit(MANUAL_ENROLLMENT_SEARCH_LIMIT)]
+      : [where("email", "==", term.value), limit(MANUAL_ENROLLMENT_SEARCH_LIMIT)];
+    const [students, members] = await Promise.all([
+      getDocs(query(collection(db, "students"), ...parts)),
+      getDocs(query(collection(db, "members"), ...parts))
+    ]);
+    if (courseId !== activeEnrollmentCourseId || requestId !== manualEnrollmentSearchRequestId) return;
+    const mapDocs = (snapshot) => snapshot.docs.map((entry) => ({ id: entry.id, data: entry.data() || {} }));
+    const results = toEnrollmentCandidates(mapDocs(students), mapDocs(members));
+    manualEnrollmentSearch = {
+      status: results.length ? "ready" : "empty", results, selectedKey: "", message: "",
+      truncated: students.size === MANUAL_ENROLLMENT_SEARCH_LIMIT || members.size === MANUAL_ENROLLMENT_SEARCH_LIMIT
+    };
+  } catch (error) {
+    if (courseId !== activeEnrollmentCourseId || requestId !== manualEnrollmentSearchRequestId) return;
+    console.error("[admin-courses] manual enrollment search failed:", error);
+    manualEnrollmentSearch = { status: "search-error", results: [], selectedKey: "", message: "", truncated: false };
+  }
+  updateManualEnrollmentSection();
+  const nextInput = $("#manualApprovalSearchInput");
+  if (nextInput) nextInput.value = term.value;
+}
+
+function renderEnrollmentTable(enrollments, { showActions = true, approvalCourse = false } = {}) {
   if (!enrollments.length) {
     return '<div class="admin-courses-enrollment-empty">이 강좌의 수강 기록이 없습니다.</div>';
   }
@@ -911,7 +1197,7 @@ function renderEnrollmentTable(enrollments, { showActions = true } = {}) {
   const actionHeader = showActions ? "<th>관리</th>" : "";
   const rowsHtml = enrollments.map((enrollment) => {
     const actionCell = showActions
-      ? `<td><button type="button" class="btn sm danger" data-remove-enrollment="${escapeHtml(enrollment.id)}">수강 기록 제거</button></td>`
+      ? `<td>${approvalCourse && enrollment.status === "revoked" ? "해제됨" : `<button type="button" class="btn sm danger" data-remove-enrollment="${escapeHtml(enrollment.id)}">${approvalCourse ? "수강 해제" : "수강 기록 제거"}</button>`}</td>`
       : "";
     return `
       <tr>
@@ -960,18 +1246,208 @@ function renderEnrollmentModal(courseId, enrollments) {
       <strong>수강생 목록</strong>
       <span class="admin-courses-enrollment-count">${enrollments.length}명</span>
     </div>
-    ${renderEnrollmentTable(enrollments, { showActions: true })}
+    ${renderEnrollmentTable(enrollments, { showActions: true, approvalCourse: isApprovalCourseRow(courseId) })}
+    ${isApprovalCourseRow(courseId) ? renderApprovalRequests() : ""}
   `;
 }
 
 async function refreshCourseEnrollments(courseId) {
   const body = $("#courseEnrollmentsBody");
-  if (body) body.innerHTML = '<p class="muted">수강 기록을 불러오는 중...</p>';
+  if (body) body.innerHTML = `<p class="muted" role="status">${isApprovalCourseRow(courseId) ? "수강 기록과 승인 요청을 불러오는 중..." : "수강 기록을 불러오는 중..."}</p>`;
   const enrollments = await loadCourseEnrollments(courseId);
+  let weeks = null;
+  try {
+    const contentSnap = await getDoc(doc(db, isApprovalCourseRow(courseId) ? "coursePrivateContent" : "courses", courseId));
+    if (contentSnap.exists() && Array.isArray(contentSnap.data()?.weeks)) weeks = contentSnap.data().weeks;
+  } catch (error) {
+    console.warn("[admin-courses] current course progress unavailable", courseId, error);
+  }
+  enrollments.forEach((enrollment) => {
+    enrollment.progress = weeks
+      ? getCurrentCourseCompletion(courseId, weeks, enrollment.watchedVideos).progress
+      : null;
+  });
+  if (isApprovalCourseRow(courseId)) await loadApprovalRequests(courseId);
   activeEnrollmentRows = enrollments;
   renderEnrollmentModal(courseId, enrollments);
   return enrollments;
 }
+
+async function refreshAfterApprovalWrite(courseId) {
+  try {
+    await refreshCourseEnrollments(courseId);
+  } catch (error) {
+    console.error("[admin-courses] enrollment refresh after write failed:", error);
+    const body = $("#courseEnrollmentsBody");
+    if (body) body.innerHTML = '<div class="admin-courses-enrollment-empty">변경사항은 저장됐지만 목록을 다시 불러오지 못했습니다. <button type="button" class="btn sm" data-retry-enrollments="1">다시 불러오기</button></div>';
+    toast("변경사항은 저장됐습니다. 목록을 다시 불러와 상태를 확인해 주세요.", true);
+  }
+}
+
+function buildApprovedEnrollment(courseId, uid, learnerType, profile) {
+  const base = {
+    userId: uid,
+    courseId,
+    status: "active",
+    learnerType,
+    learnerSnapshot: {
+      name: String(profile.name || ""),
+      email: String(profile.email || ""),
+      phone: String(profile.phone || ""),
+      type: learnerType,
+      school: learnerType === "student" ? String(profile.school || "") : null,
+      grade: learnerType === "student" ? String(profile.grade || "") : null
+    },
+    updatedAt: serverTimestamp()
+  };
+  if (learnerType === "student") {
+    base.studentSnapshot = {
+      name: base.learnerSnapshot.name,
+      email: base.learnerSnapshot.email,
+      phone: base.learnerSnapshot.phone,
+      school: base.learnerSnapshot.school,
+      grade: base.learnerSnapshot.grade
+    };
+  }
+  return base;
+}
+
+async function grantApprovalEnrollment(courseId, uid, learnerType, { requirePending = false } = {}) {
+  const profileRef = doc(db, learnerType === "student" ? "students" : "members", uid);
+  const enrollmentRef = doc(db, "enrollments", `${uid}_${courseId}`);
+  const courseRef = doc(db, "courses", courseId);
+  const requestRef = doc(db, "courses", courseId, "enrollmentRequests", uid);
+  await runTransaction(db, async (transaction) => {
+    const courseSnap = await transaction.get(courseRef);
+    const profileSnap = await transaction.get(profileRef);
+    const enrollmentSnap = await transaction.get(enrollmentRef);
+    const requestSnap = await transaction.get(requestRef);
+    if (!courseSnap.exists() || courseSnap.data().accessType !== "approvalRequired" || courseSnap.data().status !== "published") throw new Error("현재 승인형 게시 강좌가 아닙니다.");
+    if (!profileSnap.exists()) throw new Error("신청 계정을 찾을 수 없습니다.");
+    const profile = profileSnap.data() || {};
+    if (learnerType === "member" && profile.memberPurpose !== "general") throw new Error("학부모 회원은 수강 등록 대상이 아닙니다.");
+    if (requirePending && (!requestSnap.exists() || requestSnap.data().status !== "pending")) throw new Error("신청 상태가 변경됐습니다. 목록을 다시 확인해 주세요.");
+    if (requestSnap.exists() && (requestSnap.data().userId !== uid || requestSnap.data().learnerType !== learnerType)) throw new Error("신청 계정을 확인해 주세요.");
+    if (enrollmentSnap.exists() && (enrollmentSnap.data().userId !== uid || enrollmentSnap.data().courseId !== courseId)) throw new Error("기존 수강 기록을 확인해 주세요.");
+    if (enrollmentSnap.exists() && String(enrollmentSnap.data().status || "active") === "active") {
+      if (!requirePending) throw new Error("이미 수강 중인 계정입니다.");
+      transaction.update(requestRef, { status: "approved", reviewedBy: auth.currentUser.uid, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      return;
+    }
+    const approved = buildApprovedEnrollment(courseId, uid, learnerType, profile);
+    transaction.set(enrollmentRef, enrollmentSnap.exists() ? approved : { ...approved, progress: 0, createdAt: serverTimestamp() }, { merge: true });
+    if (requestSnap.exists()) transaction.update(requestRef, { status: "approved", reviewedBy: auth.currentUser.uid, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  });
+}
+
+async function reviewApprovalRequest(uid, decision) {
+  const courseId = activeEnrollmentCourseId;
+  const item = approvalRequestRows.find((row) => row.userId === uid);
+  if (!courseId || !item || approvalActionInProgress) return;
+  if (!window.confirm(`${item.profile?.name || uid}님의 수강신청을 ${decision === "approved" ? "승인" : "거절"}하시겠습니까?`)) return;
+  approvalActionInProgress = true;
+  try {
+    const requestRef = doc(db, "courses", courseId, "enrollmentRequests", uid);
+    if (decision === "approved") await grantApprovalEnrollment(courseId, uid, item.learnerType, { requirePending: true });
+    else await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(requestRef);
+      if (!snap.exists() || snap.data().status !== "pending") throw new Error("신청 상태가 변경됐습니다.");
+      transaction.update(requestRef, { status: "rejected", reviewedBy: auth.currentUser.uid, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    });
+    toast(decision === "approved" ? "수강신청을 승인했습니다." : "수강신청을 거절했습니다.");
+    await refreshAfterApprovalWrite(courseId);
+  } catch (error) {
+    toast(error.message || "신청을 처리하지 못했습니다.", true);
+  } finally {
+    approvalActionInProgress = false;
+  }
+}
+
+async function manuallyEnrollApproval(courseId) {
+  const [type, uid] = parseManualCandidateKey(manualEnrollmentSearch.selectedKey);
+  const selected = getSelectedEnrollmentCandidate(manualEnrollmentSearch.results, type, uid);
+  if (!selected) {
+    manualEnrollmentSearch.status = "selection-error";
+    manualEnrollmentSearch.message = "검색 결과에서 등록할 계정을 선택해 주세요.";
+    updateManualEnrollmentSection();
+    return;
+  }
+  if (approvalActionInProgress) return;
+  approvalActionInProgress = true;
+  try {
+    if (!window.confirm(`${selected.name || selected.email || uid}님(${type === "student" ? "학생" : "일반회원"} · ${selected.email || uid})을 이 강좌에 등록하시겠습니까?`)) return;
+    await grantApprovalEnrollment(courseId, uid, type);
+    manualEnrollmentSearch.status = "success";
+    manualEnrollmentSearch.selectedKey = "";
+    manualEnrollmentSearch.message = "선택한 계정을 등록했습니다.";
+    toast("수강생을 등록했습니다.");
+    await refreshAfterApprovalWrite(courseId);
+  } catch (error) {
+    manualEnrollmentSearch.status = error.message?.includes("이미 수강") ? "duplicate" : "save-error";
+    manualEnrollmentSearch.message = error.message || "수강생을 등록하지 못했습니다.";
+    updateManualEnrollmentSection();
+    toast(manualEnrollmentSearch.message, true);
+  } finally {
+    approvalActionInProgress = false;
+  }
+}
+
+$("#courseEnrollmentsBody")?.addEventListener("click", async (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.approveRequest) await reviewApprovalRequest(button.dataset.approveRequest, "approved");
+  if (button.dataset.rejectRequest) await reviewApprovalRequest(button.dataset.rejectRequest, "rejected");
+  if (button.dataset.clearRequestSearch) {
+    approvalRequestSearch = "";
+    renderEnrollmentModal(activeEnrollmentCourseId, activeEnrollmentRows);
+  }
+  if (button.dataset.clearManualSearch) {
+    manualEnrollmentSearchRequestId++;
+    manualEnrollmentSearchTerm = "";
+    manualEnrollmentSearch = { status: "idle", results: [], selectedKey: "", message: "", truncated: false };
+    updateManualEnrollmentSection();
+  }
+  if (button.dataset.registerManual) await manuallyEnrollApproval(activeEnrollmentCourseId);
+  if (button.dataset.retryEnrollments) await window.openCourseEnrollmentsModal(activeEnrollmentCourseId);
+  if (button.dataset.moreRequests && !approvalActionInProgress && !approvalListInProgress) {
+    const courseId = activeEnrollmentCourseId;
+    approvalListInProgress = true;
+    button.disabled = true;
+    button.textContent = "불러오는 중...";
+    try {
+      await loadApprovalRequests(courseId, { append: true });
+      renderEnrollmentModal(courseId, activeEnrollmentRows);
+    } catch (_) {
+      button.disabled = false;
+      button.textContent = "신청 더 보기";
+      toast("신청 목록을 더 불러오지 못했습니다.", true);
+    } finally {
+      approvalListInProgress = false;
+    }
+  }
+});
+
+$("#courseEnrollmentsBody")?.addEventListener("change", (event) => {
+  if (event.target.name !== "manualApprovalCandidate") return;
+  const [type, uid] = parseManualCandidateKey(event.target.value);
+  const selected = getSelectedEnrollmentCandidate(manualEnrollmentSearch.results, type, uid);
+  manualEnrollmentSearch.selectedKey = selected ? `${type}:${uid}` : "";
+  manualEnrollmentSearch.message = selected ? `${selected.name || selected.email || "선택한 계정"}님을 선택했습니다.` : "";
+  const register = $("#manualApprovalRegisterBtn");
+  if (register) register.disabled = !selected;
+});
+
+$("#courseEnrollmentsBody")?.addEventListener("submit", (event) => {
+  if (event.target.id === "approvalRequestSearchForm") {
+    event.preventDefault();
+    approvalRequestSearch = $("#approvalRequestSearch")?.value || "";
+    renderEnrollmentModal(activeEnrollmentCourseId, activeEnrollmentRows);
+    return;
+  }
+  if (event.target.id !== "manualApprovalSearchForm") return;
+  event.preventDefault();
+  searchManualEnrollment(activeEnrollmentCourseId, $("#manualApprovalSearchInput")?.value);
+});
 
 function renderGradeFilterSelect() {
   const gradeFilter = $("#adminFilterGrade");
@@ -1021,21 +1497,28 @@ function buildGradeQuick(selectedGrade = "") {
   });
 }
 
-function renderInstructorSelect(selected = "", selectedRecord = {}) {
+function renderInstructorSelect(selectedRecord = {}) {
   const el = $("#contentEditInstructorUid");
   if (!el) return;
   const list = Array.from(instructors.values()).sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko"));
-  const html = list.map((x) => `<option value="${escapeHtml(x.uid)}">${escapeHtml(x.name || x.uid)}</option>`).join("");
-  el.innerHTML = `<option value="">강사 선택</option>${html}`;
-  const selectedValue = getInstructorSelectValue({ ...selectedRecord, instructorUid: selected });
-  if (selectedValue && !Array.from(el.options).some((opt) => opt.value === selectedValue)) {
-    const opt = document.createElement("option");
-    opt.value = selectedValue;
-    opt.textContent = selectedRecord.instructorName || selectedValue;
-    opt.disabled = true;
-    el.appendChild(opt);
-  }
-  el.value = selectedValue || "";
+  const selectedValues = getInstructorSelectValues(selectedRecord);
+  const choices = list.map((instructor) => ({
+    uid: instructor.uid,
+    name: instructor.name || instructor.uid,
+    missing: false
+  }));
+  selectedValues.forEach((selectedValue, index) => {
+    if (choices.some((choice) => choice.uid === selectedValue)) return;
+    const fallbackName = selectedRecord.instructorNames?.[index] || selectedRecord.instructorName || selectedValue;
+    choices.push({ uid: selectedValue, name: fallbackName, missing: true });
+  });
+  el.innerHTML = choices.length
+    ? choices.map((choice) => `
+      <label class="admin-multi-choice">
+        <input type="checkbox" value="${escapeHtml(choice.uid)}" data-instructor-name="${escapeHtml(choice.name)}"${selectedValues.includes(choice.uid) ? " checked" : ""}>
+        <span>${escapeHtml(choice.name)}${choice.missing ? " (등록 정보 없음)" : ""}</span>
+      </label>`).join("")
+    : '<p class="admin-multi-choice-empty">배정 가능한 강사가 없습니다.</p>';
 }
 
 function renderInstructorFilterSelect() {
@@ -1051,9 +1534,13 @@ function renderInstructorFilterSelect() {
 async function loadInstructors() {
   const map = new Map();
   try {
-    const snap = await getDocs(collection(db, "instructors"));
+    const [snap, accountsSnap] = await Promise.all([
+      getDocs(collection(db, "instructors")),
+      getDocs(collection(db, "instructorAccounts"))
+    ]);
+    const accountUidByProfileId = accountUidByInstructorId(accountsSnap.docs);
     snap.docs.forEach((docSnap) => {
-      const row = normalizeInstructorProfile(docSnap);
+      const row = normalizeInstructorProfile(docSnap, accountUidByProfileId);
       if (row) map.set(row.uid, row);
     });
   } catch (_) {
@@ -1098,12 +1585,17 @@ function renderCurriculumPanels() {
 
 function initWeeks(rawWeeks, courseFormat) {
   const format = normalizeCourseFormat(courseFormat, Array.isArray(rawWeeks) ? rawWeeks.length : 0);
+  const editingCourseId = String($("#contentEditId")?.value || "").trim();
+  const isApprovalCourse = normalizeAccessType($("#contentEditAccessType")?.value) === "approvalRequired";
   let weeks = normalizeCurriculumWeeks(rawWeeks).map((w, i) => ({
     id: w.id || `week_${i + 1}`,
     title: w.title || `${i + 1}주차`,
     description: w.description || w.content || "",
     videos: (Array.isArray(w.videos) ? w.videos : w.lessons || []).map((v, vi) => ({
       id: v.id || `video_${vi + 1}`,
+      completionId: v.completionId || (editingCourseId
+        ? `${editingCourseId}_week_${isApprovalCourse ? (rawWeeks[i]?.id || `week_${i}`) : w.id}_video_${vi}`
+        : ""),
       title: v.title || "",
       url: typeof v === "string" ? v : (v.url || v.fullUrl || v.videoUrl || "")
     }))
@@ -1141,7 +1633,7 @@ function renderWeeks() {
       ${(w.videos || []).map((v, vi) => `
         <div class="course-video-row" data-video-index="${vi}" style="padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
           <input data-video-field="title" placeholder="영상 제목 (선택)" value="${escapeHtml(v.title || "")}" style="margin-bottom:8px;">
-          <input data-video-field="url" placeholder="https://..." value="${escapeHtml(v.url || "")}">
+          <input data-video-field="url" aria-label="영상 URL" placeholder="https://..." value="${escapeHtml(v.url || "")}">
           <div style="margin-top:8px;"><button type="button" class="btn sm danger" data-action="video-remove">영상 삭제</button></div>
         </div>
       `).join("")}
@@ -1159,7 +1651,7 @@ function collectWeeks() {
     weekNumber: i + 1,
     title: String(w.title || `${i + 1}주차`).trim(),
     description: String(w.description || "").trim(),
-    videos: (w.videos || []).map((v) => ({ id: v.id, title: String(v.title || "").trim(), url: String(v.url || "").trim() })).filter((v) => v.url)
+    videos: (w.videos || []).map((v) => ({ id: v.id, completionId: v.completionId, title: String(v.title || "").trim(), url: String(v.url || "").trim() })).filter((v) => v.url)
   }));
   if (fmt === "single") {
     const first = mapped[0] || { id: "week_1", weekNumber: 1, title: "1주차", description: "", videos: [] };
@@ -1198,7 +1690,7 @@ function bindWeeksEditor() {
       if (!weeksState.length) weeksState = [{ id: "week_1", title: "1주차", description: "", videos: [] }];
       renderWeeks();
     }
-    if (action === "video-add") { weeksState[wi].videos = weeksState[wi].videos || []; weeksState[wi].videos.push({ id: `video_${Date.now()}`, title: "", url: "" }); renderWeeks(); }
+    if (action === "video-add") { weeksState[wi].videos = weeksState[wi].videos || []; const id = `video_${crypto.randomUUID()}`; weeksState[wi].videos.push({ id, completionId: id, title: "", url: "" }); renderWeeks(); }
     if (action === "video-remove" && Number.isInteger(vi)) { weeksState[wi].videos.splice(vi, 1); renderWeeks(); }
   });
   root.addEventListener("input", (e) => {
@@ -1237,9 +1729,11 @@ function bindWeeksEditor() {
 
 function toRowHtml(item) {
   const created = item.createdAt?.toDate?.()?.toLocaleDateString("ko-KR") || "-";
+  const subjectName = item.subjectLabel || item.subject || "-";
+  const subjectColorStyle = getSubjectColorStyle(subjectName, subjectColorMap);
   return `<tr>
     <td><strong>${escapeHtml(item.title || "제목 없음")}</strong></td>
-    <td>${escapeHtml(item.subjectLabel || item.subject || "-")}</td>
+    <td><span class="admin-course-subject-badge${subjectColorStyle ? " has-subject-color" : ""}"${subjectColorStyle ? ` style="${subjectColorStyle}"` : ""}>${escapeHtml(subjectName)}</span></td>
     <td>${escapeHtml(item.gradeLabel || item.grade || "-")}</td>
     <td>${escapeHtml(item.year || "-")}</td>
     <td>${escapeHtml(item.instructorName || "-")}</td>
@@ -1250,6 +1744,7 @@ function toRowHtml(item) {
     <td>
       <div class="admin-courses-action-row">
         <button class="btn sm" onclick="openEditContentModal('${escapeHtml(item.id)}')">수정</button>
+        <button type="button" class="btn sm" data-course-preview="${escapeHtml(item.id).replace(/"/g, "&quot;")}">강좌 보기</button>
         <button class="btn sm" onclick="openCourseEnrollmentsModal('${escapeHtml(item.id)}')">수강생 확인</button>
         <button class="btn sm danger" onclick="deleteContent('${escapeHtml(item.id)}')">영구 삭제</button>
       </div>
@@ -1282,9 +1777,13 @@ function applyFilters() {
     }
     if (filters.instructor !== "all") {
       const keys = getInstructorMatchKeys(filters.instructor);
-      const rowInstructorUid = String(r.instructorUid || "").trim();
-      const rowInstructorId = String(r.instructorId || "").trim();
-      if (!keys.has(rowInstructorUid) && !keys.has(rowInstructorId)) return false;
+      const rowInstructorKeys = [
+        r.instructorUid,
+        r.instructorId,
+        ...(Array.isArray(r.instructorUids) ? r.instructorUids : []),
+        ...(Array.isArray(r.instructorIds) ? r.instructorIds : [])
+      ].map((value) => String(value || "").trim()).filter(Boolean);
+      if (!rowInstructorKeys.some((value) => keys.has(value))) return false;
     }
     const q = filters.search.trim().toLowerCase();
     if (q && !String(r.title || "").toLowerCase().includes(q)) return false;
@@ -1326,94 +1825,44 @@ function setAdvancedFiltersOpen(isOpen) {
 }
 
 function renderAdminPagination(totalPages, totalItems) {
-  if (!pageEl) return;
-
-  const startItem = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const endItem = Math.min(page * PAGE_SIZE, totalItems);
-  const rangeText = totalItems === 0 ? "" : `${startItem}-${endItem} / ${totalItems}`;
-
-  pageEl.classList.add("is-visible");
-  pageEl.onclick = null;
-
-  if (totalPages <= 1) {
-    pageEl.innerHTML = `
-      <div class="admin-courses-pagination-inner">
-        <p class="admin-courses-pagination-info" aria-live="polite">${escapeHtml(rangeText)}</p>
-      </div>
-    `;
-    return;
-  }
-
-  const current = page;
-  const firstDisabled = current <= 1;
-  const lastDisabled = current >= totalPages;
-
-  let start = Math.max(1, current - Math.floor(PAGINATION_GROUP_SIZE / 2));
-  let end = Math.min(totalPages, start + PAGINATION_GROUP_SIZE - 1);
-  if (end - start < PAGINATION_GROUP_SIZE - 1) start = Math.max(1, end - PAGINATION_GROUP_SIZE + 1);
-
-  let pages = "";
-  for (let index = start; index <= end; index += 1) {
-    const activeClass = index === current ? " is-active" : "";
-    pages += `<button type="button" class="pagination-btn admin-courses-pagination-num${activeClass}" data-admin-p="${index}">${index}</button>`;
-  }
-
-  pageEl.innerHTML = `
-    <div class="admin-courses-pagination-inner">
-      <div class="admin-courses-pagination-controls">
-        <button type="button" class="pagination-btn admin-courses-pagination-arrow" data-admin-p="first" ${firstDisabled ? "disabled" : ""}>&lt;&lt;</button>
-        <button type="button" class="pagination-btn admin-courses-pagination-arrow" data-admin-p="prev" ${firstDisabled ? "disabled" : ""}>&lt;</button>
-        <div class="admin-courses-pagination-pages">${pages}</div>
-        <button type="button" class="pagination-btn admin-courses-pagination-arrow" data-admin-p="next" ${lastDisabled ? "disabled" : ""}>&gt;</button>
-        <button type="button" class="pagination-btn admin-courses-pagination-arrow" data-admin-p="last" ${lastDisabled ? "disabled" : ""}>&gt;&gt;</button>
-      </div>
-      <p class="admin-courses-pagination-info" aria-live="polite">${escapeHtml(rangeText)}</p>
-    </div>
-  `;
-
-  pageEl.onclick = (event) => {
-    const button = event.target.closest("button[data-admin-p]");
-    if (!button || button.disabled) return;
-
-    const action = button.getAttribute("data-admin-p");
-    const pageCount = Math.max(1, Math.ceil(viewRows.length / PAGE_SIZE));
-
-    let nextPage = current;
-    if (action === "first") nextPage = 1;
-    else if (action === "prev") nextPage = current - 1;
-    else if (action === "next") nextPage = current + 1;
-    else if (action === "last") nextPage = pageCount;
-    else nextPage = Number.parseInt(action, 10);
-
-    if (!Number.isInteger(nextPage) || nextPage < 1 || nextPage > pageCount) return;
-
-    page = nextPage;
-    renderTable();
-    pageEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  };
+  void totalPages;
+  pageEl?.classList.add("is-visible");
+  const state = renderListPagination(pageEl, {
+    currentPage: page,
+    itemLabel: "개",
+    onPageChange: (nextPage) => {
+      page = nextPage;
+      renderTable();
+    },
+    pageSize,
+    totalItems,
+  });
+  page = state.currentPage;
 }
 
 function renderTable() {
+  setCourseExportReady();
   if (!tbody) return;
   if (!viewRows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="muted admin-table-empty">표시할 강좌가 없습니다.</td></tr>';
-    if (pageEl) {
-      pageEl.classList.remove("is-visible");
-      pageEl.innerHTML = "";
-      pageEl.onclick = null;
-    }
-    metaEl.textContent = rows.length ? "조건에 맞는 강좌가 없습니다." : "등록된 강좌가 없습니다.";
+    const emptyMessage = rows.length ? "조건에 맞는 강좌가 없습니다." : "등록된 강좌가 없습니다.";
+    tbody.innerHTML = `<tr><td colspan="10" class="muted admin-table-empty">${emptyMessage}</td></tr>`;
+    renderAdminPagination(1, 0);
+    metaEl.textContent = emptyMessage;
+    metaEl.hidden = false;
     return;
   }
-  const totalPages = Math.max(1, Math.ceil(viewRows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(viewRows.length / pageSize));
   if (page > totalPages) page = totalPages;
-  const start = (page - 1) * PAGE_SIZE;
-  tbody.innerHTML = viewRows.slice(start, start + PAGE_SIZE).map(toRowHtml).join("");
-  metaEl.textContent = `${viewRows.length}개 표시 / 전체 ${rows.length}개 (페이지 ${page}/${totalPages})`;
+  const start = (page - 1) * pageSize;
+  tbody.innerHTML = viewRows.slice(start, start + pageSize).map(toRowHtml).join("");
+  metaEl.textContent = "";
+  metaEl.hidden = true;
   renderAdminPagination(totalPages, viewRows.length);
 }
 
 async function loadRows() {
+  coursesLoaded = false;
+  setCourseExportReady();
   const snap = await getDocs(query(collection(db, "courses"), orderBy("createdAt", "desc")));
   const instructorsByUid = {};
   instructors.forEach((row) => {
@@ -1425,30 +1874,40 @@ async function loadRows() {
     { id: d.id, ...d.data() },
     { labelMaps, instructorsByUid }
   ));
+  coursesLoaded = true;
   applyFilters();
 }
 
 window.openAddContentModal = function openAddContentModal() {
   $("#contentEditForm")?.reset();
+  showCourseFormError("");
   $("#contentEditId").value = "";
   $("#contentEditStatus").value = "published";
   $("#contentEditCourseFormat").value = "single";
   setSelectValue($("#contentEditAccessType"), "public", "public");
+  $("#contentEditAccessType").disabled = false;
   refreshCourseCatalogSelects("", "", "");
   renderInstructorSelect();
   initWeeks([], "single");
   updateLivePreview();
   $("#contentModalTitle").textContent = "강좌 추가";
-  $("#contentEditModal")?.classList.add("is-open");
+  showCourseModal($("#contentEditModal"));
   document.body.classList.add("modal-open");
   document.documentElement.classList.add("modal-open");
-  contentFormDirty.capture();
 };
 
 window.openEditContentModal = async function openEditContentModal(id) {
+  showCourseFormError("");
   const snap = await getDoc(doc(db, "courses", id));
   if (!snap.exists()) return toast("강좌를 찾을 수 없습니다.", true);
   const rawCourse = snap.data() || {};
+  if (normalizeAccessType(rawCourse.accessType) === "approvalRequired") {
+    const protectedSnap = await getDoc(doc(db, "coursePrivateContent", id));
+    if (!protectedSnap.exists()) return toast("보호된 강좌 영상을 찾을 수 없어 편집을 중단했습니다.", true);
+    const protectedData = protectedSnap.data() || {};
+    rawCourse.weeks = protectedData.weeks || [];
+    rawCourse.previewVideoUrl = protectedData.previewVideoUrl || "";
+  }
   const c = normalizeCourseForReadOnly({ id: snap.id, ...rawCourse }, { labelMaps });
   $("#contentEditId").value = id;
   $("#contentEditTitle").value = c.title || "";
@@ -1460,31 +1919,90 @@ window.openEditContentModal = async function openEditContentModal(id) {
   $("#contentEditPreviewVideoUrl").value = c.previewVideoUrl || "";
   setSelectValue($("#contentEditStatus"), normalizeCourseStatusForSave(c.status), "published");
   setSelectValue($("#contentEditAccessType"), normalizeAccessType(c.accessType), "public");
-  renderInstructorSelect(c.instructorUid || "", c);
-  initWeeks(c.weeks || c.curriculumWeeks || [], c.courseFormat || "single");
+  $("#contentEditAccessType").disabled = true;
+  renderInstructorSelect(rawCourse);
+  initWeeks(Array.isArray(rawCourse.weeks) && rawCourse.weeks.length ? rawCourse.weeks : (c.weeks || c.curriculumWeeks || []), c.courseFormat || "single");
   updateLivePreview();
   $("#contentModalTitle").textContent = "강좌 수정";
-  $("#contentEditModal")?.classList.add("is-open");
+  showCourseModal($("#contentEditModal"));
   document.body.classList.add("modal-open");
   document.documentElement.classList.add("modal-open");
-  contentFormDirty.capture();
 };
 
-window.closeContentModal = async function closeContentModal(force = false) {
-  if (!force && !(await confirmDiscardIfDirty(contentFormDirty))) return;
-  $("#contentEditModal")?.classList.remove("is-open");
+window.closeContentModal = function closeContentModal() {
+  hideCourseModal($("#contentEditModal"));
   document.body.classList.remove("modal-open");
   document.documentElement.classList.remove("modal-open");
 };
 
+function renderAdminCourseVideo(video, title) {
+  const info = normalizeVideoUrl(video.url);
+  if (!info) return '<p class="muted">영상 주소를 확인할 수 없습니다.</p>';
+  if (info.type === "mp4") {
+    return `<video controls preload="metadata" src="${escapeHtml(info.url)}" aria-label="${escapeHtml(title)}"></video>`;
+  }
+  return `<iframe src="${escapeHtml(info.embedUrl)}" title="${escapeHtml(title)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><a href="${escapeHtml(info.watchUrl)}" target="_blank" rel="noopener noreferrer">YouTube에서 보기</a>`;
+}
+
+window.openAdminCoursePreview = async function openAdminCoursePreview(courseId) {
+  const requestId = ++adminCoursePreviewRequestId;
+  const body = $("#adminCoursePreviewBody");
+  const title = $("#adminCoursePreviewTitle");
+  const note = $("#adminCoursePreviewNote");
+  if (!body || !title || !note) return;
+  try {
+    await requireRole("admin", "/members/login.html");
+  } catch (_) {
+    return;
+  }
+  if (requestId !== adminCoursePreviewRequestId) return;
+  title.textContent = "강좌 보기";
+  note.textContent = "학습 진도와 수강 기록을 변경하지 않는 관리자 보기입니다.";
+  body.innerHTML = '<p class="muted" role="status">강좌 영상을 불러오는 중...</p>';
+  openSupportModal("adminCoursePreviewModal");
+  try {
+    const snap = await getDoc(doc(db, "courses", courseId));
+    if (!snap.exists()) throw new Error("강좌를 찾을 수 없습니다.");
+    const raw = snap.data() || {};
+    if (normalizeAccessType(raw.accessType) === "approvalRequired") {
+      const protectedSnap = await getDoc(doc(db, "coursePrivateContent", courseId));
+      if (!protectedSnap.exists()) throw new Error("보호된 강좌 영상을 찾을 수 없습니다.");
+      raw.weeks = protectedSnap.data()?.weeks || [];
+    }
+    const course = normalizeCourseForReadOnly({ id: snap.id, ...raw }, { labelMaps });
+    if (requestId !== adminCoursePreviewRequestId) return;
+    title.textContent = course.title || "강좌 보기";
+    note.textContent = `${getAdminAccessTypeLabel(course.accessType)} · ${getAdminCourseStatusLabel(course.status)} · 관리자 읽기 전용`;
+    const weeks = course.curriculumWeeks || [];
+    body.innerHTML = weeks.length
+      ? weeks.map((week) => `<section class="admin-course-preview-week"><h3>${escapeHtml(week.title)}</h3>${(week.videos || []).map((video) => `<div class="admin-course-preview-video"><h4>${escapeHtml(video.title || "강좌 영상")}</h4>${renderAdminCourseVideo(video, video.title || "강좌 영상")}</div>`).join("") || '<p class="muted">등록된 영상이 없습니다.</p>'}</section>`).join("")
+      : '<p class="muted">등록된 학습 영상이 없습니다.</p>';
+  } catch (error) {
+    if (requestId !== adminCoursePreviewRequestId) return;
+    console.error("[admin-courses] preview failed", error);
+    body.innerHTML = `<p role="alert">${escapeHtml(error.message || "강좌 영상을 불러오지 못했습니다.")}</p>`;
+  }
+};
+
+window.closeAdminCoursePreview = function closeAdminCoursePreview() {
+  adminCoursePreviewRequestId++;
+  closeSupportModal("adminCoursePreviewModal");
+  const body = $("#adminCoursePreviewBody");
+  if (body) body.innerHTML = "";
+};
+
 window.openCourseEnrollmentsModal = async function openCourseEnrollmentsModal(courseId) {
   activeEnrollmentCourseId = courseId;
+  approvalRequestSearch = "";
+  manualEnrollmentSearchRequestId++;
+  manualEnrollmentSearchTerm = "";
+  manualEnrollmentSearch = { status: "idle", results: [], selectedKey: "", message: "", truncated: false };
   const title = $("#courseEnrollmentsTitle");
   const subtitle = $("#courseEnrollmentsSubtitle");
   const body = $("#courseEnrollmentsBody");
   if (title) title.textContent = "수강생 확인";
   if (subtitle) subtitle.textContent = `${getCourseTitle(courseId)} / 불러오는 중`;
-  if (body) body.innerHTML = '<p class="muted">수강 기록을 불러오는 중...</p>';
+  if (body) body.innerHTML = '<p class="muted" role="status">수강 기록을 불러오는 중...</p>';
   openSupportModal("courseEnrollmentsModal");
 
   try {
@@ -1492,13 +2010,14 @@ window.openCourseEnrollmentsModal = async function openCourseEnrollmentsModal(co
   } catch (error) {
     console.error("[admin-courses] enrollment list load failed:", error);
     if (body) {
-      body.innerHTML = '<div class="admin-courses-enrollment-empty">수강 기록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</div>';
+      body.innerHTML = '<div class="admin-courses-enrollment-empty">수강 기록 또는 승인 요청을 불러오지 못했습니다. <button type="button" class="btn sm" data-retry-enrollments="1">다시 시도</button></div>';
     }
     toast("수강 기록을 불러오지 못했습니다.", true);
   }
 };
 
 window.closeCourseEnrollmentsModal = function closeCourseEnrollmentsModal() {
+  manualEnrollmentSearchRequestId++;
   activeEnrollmentCourseId = "";
   activeEnrollmentRows = [];
   closeSupportModal("courseEnrollmentsModal");
@@ -1520,8 +2039,8 @@ function removeEnrollmentRecord(enrollmentId) {
   if (body) {
     body.innerHTML = `
       <div class="admin-courses-warning-box">
-        <strong>${escapeHtml(enrollment.learnerName || "선택한 수강생")}의 수강 기록을 제거합니다.</strong>
-        <p style="margin:6px 0 0;">이 작업은 이 강좌의 수강 기록만 제거합니다.</p>
+        <strong>${escapeHtml(enrollment.learnerName || "선택한 수강생")}의 ${isApprovalCourseRow(activeEnrollmentCourseId) ? "수강을 해제합니다." : "수강 기록을 제거합니다."}</strong>
+        <p style="margin:6px 0 0;">${isApprovalCourseRow(activeEnrollmentCourseId) ? "학습 접근을 차단하고 완료 기록은 보존합니다." : "이 작업은 이 강좌의 수강 기록만 제거합니다."}</p>
         <p style="margin:4px 0 0;">학생/회원 계정은 삭제하지 않습니다.</p>
         <p style="margin:4px 0 0;">강좌도 삭제하지 않습니다.</p>
       </div>
@@ -1541,8 +2060,13 @@ window.confirmEnrollmentRemoval = async function confirmEnrollmentRemoval() {
   if (!courseId || !enrollmentId) return;
 
   try {
-    await deleteDoc(doc(db, "enrollments", enrollmentId));
-    toast("수강 기록을 제거했습니다.");
+    if (isApprovalCourseRow(courseId)) {
+      await updateDoc(doc(db, "enrollments", enrollmentId), { status: "revoked", updatedAt: serverTimestamp() });
+      toast("수강을 해제하고 기존 진도를 보존했습니다.");
+    } else {
+      await deleteDoc(doc(db, "enrollments", enrollmentId));
+      toast("수강 기록을 제거했습니다.");
+    }
     window.closeEnrollmentRemoveConfirmModal();
     await refreshCourseEnrollments(courseId);
     await loadRows();
@@ -1558,7 +2082,8 @@ $("#courseEnrollmentsBody")?.addEventListener("click", (event) => {
   removeEnrollmentRecord(button.dataset.removeEnrollment || "");
 });
 
-function renderDeleteBlockedModal(courseId, enrollments) {
+function renderDeleteBlockedModal(courseId, inventory) {
+  const enrollments = inventory.enrollments;
   const body = $("#courseDeleteBlockedBody");
   const subtitle = $("#courseDeleteBlockedSubtitle");
   if (subtitle) {
@@ -1569,7 +2094,7 @@ function renderDeleteBlockedModal(courseId, enrollments) {
     <div class="admin-courses-warning-box">
       <strong>기본 삭제는 차단되었습니다.</strong>
       <p style="margin:6px 0 0;">이 강좌에는 수강 기록이 있습니다. 일반 운영에서는 <strong>보관으로 전환</strong>을 권장합니다.</p>
-      <p style="margin:4px 0 0;">위험 삭제를 선택하면 아래 수강 기록과 강좌 문서만 삭제됩니다. 학생/회원/강사 계정과 오프라인 반 데이터는 삭제하지 않습니다.</p>
+      <p style="margin:4px 0 0;">영구 삭제 시 강좌, 보호 영상 ${Number(inventory.hasPrivateContent)}개, 신청 기록 ${inventory.requests.length}개, 수강·진도 기록 ${enrollments.length}개를 함께 삭제합니다. 학생/회원/강사 계정과 오프라인 반 데이터는 삭제하지 않습니다.</p>
     </div>
     <div class="admin-courses-enrollment-summary">
       <strong>영향 받는 수강 기록 미리보기</strong>
@@ -1579,18 +2104,19 @@ function renderDeleteBlockedModal(courseId, enrollments) {
   `;
 }
 
-function openDeleteBlockedModal(courseId, enrollments) {
+function openDeleteBlockedModal(courseId, inventory) {
   deleteBlockedState = {
     courseId,
     course: getCourseRow(courseId),
-    enrollments
+    enrollments: inventory.enrollments,
+    inventory
   };
-  renderDeleteBlockedModal(courseId, enrollments);
+  renderDeleteBlockedModal(courseId, inventory);
   openSupportModal("courseDeleteBlockedModal");
 }
 
 window.closeCourseDeleteBlockedModal = function closeCourseDeleteBlockedModal() {
-  deleteBlockedState = { courseId: "", course: null, enrollments: [] };
+  deleteBlockedState = { courseId: "", course: null, enrollments: [], inventory: null };
   closeSupportModal("courseDeleteBlockedModal");
 };
 
@@ -1619,7 +2145,8 @@ window.archiveCourseFromDeleteBlocked = async function archiveCourseFromDeleteBl
   }
 };
 
-function renderForceDeleteModal(courseId, enrollments) {
+function renderForceDeleteModal(courseId, inventory) {
+  const enrollments = inventory.enrollments;
   const subtitle = $("#courseForceDeleteSubtitle");
   const body = $("#courseForceDeleteBody");
   if (subtitle) {
@@ -1629,7 +2156,7 @@ function renderForceDeleteModal(courseId, enrollments) {
   body.innerHTML = `
     <div class="admin-courses-danger-box">
       <strong>위험 작업입니다.</strong>
-      <p style="margin:6px 0 0;">강좌와 연결된 수강 기록 ${enrollments.length}개를 함께 삭제한 뒤 강좌를 영구 삭제합니다.</p>
+      <p style="margin:6px 0 0;">강좌, 보호 영상 ${Number(inventory.hasPrivateContent)}개, 신청 기록 ${inventory.requests.length}개와 수강·진도 기록 ${enrollments.length}개를 함께 영구 삭제합니다.</p>
       <p style="margin:4px 0 0;">삭제 직전에 수강 기록을 다시 확인합니다.</p>
     </div>
     <div class="admin-courses-delete-list">
@@ -1638,6 +2165,7 @@ function renderForceDeleteModal(courseId, enrollments) {
         <ul>
           <li>이 강좌 문서</li>
           <li>이 강좌의 수강 기록</li>
+          <li>이 강좌의 보호 영상 및 신청 기록</li>
         </ul>
       </div>
       <div class="admin-courses-delete-list__box">
@@ -1664,28 +2192,25 @@ function renderForceDeleteModal(courseId, enrollments) {
   `;
 }
 
-async function deleteCourseWithEnrollments(courseId, enrollments) {
-  let batch = writeBatch(db);
-  let operationCount = 0;
-
-  for (const enrollment of enrollments) {
-    batch.delete(doc(db, "enrollments", enrollment.id));
-    operationCount += 1;
-    if (operationCount >= 450) {
-      await batch.commit();
-      batch = writeBatch(db);
-      operationCount = 0;
-    }
+async function deleteCourseWithEnrollments(courseId, inventory) {
+  const latest = await loadCourseDeleteInventory(courseId);
+  if (deleteInventoryKey(latest) !== deleteInventoryKey(inventory)) {
+    throw new Error("삭제 대상이 변경됐습니다. 삭제 화면을 닫고 다시 확인해 주세요.");
   }
-
+  const batch = writeBatch(db);
+  for (const enrollment of latest.enrollments) {
+    batch.delete(doc(db, "enrollments", enrollment.id));
+  }
+  for (const requestId of latest.requests) batch.delete(doc(db, "courses", courseId, "enrollmentRequests", requestId));
+  if (latest.hasPrivateContent) batch.delete(doc(db, "coursePrivateContent", courseId));
   batch.delete(doc(db, "courses", courseId));
   await batch.commit();
 }
 
 window.forceDeleteCourseFromDeleteBlocked = async function forceDeleteCourseFromDeleteBlocked() {
-  const { courseId, enrollments } = deleteBlockedState;
-  if (!courseId || !enrollments.length) return;
-  renderForceDeleteModal(courseId, enrollments);
+  const { courseId, inventory } = deleteBlockedState;
+  if (!courseId || !inventory?.enrollments.length) return;
+  renderForceDeleteModal(courseId, inventory);
   openSupportModal("courseForceDeleteModal");
   focusModalInput("#courseForceDeleteConfirmInput");
 };
@@ -1705,26 +2230,30 @@ window.confirmForceCourseDelete = async function confirmForceCourseDelete() {
     return;
   }
 
+  let deleted = false;
   try {
-    const latestEnrollments = await loadCourseEnrollments(courseId);
-    await deleteCourseWithEnrollments(courseId, latestEnrollments);
-    toast("강좌와 해당 수강 기록을 삭제했습니다.");
+    await deleteCourseWithEnrollments(courseId, deleteBlockedState.inventory);
+    deleted = true;
     window.closeCourseForceDeleteModal();
     window.closeCourseDeleteBlockedModal();
     await loadRows();
+    toast("강좌와 관련 기록을 삭제했습니다.");
   } catch (error) {
     console.error("[admin-courses] force course delete failed:", error);
-    const message = "강좌 영구 삭제 중 오류가 발생했습니다.";
+    const message = deleted ? "강좌는 삭제됐지만 목록을 새로고침하지 못했습니다. 페이지를 새로고침해 확인해 주세요." : (error.message || "강좌 영구 삭제 중 오류가 발생했습니다.");
     setCourseDeleteFeedback("#courseForceDeleteFeedback", message);
     toast(message, true);
   }
 };
 
-function openNoEnrollmentDeleteModal(courseId) {
+function openNoEnrollmentDeleteModal(courseId, inventory) {
   noEnrollmentDeleteState = {
     courseId,
-    course: getCourseRow(courseId)
+    course: getCourseRow(courseId),
+    inventory
   };
+  const impact = $("#courseDeleteEmptyImpact");
+  if (impact) impact.textContent = `강좌, 보호 영상 ${Number(inventory.hasPrivateContent)}개, 신청 기록 ${inventory.requests.length}개를 삭제합니다. 현재 수강·진도 기록은 없습니다.`;
   const subtitle = $("#courseDeleteEmptySubtitle");
   const input = $("#courseDeleteEmptyConfirmInput");
   if (subtitle) {
@@ -1737,7 +2266,7 @@ function openNoEnrollmentDeleteModal(courseId) {
 }
 
 window.closeCourseDeleteEmptyModal = function closeCourseDeleteEmptyModal() {
-  noEnrollmentDeleteState = { courseId: "", course: null };
+  noEnrollmentDeleteState = { courseId: "", course: null, inventory: null };
   closeSupportModal("courseDeleteEmptyModal");
 };
 
@@ -1752,39 +2281,44 @@ window.confirmNoEnrollmentCourseDelete = async function confirmNoEnrollmentCours
     return;
   }
 
+  let deleted = false;
   try {
-    await deleteDoc(doc(db, "courses", courseId));
-    toast("강좌를 영구 삭제했습니다.");
+    await deleteCourseWithEnrollments(courseId, noEnrollmentDeleteState.inventory);
+    deleted = true;
     window.closeCourseDeleteEmptyModal();
     await loadRows();
+    toast("강좌를 영구 삭제했습니다.");
   } catch (error) {
     console.error("[admin-courses] course delete failed:", error);
-    const message = "강좌 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+    const message = deleted ? "강좌는 삭제됐지만 목록을 새로고침하지 못했습니다. 페이지를 새로고침해 확인해 주세요." : (error.message || "강좌 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     setCourseDeleteFeedback("#courseDeleteEmptyFeedback", message);
     toast(message, true);
   }
 };
 
 window.deleteContent = async function deleteContent(id) {
-  let enrollments;
+  let inventory;
   try {
-    enrollments = await loadCourseEnrollments(id);
+    inventory = await loadCourseDeleteInventory(id);
   } catch (error) {
     console.error("[admin-courses] enrollment check failed before delete:", error);
-    toast("수강 신청 기록 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", true);
+    toast(error.message || "삭제 대상 확인 중 오류가 발생했습니다.", true);
     return;
   }
 
-  if (enrollments.length > 0) {
-    openDeleteBlockedModal(id, enrollments);
+  if (inventory.enrollments.length > 0) {
+    openDeleteBlockedModal(id, inventory);
     return;
   }
 
-  openNoEnrollmentDeleteModal(id);
+  openNoEnrollmentDeleteModal(id, inventory);
 };
 
+let courseSaveInProgress = false;
 $("#contentEditForm")?.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (courseSaveInProgress) return;
+  showCourseFormError("");
   const id = $("#contentEditId").value.trim();
   const title = $("#contentEditTitle").value.trim();
   const subject = resolveSubjectFromForm();
@@ -1795,20 +2329,47 @@ $("#contentEditForm")?.addEventListener("submit", async (e) => {
 
   const weeks = collectWeeks();
   const previewVideoUrl = $("#contentEditPreviewVideoUrl").value.trim();
-  if (previewVideoUrl) {
-    try { new URL(previewVideoUrl); } catch (_) { return toast("미리보기 영상 URL 형식이 올바르지 않습니다.", true); }
+  if (previewVideoUrl && !normalizeVideoUrl(previewVideoUrl)) {
+    showCourseFormError("미리보기 영상 또는 재생목록 주소를 확인해 주세요.", $("#contentEditPreviewVideoUrl"));
+    return toast("미리보기 영상 URL 형식이 올바르지 않습니다.", true);
   }
-  for (const w of weeks) {
-    for (const v of (w.videos || [])) {
+  for (const [weekIndex, w] of weeks.entries()) {
+    for (const [videoIndex, v] of (w.videos || []).entries()) {
       if (!v.url) continue;
-      try { new URL(v.url); } catch (_) { return toast(`주차 영상 URL이 올바르지 않습니다: ${v.url}`, true); }
+      if (!normalizeVideoUrl(v.url)) {
+        const field = $("#contentEditCourseFormat")?.value === "single"
+          ? $("#contentEditSingleVideoUrl")
+          : $(`#contentEditWeeksList [data-week-index="${weekIndex}"] [data-video-index="${videoIndex}"] [data-video-field="url"]`);
+        showCourseFormError("영상 또는 재생목록 주소를 확인해 주세요. YouTube 공유 URL이나 MP4 주소를 입력할 수 있습니다.", field);
+        return toast("영상 또는 재생목록 주소를 확인해 주세요.", true);
+      }
     }
   }
 
-  const existingCourse = id ? ((await getDoc(doc(db, "courses", id))).data() || {}) : {};
-  const { instructorUid, instructorId, instructorName } = getSelectedInstructor(existingCourse);
+  courseSaveInProgress = true;
+  const saveButton = $("#contentEditSaveBtn");
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "저장 중...";
+  }
+  let saved = false;
+  try {
+  const existingSnap = id ? await getDoc(doc(db, "courses", id)) : null;
+  if (id && !existingSnap.exists()) throw new Error("강좌를 찾을 수 없습니다.");
+  const existingCourse = existingSnap?.data() || {};
+  const {
+    instructorUid,
+    instructorId,
+    instructorName,
+    instructorUids,
+    instructorIds,
+    instructorNames
+  } = getSelectedInstructors();
   const selectedAccess = $("#contentEditAccessType")?.value || existingCourse.accessType || "public";
-  const accessType = normalizeAccessType(selectedAccess);
+  const accessType = id ? (existingCourse.accessType || "public") : normalizeAccessType(selectedAccess);
+  if (id && normalizeAccessType(selectedAccess) !== normalizeAccessType(existingCourse.accessType)) {
+    throw new Error("기존 강좌의 수강 유형은 변경할 수 없습니다. 제목과 영상 등 다른 항목은 수정할 수 있습니다.");
+  }
   const statusRaw = String($("#contentEditStatus")?.value || existingCourse.status || "published").trim();
   const status = normalizeCourseStatusForSave(statusRaw);
   const visibility = resolveVisibilityForSave(existingCourse, status);
@@ -1822,6 +2383,9 @@ $("#contentEditForm")?.addEventListener("submit", async (e) => {
     instructorUid,
     instructorId,
     instructorName,
+    instructorUids,
+    instructorIds,
+    instructorNames,
     grade: $("#contentEditGrade").value.trim(),
     year: $("#contentEditYear").value.trim(),
     previewVideoUrl,
@@ -1843,18 +2407,97 @@ $("#contentEditForm")?.addEventListener("submit", async (e) => {
     savePayload.detailSections = existingCourse.detailSections;
   }
 
-  if (id) {
-    await updateDoc(doc(db, "courses", id), { ...savePayload, updatedAt: serverTimestamp(), ...legacyRemove });
-    toast("강좌 정보를 저장했습니다.");
+   if (accessType === "approvalRequired") {
+     const courseRef = id ? doc(db, "courses", id) : doc(collection(db, "courses"));
+     const privateRef = doc(db, "coursePrivateContent", courseRef.id);
+     const batch = writeBatch(db);
+     const publicPayload = {
+       ...toApprovalPublicCourse(savePayload),
+       updatedAt: serverTimestamp(),
+       ...(id ? legacyRemove : {})
+     };
+     if (id) batch.update(courseRef, publicPayload);
+     else batch.set(courseRef, { ...publicPayload, createdAt: serverTimestamp() });
+     batch.set(privateRef, { weeks: savePayload.weeks, previewVideoUrl: savePayload.previewVideoUrl || null, updatedAt: serverTimestamp() });
+     await batch.commit();
+     saved = true;
+   } else if (id) {
+     await updateDoc(doc(db, "courses", id), { ...savePayload, updatedAt: serverTimestamp(), ...legacyRemove });
+    saved = true;
   } else {
     await addDoc(collection(db, "courses"), { ...savePayload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    toast("강좌를 등록했습니다.");
+    saved = true;
   }
-  closeContentModal(true);
+  window.closeContentModal(true);
   await loadRows();
+  toast(id ? "강좌 정보를 저장했습니다." : "강좌를 등록했습니다.");
+  } catch (error) {
+    console.error("[admin-courses] course save failed:", error);
+    toast(saved
+      ? "강좌는 저장됐지만 목록을 새로고침하지 못했습니다. 새로고침해 확인해 주세요."
+      : (error.message?.includes("수강 유형은 변경") ? error.message : "강좌를 저장하지 못했습니다. 다시 시도해 주세요."), true);
+  } finally {
+    courseSaveInProgress = false;
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "저장";
+    }
+  }
 });
 
-searchEl?.addEventListener("input", () => { filters.search = searchEl.value || ""; applyFilters(); });
+bindCommittedSearch(searchEl, $("#adminCourseSearchButton"), (keyword) => {
+  filters.search = keyword;
+  applyFilters();
+});
+
+let courseExportPending = false;
+$("#dlCourses")?.addEventListener("click", async () => {
+  if (courseExportPending) return;
+  if (!coursesLoaded) return toast("강좌 목록을 먼저 불러와 주세요.", true);
+  if (!viewRows.length) return toast(rows.length ? "필터 결과에 강좌가 없습니다." : "등록된 강좌가 없습니다.", true);
+  courseExportPending = true;
+  try {
+    const exportRows = viewRows.map((course) => {
+      const weeks = course.accessType === "approvalRequired"
+        ? null
+        : (course.weeks || []);
+      return {
+        강좌명: course.title || "",
+        과목: course.subjectLabel || course.subject || "",
+        학년: course.gradeLabel || course.grade || "",
+        연도: course.year || "",
+        강사: course.instructorName || "",
+        수강유형: getAdminAccessTypeLabel(course.accessType),
+        형식: getAdminCourseFormatLabel(course.courseFormat, course),
+        "운영 상태": getAdminCourseStatusLabel(course.status),
+        "주차 수": weeks ? weeks.length : "",
+        "영상 수": weeks ? weeks.reduce((sum, week) => sum + (week.videos || []).length, 0) : "",
+        "콘텐츠 집계": weeks ? "강좌 문서" : "보호 콘텐츠 제외",
+        등록일: course.createdAt?.toDate?.()?.toLocaleDateString("ko-KR") || "",
+      };
+    });
+    const filtered = Object.values(filters).some((value) => value && value !== "all");
+    const done = await writeAdminXlsx(XLSX, {
+      rows: exportRows, sheetName: "강좌", button: $("#dlCourses"),
+      filename: adminXlsxFilename("강좌목록", exportRows.length, filtered ? "필터결과" : "전체"),
+    });
+    if (done) toast(`강좌 ${exportRows.length}개 엑셀 파일을 다운로드했습니다.`);
+  } catch (error) {
+    console.error("[admin-courses] export failed", error);
+    toast(`엑셀 다운로드에 실패했습니다. ${error.message || "다시 시도해 주세요."}`, true);
+  } finally {
+    courseExportPending = false;
+  }
+});
+$("#adminCoursesPageSize")?.addEventListener("change", (event) => {
+  pageSize = normalizeListPageSize(event.target.value);
+  page = 1;
+  renderTable();
+});
+tbody?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-course-preview]");
+  if (button) window.openAdminCoursePreview(button.getAttribute("data-course-preview"));
+});
 gradeFilterEl?.addEventListener("change", () => { filters.grade = gradeFilterEl.value || "all"; applyFilters(); });
 subjectFilterEl?.addEventListener("change", () => { filters.subject = subjectFilterEl.value || "all"; applyFilters(); });
 statusFilterEl?.addEventListener("change", () => { filters.status = statusFilterEl.value || "all"; applyFilters(); });
@@ -1867,12 +2510,13 @@ advancedFilterToggleEl?.addEventListener("click", () => {
 filterResetEl?.addEventListener("click", resetCourseFilters);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if ($("#adminCoursePreviewModal")?.classList.contains("is-open")) return window.closeAdminCoursePreview();
     if ($("#courseForceDeleteModal")?.classList.contains("is-open")) return window.closeCourseForceDeleteModal();
     if ($("#courseDeleteEmptyModal")?.classList.contains("is-open")) return window.closeCourseDeleteEmptyModal();
     if ($("#enrollmentRemoveConfirmModal")?.classList.contains("is-open")) return window.closeEnrollmentRemoveConfirmModal();
     if ($("#courseDeleteBlockedModal")?.classList.contains("is-open")) return window.closeCourseDeleteBlockedModal();
     if ($("#courseEnrollmentsModal")?.classList.contains("is-open")) return window.closeCourseEnrollmentsModal();
-    if ($("#contentEditModal")?.classList.contains("is-open")) closeContentModal();
+    if ($("#contentEditModal")?.classList.contains("is-open")) window.closeContentModal();
   }
   if (e.key === "Enter" && $("#courseDeleteEmptyModal")?.classList.contains("is-open")) {
     if (e.target === $("#courseDeleteEmptyConfirmInput")) window.confirmNoEnrollmentCourseDelete();
@@ -1893,14 +2537,33 @@ document.addEventListener("input", (event) => {
 async function initSelects() {
   const fallback = mergeCourseCatalog({});
   mergedCourseCatalog = fallback;
-  try {
-    const catalog = await getSettingDoc("courseCatalog");
-    mergedCourseCatalog = mergeCourseCatalog(catalog.exists ? catalog.data : {});
-    labelMaps = buildLabelMaps(mergedCourseCatalog);
-  } catch (_) {
-    labelMaps = buildLabelMaps(fallback);
-    mergedCourseCatalog = fallback;
-  }
+  await Promise.all([
+    (async () => {
+      try {
+        const catalog = await getSettingDoc("courseCatalog");
+        mergedCourseCatalog = mergeCourseCatalog(catalog.exists ? catalog.data : {});
+        labelMaps = buildLabelMaps(mergedCourseCatalog);
+      } catch (_) {
+        labelMaps = buildLabelMaps(fallback);
+        mergedCourseCatalog = fallback;
+      }
+    })(),
+    (async () => {
+      try {
+        const colorResult = await getSettingDoc(SUBJECT_COLOR_SETTINGS_KEY);
+        persistedCourseSubjectColorMap = colorResult.exists
+          ? getSubjectColorMapFromSettings(colorResult.data)
+          : {};
+        subjectColorMap = Object.keys(persistedCourseSubjectColorMap).length
+          ? mergeSubjectColorMap(persistedCourseSubjectColorMap)
+          : await loadSharedSubjectColorMap(getSettingDoc);
+        courseSubjectColorSourceMap = { ...subjectColorMap };
+      } catch (_) {
+        subjectColorMap = mergeSubjectColorMap({});
+        courseSubjectColorSourceMap = { ...subjectColorMap };
+      }
+    })(),
+  ]);
 
   catalogGrades = getCourseGradeLabels(mergedCourseCatalog);
   catalogCourseSubjects = getCourseSubjectOptions(mergedCourseCatalog);
@@ -1910,6 +2573,10 @@ async function initSelects() {
   renderCourseCatalogPanel();
   refreshCourseCatalogSelects();
 }
+resetCourseModalState();
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) resetCourseModalState();
+});
 (async () => {
   bindLivePreview();
   bindWeeksEditor();

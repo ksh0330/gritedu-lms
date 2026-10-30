@@ -5,34 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>상담 문의 | 그릿에듀학원</title>
 
-  <meta name="description" content="그릿에듀학원의 수업, 강좌, 시간표, 입학 상담 문의를 안내합니다. 중고등 내신과 입시 학습 방향을 상담하세요.">
-  <link rel="canonical" href="https://gritedu.kr/contact.html">
+  <meta name="description" content="그릿에듀학원의 수강 및 입학 상담을 안내합니다. 국어, 영어, 수학, 과학, 수리논술 등 중등부터 고등, 내신부터 수능과 대학별고사까지 학습 방향을 상담하세요.">
+  <meta name="keywords" content="그릿에듀,그릿에듀학원,그릿에듀 학원,학원 상담,수강 상담,입학 상담,입시 상담,중등 학원,고등 학원,금천구 학원,중고등 내신,수능,대학별고사,국어,영어,수학,과학,수리논술">
+  <link rel="canonical" href="https://gritedu.kr/contact">
+
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:site_name" content="그릿에듀학원">
   <meta property="og:title" content="상담 문의 | 그릿에듀학원">
-  <meta property="og:description" content="그릿에듀학원의 수업, 강좌, 시간표, 입학 상담 문의를 안내합니다. 중고등 내신과 입시 학습 방향을 상담하세요.">
-  <meta property="og:url" content="https://gritedu.kr/contact.html">
+  <meta property="og:description" content="그릿에듀학원의 수강 및 입학 상담을 안내합니다. 중등부터 고등, 내신부터 수능과 대학별고사까지 학생에게 맞는 학습 방향을 상담하세요.">
+  <meta property="og:url" content="https://gritedu.kr/contact">
   <meta property="og:image" content="https://gritedu.kr/assets/main.png">
 
   <link rel="icon" href="/assets/favicon.png" type="image/png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#ff7a00" />
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
-<!-- 폰트 로드 -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <!-- Pretendard는 CSS에서 @font-face로 로드 (font-display: swap 적용) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- 테마 즉시 적용 및 조건부 이미지 프리로드 -->
   <script>
     (function() {
       const THEME_KEY = 'grit-theme';
       function getCurrentTheme() {
         try {
-          return localStorage.getItem(THEME_KEY) || 
+          return localStorage.getItem(THEME_KEY) ||
             (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         } catch {
           return 'light';
@@ -40,8 +40,6 @@
       }
       const theme = getCurrentTheme();
       document.documentElement.setAttribute('data-theme', theme);
-      
-      // 현재 테마에 따라 필요한 이미지만 preload
       const link = document.createElement('link');
       link.rel = 'preload';
       link.as = 'image';
@@ -49,8 +47,6 @@
       document.head.appendChild(link);
     })();
   </script>
-  
-  <!-- 헤더/푸터는 common.js에서만 로드 (인라인 fetch와 중복 시 DOM/이벤트가 꼬일 수 있음) -->
 
   <script type="module" src="/assets/js/firebase-init.js"></script>
   <script type="module" src="/assets/js/common.js"></script>
@@ -66,12 +62,11 @@
     <div class="contact-wrap" style="opacity:0;transition:opacity 0.3s ease;">
       <h1 class="page-title">그릿에듀 상담 문의</h1>
       <p class="muted" style="text-align:center;line-height:1.7;">
-        그릿에듀학원의 수업, 강좌, 시간표, 입학 상담을 안내합니다.<br>
-        중고등 내신과 입시 상담을 통해 국어, 영어, 수학, 과학, 수리논술 수업과 온라인 강의, 오프라인 수업 방향을 확인하세요.
+        그릿에듀학원의 수강 및 입학 상담을 안내합니다.<br>
+        국어, 영어, 수학, 과학, 수리논술 등 중등부터 고등, 내신부터 수능과 대학별고사까지 학생에게 맞는 학습 방향을 상담해 드립니다.
       </p>
 
       <section class="contact-grid" aria-label="상담 정보와 위치 안내">
-        <!-- 왼쪽 : 상담 정보 -->
         <div class="contact-card">
           <div class="contact-meta" aria-label="상담 예약 기본 정보">
             <div class="contact-phone-section">
@@ -84,6 +79,7 @@
               <div style="margin-top:8px;font-size:14px;color:var(--text-secondary);line-height:1.5;">전화 또는 온라인 예약으로 상담 일정을 잡으신 뒤 방문해 주세요.</div>
               <div style="margin-top:4px;font-size:13px;color:var(--text-secondary);line-height:1.5;">통화 가능 시간 : 평일 3~10pm / 주말 12~10pm</div>
             </div>
+
             <div class="contact-info-item">
               <span class="contact-label">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px;">
@@ -94,6 +90,7 @@
               </span>
               <span class="contact-value">평일 15:00–22:00 / 주말 12:00–22:00</span>
             </div>
+
             <div class="contact-info-item">
               <span class="contact-label">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px;">
@@ -102,12 +99,10 @@
                 </svg>
                 주소
               </span>
-              <address class="contact-value" style="font-style:normal;margin:0;">
-                서울 금천구 시흥대로47길 28-5
-              </address>
+              <address class="contact-value" style="font-style:normal;margin:0;">서울 금천구 시흥대로47길 28-5</address>
             </div>
           </div>
-          <!-- 교통수단 정보는 contact.js에서 동적으로 로드됩니다 -->
+
           <div id="contact-directions-container" style="margin-top:16px;">
             <div class="contact-directions" style="padding:20px;background:var(--bg-secondary);border-radius:12px;">
               <h4 class="directions-title" style="margin:0 0 16px 0;font-size:16px;font-weight:700;color:var(--text);">교통수단</h4>
@@ -126,33 +121,25 @@
           </div>
         </div>
 
-        <!-- 오른쪽 : 지도 -->
         <div class="contact-map-area">
-      <div class="grit-map">
+          <div class="grit-map">
             <div class="embed-map" role="img" aria-label="그릿에듀 위치 지도">
-          <iframe
-            src="https://www.google.com/maps?q=%EC%84%9C%EC%9A%B8%20%EA%B8%88%EC%B2%9C%EA%B5%AC%20%EC%8B%9C%ED%9D%A5%EB%8C%80%EB%A1%9C47%EA%B8%B8%2028-5&output=embed"
-            allowfullscreen
-            loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade">
-          </iframe>
-        </div>
-      </div>
-
-          <!-- 지도 앱 바로가기 -->
-          <div class="map-links" aria-label="지도 앱으로 열기">
-            <a href="https://map.naver.com/p/entry/place/1775828207?c=15.00,0,0,0,dh" target="_blank" rel="noopener" class="map-link-btn">
-              네이버 지도
-            </a>
-            <a href="https://place.map.kakao.com/1537339636" target="_blank" rel="noopener" class="map-link-btn">
-              카카오 지도
-            </a>
-            <a href="https://maps.app.goo.gl/s24PTXWa5A27BZ5L8" target="_blank" rel="noopener" class="map-link-btn">
-              구글 지도
-            </a>
+              <iframe
+                src="https://www.google.com/maps?q=%EC%84%9C%EC%9A%B8%20%EA%B8%88%EC%B2%9C%EA%B5%AC%20%EC%8B%9C%ED%9D%A5%EB%8C%80%EB%A1%9C47%EA%B8%B8%2028-5&output=embed"
+                allowfullscreen
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade">
+              </iframe>
+            </div>
           </div>
-      </div>
-    </section>
+
+          <div class="map-links" aria-label="지도 앱으로 열기">
+            <a href="https://map.naver.com/p/entry/place/1775828207?c=15.00,0,0,0,dh" target="_blank" rel="noopener" class="map-link-btn">네이버 지도</a>
+            <a href="https://place.map.kakao.com/1537339636" target="_blank" rel="noopener" class="map-link-btn">카카오 지도</a>
+            <a href="https://maps.app.goo.gl/s24PTXWa5A27BZ5L8" target="_blank" rel="noopener" class="map-link-btn">구글 지도</a>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 

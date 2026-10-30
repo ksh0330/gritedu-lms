@@ -1,9 +1,9 @@
 import { createCourseLabelMaps } from "/assets/js/utils/course-readonly.js";
+import { mergeSubjectColorMap } from "/assets/js/utils/subject-colors.js";
 
 export const dom = {
   welcomeMsg: document.getElementById("welcomeMsg"),
   myCoursesGrid: document.getElementById("myCoursesGrid"),
-  myCoursesMeta: document.getElementById("myCoursesMeta"),
   courseFilterButtons: Array.from(document.querySelectorAll(".course-filter-btn")),
   editProfileModal: document.getElementById("editProfileModal"),
   editProfileBtn: document.getElementById("editProfileBtn"),
@@ -11,7 +11,6 @@ export const dom = {
   editProfileForm: document.getElementById("editProfileForm"),
   editProfileStatus: document.getElementById("editProfileStatus"),
   myOfflineClassesGrid: document.getElementById("myOfflineClassesGrid"),
-  myOfflineClassesMeta: document.getElementById("myOfflineClassesMeta"),
   unenrollModal: document.getElementById("unenrollModal"),
   closeUnenrollModal: document.getElementById("closeUnenrollModal"),
   cancelUnenrollBtn: document.getElementById("cancelUnenrollBtn"),
@@ -27,6 +26,7 @@ export const state = {
   courseLabelMaps: createCourseLabelMaps({}),
   hiddenCourseIds: new Set(),
   instructorsByUid: {},
+  subjectColorMap: mergeSubjectColorMap({}),
   allMyCourseRows: [],
   currentCourseFilter: "in-progress",
   latestLegacyCount: 0,

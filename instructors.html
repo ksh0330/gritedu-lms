@@ -5,34 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>강사진 | 그릿에듀학원</title>
 
-  <meta name="description" content="그릿에듀학원의 과목별 강사진과 중고등 내신, 입시 수업 방향을 소개합니다.">
-  <link rel="canonical" href="https://gritedu.kr/instructors.html">
+  <meta name="description" content="그릿에듀학원의 국어, 영어, 수학, 과학, 수리논술 과목별 전문 강사진을 소개합니다. 중등부터 고등, 내신부터 수능과 대학별고사까지 학생의 학습 흐름에 맞춰 수업을 설계합니다.">
+  <meta name="keywords" content="그릿에듀,그릿에듀학원,그릿에듀 학원,강사진,학원 강사,국어 강사,영어 강사,수학 강사,과학 강사,수리논술 강사,중등 학원,고등 학원,중고등 내신,입시 학원,수능,대학별고사">
+  <link rel="canonical" href="https://gritedu.kr/instructors">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:site_name" content="그릿에듀학원">
   <meta property="og:title" content="강사진 | 그릿에듀학원">
-  <meta property="og:description" content="그릿에듀학원의 과목별 강사진과 중고등 내신, 입시 수업 방향을 소개합니다.">
-  <meta property="og:url" content="https://gritedu.kr/instructors.html">
+  <meta property="og:description" content="국어, 영어, 수학, 과학, 수리논술 과목별 전문 강사진을 소개합니다. 중등부터 고등, 내신부터 수능과 대학별고사까지 학생의 학습 흐름에 맞춰 수업을 설계합니다.">
+  <meta property="og:url" content="https://gritedu.kr/instructors">
   <meta property="og:image" content="https://gritedu.kr/assets/main.png">
 
   <link rel="icon" href="/assets/favicon.png" type="image/png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#ff7a00" />
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
-<!-- 폰트 로드 -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <!-- Pretendard는 CSS에서 @font-face로 로드 (font-display: swap 적용) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- 테마 즉시 적용 및 조건부 이미지 프리로드 -->
   <script>
     (function() {
       const THEME_KEY = 'grit-theme';
       function getCurrentTheme() {
         try {
-          return localStorage.getItem(THEME_KEY) || 
+          return localStorage.getItem(THEME_KEY) ||
             (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         } catch {
           return 'light';
@@ -40,8 +39,6 @@
       }
       const theme = getCurrentTheme();
       document.documentElement.setAttribute('data-theme', theme);
-      
-      // 현재 테마에 따라 필요한 이미지만 preload
       const link = document.createElement('link');
       link.rel = 'preload';
       link.as = 'image';
@@ -49,8 +46,6 @@
       document.head.appendChild(link);
     })();
   </script>
-  
-  <!-- 헤더/푸터는 common.js에서만 로드 (인라인 fetch와 중복 시 DOM/이벤트가 꼬일 수 있음) -->
 
   <script type="module" src="/assets/js/firebase-init.js"></script>
   <script type="module" src="/assets/js/common.js"></script>
@@ -67,19 +62,17 @@
     <header class="instructors-page-header">
       <h1 class="page-title">그릿에듀 강사진</h1>
       <p class="muted" style="text-align:center;line-height:1.7;">
-        국어, 영어, 수학, 과학, 수리논술 과목별 강사진을 소개합니다.<br>
-        그릿에듀학원은 중고등 내신과 입시 수업을 학생의 학습 흐름에 맞춰 설계합니다.
+        국어, 영어, 수학, 과학, 수리논술 과목별 전문 강사진을 소개합니다.<br>
+        중등부터 고등, 내신부터 수능과 대학별고사까지 학생의 학습 흐름에 맞춰 수업을 설계합니다.
       </p>
     </header>
 
-    <!-- 필터 영역 — settings/instructorsMenu.subjects 로 채움 (전체는 렌더링 시 가상 추가) -->
     <section class="grit-filter" aria-label="강사진 필터" data-for="instructors">
       <div id="instructorFilterChips" class="filter-group">
         <span class="muted" style="font-size:14px;">필터를 불러오는 중…</span>
       </div>
     </section>
 
-    <!-- 강사 카드 영역 -->
     <section>
       <div class="grid-instructors" id="instructorGrid"></div>
       <div id="instructorEmpty" class="instructor-empty muted" hidden>

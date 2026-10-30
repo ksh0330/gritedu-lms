@@ -30,6 +30,52 @@
   font-size:14px
 }
 
+/* Shared list pagination: administrator, public course, and instructor lists */
+.admin-list-pagination {
+  align-items:center;
+  border-top:1px solid color-mix(in srgb,var(--brand) 18%,var(--border));
+  display:flex;
+  justify-content:center;
+  margin-top:16px;
+  min-height:64px;
+  padding-top:14px;
+  width:100%
+}
+.admin-list-pagination[hidden] {
+  display:none !important
+}
+.admin-list-pagination__controls,
+.admin-list-pagination__pages {
+  align-items:center;
+  display:flex;
+  gap:6px;
+  justify-content:center
+}
+.admin-list-pagination__controls {
+  max-width:100%;
+  overflow-x:auto;
+  padding:2px
+}
+.admin-list-pagination__controls .btn {
+  align-items:center;
+  border-radius:8px;
+  display:inline-flex;
+  flex:0 0 36px;
+  font-size:13px;
+  height:36px;
+  justify-content:center;
+  margin:0;
+  min-height:36px;
+  min-width:36px;
+  padding:0 8px;
+  width:36px
+}
+@media (max-width:640px) {
+  .admin-list-pagination__controls {
+    justify-content:flex-start
+  }
+}
+
 /* 모바일 반응형 */
 @media (max-width:768px) {
   .pagination {

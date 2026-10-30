@@ -11,7 +11,7 @@ export const KAKAO_CHANNEL_PAGE_OPTIONS = [
   { key: "schedule", label: "시간표", file: "schedule.html" },
   { key: "contact", label: "상담 문의", file: "contact.html" },
   { key: "instructors", label: "강사진", file: "instructors.html" },
-  { key: "courses", label: "모든 강좌", file: "courses.html" }
+  { key: "courses", label: "온라인 강좌", file: "courses.html" }
 ];
 
 const PAGE_KEY_BY_FILE = KAKAO_CHANNEL_PAGE_OPTIONS.reduce((map, page) => {

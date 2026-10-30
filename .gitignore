@@ -11,6 +11,12 @@
 # 민감키
 **/serviceAccountKey.json
 **/serviceAccountKey-*.json
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
 
 # 로컬 산출물 / 데이터
 *.csv
@@ -68,46 +74,18 @@ assets/css/*.min.css
 *.map
 *.sourcemap
 
-# 문서 파일
-# 중요한 문서 파일은 추적 예외 (부정 패턴은 와일드카드보다 나중에 나와야 함)
-*.md
-!PROJECT_STATE.md
-!PROJECT_DOCS_INDEX.md
-!ONLINE_COURSE_SYSTEM_STATE.md
-!CSS_CLEANUP_PROGRESS.md
-!OFFLINE_CLASS_SYSTEM_PLAN.md
-!md/DATABASE_SCHEMA.md
-!md/**/*.md
-!docs/**/*.md
-!COLLECTIONS_SUMMARY.md
-!DATABASE_SCHEMA.md
-!PROJECT_PLAN.md
-!PROJECT_STATUS.md
-!BUILD_GUIDE.md
-!QUICK_START.md
-!WORKFLOW_GUIDE.md
-!FIREBASE_FUNCTIONS_SETUP.md
-!CLOUD_FUNCTIONS_LIST.md
-!IMPLEMENTATION_SUMMARY.md
-!DEPLOYMENT_OPTIMIZATION.md
-!PRODUCTION_CHECKLIST.md
-!PRODUCTION_VERIFICATION.md
-!OPTIMIZATION_GUIDE.md
-!ADDITIONAL_OPTIMIZATIONS.md
+# 로컬 전용 Markdown
+/CODEX_PHASE1_SAFE_AUDIT_PROMPT.md
+/CODEX_PHASE1B_AUDIT_VALIDATION.md
+/FIRESTORE_CRUD_READ_AUDIT.md
 .build/
 _work/
 _r2-upload/
+.qa-local/
 
 # tools/kor-to-eng 작업용 이미지 (커밋 금지)
 /tools/kor-to-eng/input/
 /tools/kor-to-eng/output/
 
-# 공개 포트폴리오 제외: 검색엔진 소유권 인증 파일
-/google*.html
-/naver*.html
-
-# 공개 포트폴리오 제외: 이미지 변환 작업 원본/산출물
-/tools/image-to-webp/input/*
-!/tools/image-to-webp/input/.gitkeep
-/tools/image-to-webp/output/*
-!/tools/image-to-webp/output/.gitkeep
+# 개인 Secret - 절대 커밋 금지
+md/appPW.md

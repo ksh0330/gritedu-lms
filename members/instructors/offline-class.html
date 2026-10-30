@@ -23,11 +23,10 @@
 
   <main class="grit-page-container" id="instructorOfflineClassPage">
     <div class="dash-back">
-      <a href="/members/instructors/dashboard.html" class="btn sm">
+      <a href="/members/instructors/dashboard.html" class="btn sm dash-back__link" aria-label="강사 LMS로 돌아가기" title="강사 LMS로 돌아가기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        강사 LMS로 돌아가기
       </a>
     </div>
 
@@ -38,7 +37,6 @@
     <section class="grit-section instructor-offline-members-section" id="offlineMembersSection" hidden>
       <div class="instructor-section-toolbar">
         <h2 class="instructor-section-title">반 학생</h2>
-        <p id="offlineMembersMeta" class="instructor-section-meta muted" aria-live="polite"></p>
       </div>
       <div class="instructor-table-wrap">
         <table id="offlineMembersTable" class="progress-table instructor-data-table">
@@ -60,7 +58,6 @@
     <section class="grit-section instructor-offline-sessions-section" id="offlineSessionsSection" hidden>
       <div class="instructor-section-toolbar">
         <h2 class="instructor-section-title">수업별 영상</h2>
-        <p id="offlineSessionsMeta" class="instructor-section-meta muted" aria-live="polite"></p>
       </div>
       <p class="instructor-offline-access-note muted" id="offlineAccessNote" hidden>
         학생별 시청 가능 여부는 입반일 및 예외 권한 기준으로 관리됩니다.

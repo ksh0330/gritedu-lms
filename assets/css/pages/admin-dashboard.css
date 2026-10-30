@@ -88,9 +88,18 @@
   font-size: 13px;
 }
 
+#statusResult {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+#statusResult:empty { display: none; }
+#statusResult[data-state="error"] { color: var(--error-color); }
+
 .dashboard-status-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -257,26 +266,12 @@
   gap: 12px;
 }
 
-#refreshBtn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-#refreshBtn:not(:disabled) {
-  border-color: var(--brand);
-  background: var(--brand);
-  color: #fff;
-}
-
-#refreshBtn:not(:disabled):hover {
-  border-color: #ff8c42;
-  background: #ff8c42;
-}
-
 .dashboard-actions .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 @media (hover: none) and (pointer: coarse) {

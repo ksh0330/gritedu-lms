@@ -2,6 +2,7 @@ import { db } from "/assets/js/firebase-init.js";
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 import { escapeHtml } from "/assets/js/utils/html.js";
 import { handleError } from "/assets/js/utils/error-handler.js";
+import { bindCommittedSearch } from "/assets/js/utils/list-controls.js";
 import {
   dom,
   state,
@@ -9,6 +10,8 @@ import {
   renderEmptyTable,
   renderListPagination,
   formatInstructorGrade,
+  formatListLoadError,
+  setDashboardMessage,
   setDashboardText
 } from "/assets/js/pages/instructor-dashboard/context.js";
 
@@ -144,7 +147,7 @@ function populateOfflineEnrollmentFilters() {
 function applyOfflineEnrollmentFilters() {
   state.filteredOfflineEnrollments = [...state.allOfflineEnrollments];
 
-  const keyword = dom.offlineEnrollmentSearch?.value.trim().toLowerCase() || "";
+  const keyword = state.appliedOfflineEnrollmentKeyword;
   if (keyword) {
     state.filteredOfflineEnrollments = state.filteredOfflineEnrollments.filter((row) => {
       const haystack = [
@@ -244,7 +247,6 @@ function renderOfflineEnrollmentsTable() {
     onPageChange: (nextPage) => {
       state.offlineEnrollmentsPage = nextPage;
       renderOfflineEnrollmentsTable();
-      dom.offlineEnrollmentsPagination?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }) || state.offlineEnrollmentsPage;
 }
@@ -256,12 +258,27 @@ export async function loadOfflineEnrollments() {
     renderEmptyTable(dom.offlineEnrollmentTable, 6, "오프라인 수강생을 불러오는 중입니다...");
     expandedOfflineStudentIds.clear();
 
+    if (state.offlineClassesLoadError) {
+      const errorMessage = formatListLoadError(
+        "오프라인 반 목록 오류로 수강생 목록을 불러올 수 없습니다.",
+        state.offlineClassesLoadError
+      );
+      renderEmptyTable(dom.offlineEnrollmentTable, 6, errorMessage);
+      if (dom.offlineEnrollmentInfo) {
+        setDashboardMessage(dom.offlineEnrollmentInfo, errorMessage);
+        dom.offlineEnrollmentInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
+      }
+      setDashboardText(dom.statOfflineStudents, "-");
+      return;
+    }
+
     if (!state.myOfflineClasses.length) {
       state.allOfflineEnrollments = [];
       state.filteredOfflineEnrollments = [];
       renderOfflineEnrollmentsTable();
       if (dom.offlineEnrollmentInfo) {
         dom.offlineEnrollmentInfo.textContent = "담당 오프라인 반이 없습니다.";
+        dom.offlineEnrollmentInfo.hidden = false;
         dom.offlineEnrollmentInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
       }
       setDashboardText(dom.statOfflineStudents, "0");
@@ -269,7 +286,6 @@ export async function loadOfflineEnrollments() {
     }
 
     const membershipRows = [];
-    let membershipCount = 0;
 
     for (const classRow of state.myOfflineClasses) {
       const membersSnap = await getDocs(
@@ -278,7 +294,6 @@ export async function loadOfflineEnrollments() {
       membersSnap.docs.forEach((memberDoc) => {
         const member = { id: memberDoc.id, ...memberDoc.data() };
         if (!isVisibleMember(member)) return;
-        membershipCount += 1;
         membershipRows.push({ member, classRow });
       });
     }
@@ -288,19 +303,18 @@ export async function loadOfflineEnrollments() {
     state.filteredOfflineEnrollments = [...students];
     populateOfflineEnrollmentFilters();
 
-    if (dom.offlineEnrollmentInfo) {
-      dom.offlineEnrollmentInfo.textContent = `배정 기록 ${membershipCount}건 / 고유 수강생 ${students.length}명`;
-      dom.offlineEnrollmentInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
-    }
+    setDashboardMessage(dom.offlineEnrollmentInfo, "");
+    dom.offlineEnrollmentInfo?.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
 
     state.offlineEnrollmentsPage = 1;
     renderOfflineEnrollmentsTable();
     setDashboardText(dom.statOfflineStudents, String(students.length));
   } catch (error) {
     handleError(error, "Load offline enrollments", { showToast: false, logError: true });
-    renderEmptyTable(dom.offlineEnrollmentTable, 6, "오프라인 수강생을 불러오지 못했습니다.");
+    const errorMessage = formatListLoadError("오프라인 수강생 목록을 불러오지 못했습니다.", error);
+    renderEmptyTable(dom.offlineEnrollmentTable, 6, errorMessage);
     if (dom.offlineEnrollmentInfo) {
-      dom.offlineEnrollmentInfo.textContent = "오프라인 수강생을 불러오지 못했습니다.";
+      setDashboardMessage(dom.offlineEnrollmentInfo, errorMessage);
       dom.offlineEnrollmentInfo.classList.remove("dashboard-skeleton", "dashboard-skeleton--text");
     }
     setDashboardText(dom.statOfflineStudents, "-");
@@ -317,12 +331,10 @@ export function setupOfflineEnrollmentFilters() {
     el?.addEventListener("change", rerender);
   });
 
-  if (dom.offlineEnrollmentSearch) {
-    dom.offlineEnrollmentSearch.addEventListener("input", () => {
-      if (state.searchDebounceTimer) clearTimeout(state.searchDebounceTimer);
-      state.searchDebounceTimer = setTimeout(rerender, 250);
-    });
-  }
+  bindCommittedSearch(dom.offlineEnrollmentSearch, dom.offlineEnrollmentSearchButton, (keyword) => {
+    state.appliedOfflineEnrollmentKeyword = keyword;
+    rerender();
+  });
 
   document.getElementById("offlineEnrollmentTable")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-offline-student-expand]");
