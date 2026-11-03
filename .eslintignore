@@ -1,0 +1,7 @@
+node_modules/
+functions/
+dist/
+.firebase/
+tools/
+assets/js/vendor/
+*.min.js

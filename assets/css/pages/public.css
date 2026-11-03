@@ -1,0 +1,482 @@
+.home-subdesc {
+  color:var(--muted);
+  margin-top:-6px;
+  text-align:center
+}
+.text-design-speech {
+  background:#f0f4f8;
+  border-radius:12px;
+  color:var(--text);
+  margin:12px 0;
+  padding:16px 20px;
+  position:relative
+}
+.text-design-speech:before {
+  border-left:8px solid transparent;
+  border-right:8px solid transparent;
+  border-top:8px solid #f0f4f8;
+  bottom:-8px;
+  content:"";
+  height:0;
+  left:20px;
+  position:absolute;
+  width:0
+}
+.text-design-speech.speech-right:before {
+  left:auto;
+  right:20px
+}
+html[data-theme=dark] .text-design-speech {
+  background:#f0f4f8;
+  color:#000
+}
+html[data-theme=dark] .text-design-speech:before {
+  border-top-color:#f0f4f8
+}
+.text-design-box {
+  background:var(--bg-secondary);
+  border:2px solid var(--border);
+  border-radius:8px;
+  margin:12px 0;
+  padding:16px
+}
+.text-design-highlight {
+  background:linear-gradient(120deg,rgba(255,122,0,.1),rgba(255,122,0,.05));
+  border-radius:4px;
+  padding:16px
+}
+.text-design-highlight,.text-design-quote {
+  border-left:4px solid var(--brand);
+  margin:12px 0
+}
+.text-design-quote {
+  color:var(--muted);
+  font-style:italic;
+  padding-left:16px
+}
+/* 필터 스타일은 components/filter.css로 이동됨 */
+/* 강사 스타일은 pages/instructor.css로 이동됨 */
+.grit-grid {
+  display:grid;
+  gap:16px;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr))
+}
+/* 강의 스타일은 pages/course.css로 이동됨 */
+@media (max-width:640px) {
+  /* 필터 스타일은 components/filter.css로 이동됨 */
+  /* 강사 스타일은 pages/instructor.css로 이동됨 */
+  .grit-grid {
+    grid-template-columns:repeat(2,1fr)
+  }
+}
+@media (max-width:480px) {
+  /* 필터 스타일은 components/filter.css로 이동됨 */
+}
+.school-search-modal {
+  align-items:center;
+  bottom:0;
+  display:flex;
+  justify-content:center;
+  left:0;
+  position:fixed;
+  right:0;
+  top:0;
+  z-index:10000
+}
+.school-search-modal.hidden {
+  display:none
+}
+.school-search-modal-overlay {
+  background:rgba(0,0,0,.5);
+  inset:0;
+  position:absolute
+}
+/* 모달 스타일은 components/modal.css로 이동됨 */
+.school-search-modal-content {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.2);
+  display:flex;
+  flex-direction:column;
+  height:80vh;
+  height:80svh;
+  max-height:80vh;
+  max-height:80svh;
+  max-width:600px;
+  position:relative;
+  width:90%
+}
+.school-search-modal-header {
+  align-items:center;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  flex-shrink:0;
+  justify-content:space-between;
+  padding:20px 24px
+}
+.school-search-modal-header h2 {
+  font-size:20px;
+  font-weight:700;
+  margin:0
+}
+.school-search-modal-close {
+  align-items:center;
+  background:none;
+  border:none;
+  border-radius:4px;
+  color:var(--muted);
+  cursor:pointer;
+  display:flex;
+  font-size:28px;
+  height:32px;
+  justify-content:center;
+  padding:0;
+  transition:all .2s;
+  width:32px
+}
+.school-search-modal-close:hover {
+  background:var(--hover);
+  color:var(--text)
+}
+.school-search-modal-body {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  gap:16px;
+  min-height:0;
+  overflow:hidden;
+  padding:24px
+}
+.school-search-input-wrapper {
+  flex-shrink:0
+}
+.school-search-input-wrapper input {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  font-size:15px;
+  padding:12px 16px;
+  width:100%
+}
+.school-search-results {
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:8px;
+  flex:1;
+  min-height:0;
+  overflow-y:auto
+}
+.school-search-actions {
+  flex-shrink:0
+}
+.school-search-empty {
+  color:var(--muted);
+  padding:40px 20px;
+  text-align:center
+}
+.school-search-item {
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  padding:16px;
+  transition:background .2s
+}
+.school-search-item:last-child {
+  border-bottom:none
+}
+.school-search-item:hover {
+  background:var(--hover)
+}
+.school-search-item-name {
+  color:var(--text);
+  font-weight:600;
+  margin-bottom:4px
+}
+.school-search-item-info {
+  color:var(--muted);
+  font-size:13px
+}
+.school-search-actions {
+  display:flex;
+  gap:8px;
+  justify-content:flex-end
+}
+@media (max-width:768px) {
+  .school-search-modal-content {
+    height:85vh;
+    height:85svh;
+    max-height:85vh;
+    max-height:85svh;
+    width:95%
+  }
+  .school-search-modal-header {
+    padding:16px 20px
+  }
+  .school-search-modal-header h2 {
+    font-size:18px
+  }
+  .school-search-modal-body {
+    gap:12px;
+    padding:20px
+  }
+  .school-search-input-wrapper input {
+    font-size:16px;
+    padding:10px 14px
+  }
+  .school-search-empty {
+    font-size:14px;
+    padding:30px 16px
+  }
+  .school-search-item {
+    padding:12px
+  }
+  .school-search-item-name {
+    font-size:14px
+  }
+  .school-search-item-info {
+    font-size:12px
+  }
+}
+@media (max-width:480px) {
+  .school-search-modal-content {
+    border-radius:0;
+    height:100vh;
+    height:100svh;
+    max-height:100vh;
+    max-height:100svh;
+    width:100%
+  }
+  .school-search-modal-header {
+    padding:14px 16px
+  }
+  .school-search-modal-header h2 {
+    font-size:16px
+  }
+  .school-search-modal-body {
+    gap:12px;
+    padding:16px
+  }
+  .school-search-input-wrapper input {
+    font-size:16px;
+    padding:10px 12px
+  }
+  .school-search-empty {
+    font-size:13px;
+    padding:24px 12px
+  }
+  .school-search-item {
+    padding:10px
+  }
+  .school-search-item-name {
+    font-size:13px
+  }
+  .school-search-item-info {
+    font-size:11px
+  }
+}
+/* Skeleton 스타일은 components/skeleton.css로 이동됨 */
+/* 강의 스타일은 pages/course.css로 이동됨 */
+/* 강사 스타일은 pages/instructor.css로 이동됨 */
+.auth-wrap {
+  align-items:center;
+  display:flex;
+  justify-content:center;
+  min-height:calc(100vh - var(--header-h) - 180px);
+  min-height:calc(100svh - var(--header-h) - 180px);
+  padding:24px 16px
+}
+.auth-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:var(--shadow-soft);
+  max-width:92vw;
+  padding:32px 24px;
+  width:420px
+}
+.auth-card h1 {
+  font-size:22px;
+  font-weight:800;
+  margin:0 0 16px
+}
+.auth-card .desc {
+  color:var(--muted);
+  margin-bottom:20px
+}
+.auth-card label {
+  display:block;
+  font-weight:700;
+  margin:12px 0 6px
+}
+.auth-card input {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--text);
+  font-size:16px;
+  height:44px;
+  padding:0 12px;
+  width:100%
+}
+.auth-card button {
+  border:0;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:800;
+  height:44px;
+  margin-top:16px;
+  width:100%
+}
+.auth-card button.primary {
+  background:var(--brand);
+  color:#fff
+}
+.progress-bar {
+  background:#eee;
+  border-radius:6px;
+  height:8px;
+  overflow:hidden
+}
+.progress-bar>span {
+  background:var(--accent);
+  display:block;
+  height:100%;
+  transition:width .3s ease;
+  width:0
+}
+html[data-theme=dark] a {
+  color:var(--link,var(--brand))
+}
+html[data-theme=dark] a:focus,html[data-theme=dark] a:hover {
+  color:var(--link-hover,var(--accent))
+}
+html[data-theme=dark] .auth-card,html[data-theme=dark] .card,html[data-theme=dark] .course-card,html[data-theme=dark] .course-card p,html[data-theme=dark] .grit-section,html[data-theme=dark] .grit-section a,html[data-theme=dark] .grit-section h1,html[data-theme=dark] .grit-section h2,html[data-theme=dark] .grit-section h3,html[data-theme=dark] .grit-section li,html[data-theme=dark] .grit-section p,html[data-theme=dark] .poster {
+  color:var(--text)
+}
+html[data-theme=dark] table,html[data-theme=dark] table tbody,html[data-theme=dark] table td,html[data-theme=dark] table th,html[data-theme=dark] table thead,html[data-theme=dark] table tr {
+  background:transparent;
+  border-color:var(--border);
+  color:var(--text)
+}
+html[data-theme=dark] table thead th {
+  background:#1f2124
+}
+/* 폼 스타일은 components/form.css로 이동됨 */
+html[data-theme=dark] .sp-list {
+  background:#17191c;
+  border-color:var(--border);
+  color:var(--text)
+}
+html[data-theme=dark] .sp-item {
+  border-bottom-color:#222
+}
+html[data-theme=dark] .sp-item:hover {
+  background:#202226
+}
+html[data-theme=dark] .bar {
+  background:#2a2d33
+}
+@media (prefers-reduced-motion:no-preference) {
+  .card,.modal__dialog,.poster,body,html {
+    transition:background-color .25s ease,color .25s ease,border-color .25s ease,box-shadow .25s ease
+  }
+}
+/* 모달 스타일은 components/modal.css로 이동됨 */
+.section-title {
+  border-left:4px solid var(--brand);
+  font-size:clamp(1.25rem, 3vw, 1.4rem);
+  font-weight:800;
+  margin:0 0 14px;
+  padding-left:12px;
+  word-break:keep-all;
+  overflow-wrap:break-word
+}
+@media (max-width:768px) {
+  .section-title {
+    font-size:1.25rem
+  }
+}
+@media (max-width:480px) {
+  .section-title {
+    font-size:1.125rem;
+    padding-left:10px
+  }
+}
+.section-content p {
+  margin:0 0 10px;
+  word-break:keep-all;
+  overflow-wrap:break-word
+}
+.section-content {
+  word-break:keep-all;
+  overflow-wrap:break-word;
+  width:100%;
+  box-sizing:border-box
+}
+@media (max-width:768px) {
+  .section-content {
+    font-size:15px
+  }
+}
+@media (max-width:480px) {
+  .section-content {
+    font-size:14px;
+    line-height:1.7
+  }
+}
+/* 강의 스타일은 pages/course.css로 이동됨 */
+.student-dashboard .course-grid {
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr))
+}
+@media (min-width:992px) {
+  .student-dashboard .course-grid {
+    grid-template-columns:repeat(auto-fill,minmax(340px,1fr))
+  }
+}
+.student-dashboard .course-card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,.08);
+  padding:12px
+}
+.iframe-box {
+  aspect-ratio:16/9;
+  background:#000;
+  border-radius:10px;
+  margin-bottom:8px;
+  overflow:hidden
+}
+.iframe-box iframe {
+  border:0;
+  display:block;
+  height:100%;
+  width:100%
+}
+.ext-box {
+  aspect-ratio:16/9;
+  background:#111;
+  border-radius:10px;
+  color:#fff;
+  display:grid;
+  margin-bottom:8px;
+  place-items:center
+}
+.student-dashboard .course-card h3 {
+  color:var(--text);
+  font-size:1.05rem;
+  margin:6px 0 2px
+}
+.student-dashboard .course-card .course-meta {
+  color:var(--muted);
+  font-size:13px;
+  margin:4px 0
+}
+.student-dashboard .course-card .course-tags {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:8px
+}
+/* 모달 스타일은 components/modal.css로 이동됨 */

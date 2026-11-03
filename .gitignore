@@ -1,0 +1,98 @@
+# ============================================
+# GRIT EDU 프로젝트 .gitignore
+# ============================================
+
+# 관리자 로컬 툴(민감키/엑셀 포함) - 절대 공개 레포에 올리지 않기
+/gritedu_lms/
+!gritedu_lms/manage.py
+!gritedu_lms/requirements.txt
+!gritedu_lms/config.json.sample
+
+# 민감키
+**/serviceAccountKey.json
+**/serviceAccountKey-*.json
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# 로컬 산출물 / 데이터
+*.csv
+!assets/school.csv
+*.xlsx
+directory_structure.txt
+url.txt
+
+# members/plans는 추적 예외
+!/members/plans/
+!/members/plans/*.json
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log
+
+# 편의
+.DS_Store
+Thumbs.db
+*.log
+
+# 임시 파일
+temp_*
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+node_modules
+.eslintcache
+
+# 빌드 출력
+dist/
+build/
+*.backup
+*.dev.backup
+backup/
+
+# CSS 백업 파일
+assets/css/*.backup
+assets/css/*.min.css
+
+# 빌드 시 생성되는 통합 CSS (Phase 3에서 추가될 예정)
+# assets/css/main.css
+
+# 소스맵 파일
+*.map
+*.sourcemap
+
+# 로컬 전용 Markdown
+/CODEX_PHASE1_SAFE_AUDIT_PROMPT.md
+/CODEX_PHASE1B_AUDIT_VALIDATION.md
+/FIRESTORE_CRUD_READ_AUDIT.md
+.build/
+_work/
+_r2-upload/
+.qa-local/
+
+# tools/kor-to-eng 작업용 이미지 (커밋 금지)
+/tools/kor-to-eng/input/
+/tools/kor-to-eng/output/
+
+# 개인 Secret - 절대 커밋 금지
+md/appPW.md
+
+# multi-agent review kit (generated / personal)
+.claude/settings.local.json
+.claude/skills/
+
+# Local audit outputs and temporary browser probes (never publish)
+/.review/runs/

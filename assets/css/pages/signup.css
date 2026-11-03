@@ -1,0 +1,761 @@
+/* Signup page layout — migrated from assets/css/pages/public.css */
+
+.signup-card {
+  max-width:95vw;
+  width:600px
+}
+.signup-steps {
+  align-items:center;
+  display:flex;
+  gap:8px;
+  justify-content:space-between;
+  margin-bottom:32px
+}
+.step-item {
+  align-items:center;
+  display:flex;
+  flex:1;
+  flex-direction:column;
+  gap:8px;
+  min-width:0;
+  position:relative
+}
+.step-number {
+  align-items:center;
+  background:var(--bg-secondary, #f5f5f5);
+  border:2px solid var(--border-color, #e0e0e0);
+  border-radius:50%;
+  color:var(--text-secondary, #666);
+  display:flex;
+  flex-shrink:0;
+  font-size:14px;
+  font-weight:600;
+  height:32px;
+  justify-content:center;
+  left:50%;
+  position:absolute;
+  top:0;
+  transform:translateX(-50%);
+  transition:all .3s;
+  width:32px
+}
+.step-item.active .step-number {
+  background:var(--primary-color, #ff6b35);
+  border-color:var(--primary-color, #ff6b35);
+  color:white
+}
+.step-item.completed .step-number {
+  background:var(--success-color);
+  border-color:var(--success-color);
+  color:white
+}
+.step-label {
+  align-items:center;
+  color:var(--text-secondary, #666);
+  display:flex;
+  font-size:11px;
+  justify-content:center;
+  line-height:1.3;
+  margin-top:40px;
+  min-height:28px;
+  text-align:center;
+  white-space:normal;
+  width:100%;
+  word-break:keep-all
+}
+.step-item.active .step-label {
+  color:var(--primary-color, #ff6b35);
+  font-weight:600
+}
+.step-item.completed .step-label {
+  color:var(--success-color)
+}
+.step-connector {
+  align-self:flex-start;
+  background:var(--border-color, #e0e0e0);
+  flex:1;
+  height:2px;
+  margin:15px 4px 0;
+  min-width:16px
+}
+.step-item.completed+.step-connector {
+  background:var(--success-color)
+}
+.step-connector.completed {
+  background:var(--success-color)
+}
+@media (max-width:768px) {
+  .step-label {
+    font-size:11px;
+    line-height:1.3;
+    margin-top:36px;
+    min-height:28px
+  }
+  .step-number {
+    font-size:12px;
+    height:28px;
+    width:28px
+  }
+}
+@media (max-width:480px) {
+  .step-label {
+    font-size:10px;
+    line-height:1.2;
+    margin-top:32px;
+    min-height:24px
+  }
+  .step-number {
+    font-size:11px;
+    height:24px;
+    width:24px
+  }
+  .signup-steps {
+    gap:4px
+  }
+  .step-connector {
+    min-width:8px
+  }
+}
+.signup-step {
+  display:none
+}
+.signup-step.active {
+  display:block
+}
+.signup-step.hidden {
+  display:none!important
+}
+.radio-group {
+  display:flex;
+  gap:16px
+}
+.radio-group.vertical,.radio-label {
+  flex-direction:column
+}
+.radio-label {
+  align-items:center;
+  background:var(--card);
+  border:2px solid var(--border);
+  border-radius:12px;
+  cursor:pointer;
+  display:flex;
+  gap:12px;
+  justify-content:center;
+  padding:24px;
+  transition:all .2s
+}
+.radio-label:hover {
+  background:var(--hover);
+  border-color:var(--brand)
+}
+.radio-label input {
+  display:none
+}
+.radio-label .radio-icon {
+  font-size:48px;
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--text)
+}
+.radio-label .radio-icon svg {
+  width:48px;
+  height:48px
+}
+.radio-label .radio-title {
+  font-size:18px;
+  font-weight:700
+}
+.radio-label .radio-desc {
+  color:var(--muted);
+  font-size:14px;
+  text-align:center
+}
+.radio-label input:checked~.radio-icon~.radio-title {
+  font-weight:700
+}
+.radio-label:has(input:checked),
+.radio-label.is-selected {
+  background:var(--hover);
+  border-color:var(--brand)
+}
+/* 폼 스타일은 components/form.css로 이동됨 */
+.terms-desc {
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.6;
+  margin-bottom:16px
+}
+.terms-item-header-content {
+  color:var(--text);
+  cursor:pointer;
+  display:block;
+  font-size:14px;
+  font-weight:500;
+  hyphens:auto;
+  line-height:1.4;
+  margin:0;
+  overflow-wrap:break-word;
+  white-space:normal;
+  word-break:keep-all
+}
+.terms-checkbox {
+  cursor:pointer;
+  flex-shrink:0
+}
+.agree-all-checkbox,.terms-checkbox {
+  accent-color:var(--brand);
+  height:16px;
+  width:16px
+}
+.agree-all-checkbox {
+  margin-right:12px
+}
+.verify-label {
+  color:var(--text);
+  display:block;
+  font-weight:600;
+  margin-bottom:8px
+}
+.verify-note {
+  color:var(--muted);
+  display:block;
+  font-size:13px;
+  margin-top:8px
+}
+/* 폼 스타일은 components/form.css로 이동됨 */
+.child-info-box {
+  background:var(--hover);
+  border-left:4px solid var(--brand);
+  border-radius:8px;
+  margin:24px 0;
+  padding:16px
+}
+.child-info-title {
+  font-size:15px;
+  font-weight:700;
+  margin:0 0 12px
+}
+.readonly-input {
+  background:var(--hover);
+  cursor:not-allowed
+}
+.terms-box {
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:24px
+}
+.checkbox-label {
+  align-items:center;
+  background:var(--hover);
+  border-radius:8px;
+  cursor:pointer;
+  display:flex;
+  font-size:15px;
+  gap:12px;
+  margin-bottom:20px;
+  padding:18px 20px
+}
+.checkbox-label .agree-all-checkbox {
+  height:16px;
+  width:16px
+}
+.terms-list {
+  display:flex;
+  flex-direction:column;
+  gap:0
+}
+.terms-item {
+  margin-bottom:0
+}
+.terms-item-header {
+  align-items:center;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  gap:8px;
+  padding:16px 0;
+  width:100%
+}
+.terms-item:last-child .terms-item-header {
+  border-bottom:none
+}
+.terms-item-header-left {
+  align-items:center;
+  display:flex;
+  flex:0 0 auto;
+  flex-shrink:0
+}
+.terms-item-header-center {
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  padding:0 8px 0 12px;
+  text-align:center
+}
+.terms-item-header-right {
+  flex:0 0 auto;
+  flex-shrink:0
+}
+.terms-item-header:has(.terms-item-header-center:empty) .terms-item-header-left {
+  flex:0 0 auto
+}
+.terms-item-header:has(.terms-item-header-center:empty) .terms-item-header-center {
+  display:none
+}
+.terms-view-btn {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text);
+  cursor:pointer;
+  flex-shrink:0;
+  font-size:12px;
+  font-weight:500;
+  height:28px;
+  min-width:50px;
+  padding:6px 12px;
+  text-align:center;
+  transition:all .2s;
+  white-space:nowrap
+}
+.terms-view-btn:hover {
+  background:var(--hover);
+  border-color:var(--brand);
+  color:var(--brand)
+}
+@media (max-width:768px) {
+  .terms-box {
+    padding:16px
+  }
+  .checkbox-label {
+    font-size:14px;
+    padding:14px 16px
+  }
+  .terms-item-header {
+    gap:8px;
+    padding:12px 0
+  }
+  .terms-item-header-center {
+    padding:0 8px
+  }
+  .terms-item-header-content {
+    font-size:13px
+  }
+  .agree-all-checkbox,.terms-checkbox {
+    height:14px;
+    width:14px
+  }
+  .agree-all-checkbox {
+    margin-right:10px
+  }
+  .terms-view-btn {
+    font-size:10px;
+    height:24px;
+    min-width:38px;
+    padding:4px 8px
+  }
+  .terms-desc {
+    font-size:12px
+  }
+  /* 폼 스타일은 components/form.css로 이동됨 */
+}
+@media (max-width:480px) {
+  .terms-item-header {
+    gap:4px;
+    padding:10px 0
+  }
+  .terms-item-header-left {
+    flex:0 0 auto
+  }
+  .terms-item-header-center {
+    flex:1;
+    min-width:0;
+    padding:0 6px
+  }
+  .terms-item-header-content {
+    font-size:11px;
+    line-height:1.3
+  }
+  .agree-all-checkbox,.terms-checkbox {
+    height:14px;
+    width:14px
+  }
+  .agree-all-checkbox {
+    margin-right:8px
+  }
+  .terms-view-btn {
+    font-size:9px;
+    height:20px;
+    min-width:32px;
+    padding:3px 6px
+  }
+}
+.terms-item-content {
+  background:var(--hover);
+  border-radius:8px;
+  color:var(--text);
+  display:none;
+  font-size:13px;
+  line-height:1.8;
+  margin-top:8px;
+  max-height:300px;
+  overflow-y:auto;
+  padding:16px;
+  white-space:pre-line
+}
+.terms-item-content:not(.hidden) {
+  display:block
+}
+.email-verify-group {
+  align-items:stretch;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:100%
+}
+.email-verify-group input {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  flex:1;
+  font-size:15px;
+  height:48px;
+  min-width:0;
+  padding:0 16px;
+  width:100%
+}
+.btn-verify {
+  align-items:center;
+  background:var(--brand);
+  border:none;
+  border-radius:8px;
+  color:#fff;
+  cursor:pointer;
+  display:inline-flex;
+  flex-shrink:0;
+  font-size:14px;
+  font-weight:600;
+  gap:6px;
+  height:48px;
+  justify-content:center;
+  line-height:1.4;
+  padding:0 12px;
+  position:relative;
+  transition:all .2s;
+  white-space:normal;
+  width:100%
+}
+.btn-verify:hover {
+  filter:brightness(1.08)
+}
+.btn-verify:disabled {
+  cursor:not-allowed;
+  opacity:.6
+}
+.verify-group {
+  align-items:stretch;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:100%
+}
+.verify-group input {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  flex:1;
+  font-size:15px;
+  height:48px;
+  min-width:0;
+  padding:0 16px;
+  width:100%
+}
+
+/* Signup verification UI migrated from assets/css/main.css */
+
+.verify-group input:disabled {
+  background:var(--bg-secondary);
+  cursor:not-allowed;
+  opacity:.7
+}
+.verify-group input.verified {
+  background:var(--success-bg);
+  border-color:var(--success-color);
+  color:var(--success-color)
+}
+.verify-status-container {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  margin-top:8px
+}
+.verification-send-meta {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:8px
+}
+.verification-send-meta .verify-note {
+  margin:0
+}
+.verify-timer {
+  color:var(--brand);
+  display:block;
+  font-size:13px;
+  font-weight:600;
+  margin-top:4px;
+  transition:color .3s
+}
+.verify-timer.warning {
+  animation:pulse 1s ease-in-out infinite;
+  color:var(--error-color)
+}
+.verify-check-icon {
+  display:inline-block;
+  font-size:18px;
+  font-weight:700;
+  margin-left:4px
+}
+.send-btn-text,.verify-btn-text {
+  display:inline-block
+}
+.send-btn-timer {
+  color:var(--info-color, var(--text-secondary));
+  display:block;
+  font-weight:700;
+  line-height:1.5;
+  margin:0;
+  overflow-wrap:anywhere;
+  transition:color .3s, font-weight .3s;
+  word-break:keep-all
+}
+.send-btn-spinner,
+.verify-btn-spinner {
+  align-items:center;
+  display:inline-flex;
+  justify-content:center
+}
+.send-btn-spinner.hidden,
+.verify-btn-spinner.hidden {
+  display:none
+}
+.timer-progress {
+  background:var(--border);
+  border-radius:2px;
+  height:3px;
+  margin-top:4px;
+  overflow:hidden;
+  width:100%
+}
+.timer-progress-bar {
+  background:var(--brand);
+  border-radius:2px;
+  height:100%;
+  transition:width 1s linear, background-color .3s
+}
+.timer-progress-bar.warning {
+  background:var(--error-color)
+}
+.btn-verify.verified {
+  background:var(--success-color);
+  cursor:default
+}
+.btn-verify.verified:hover {
+  filter:none
+}
+@media (max-width:640px) {
+  .signup-card input,
+  .signup-card select,
+  .signup-card textarea {
+    font-size:16px
+  }
+  .email-verify-group,
+  .verify-group {
+    align-items:stretch;
+    flex-direction:column;
+    gap:8px
+  }
+  .email-verify-group input,
+  .verify-group input,
+  .btn-verify {
+    width:100%
+  }
+  .btn-verify {
+    min-height:48px
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity:1
+  }
+  50% {
+    opacity:.7
+  }
+}
+
+/* Signup success step — migrated from assets/css/pages/public.css */
+
+.success-message {
+  padding:32px 0;
+  text-align:center
+}
+.success-icon {
+  align-items:center;
+  animation:successScale .5s ease-out;
+  background:var(--success-bg);
+  border-radius:50%;
+  color:var(--success-color);
+  display:flex;
+  font-size:48px;
+  font-weight:700;
+  height:80px;
+  justify-content:center;
+  margin:0 auto 24px;
+  width:80px
+}
+@keyframes successScale {
+  0% {
+    opacity:0;
+    transform:scale(0)
+  }
+  50% {
+    transform:scale(1.2)
+  }
+  100% {
+    opacity:1;
+    transform:scale(1)
+  }
+}
+.success-info {
+  background:var(--hover);
+  border-radius:8px;
+  margin:16px 0;
+  padding:16px;
+  white-space:pre-line
+}
+
+#loginLinkButton {
+  box-shadow:0 4px 12px rgba(255, 122, 0, .3);
+  font-weight:800;
+  position:relative
+}
+#loginLinkButton:hover {
+  box-shadow:0 6px 16px rgba(255, 122, 0, .4);
+  transform:translateY(-2px)
+}
+
+/* School search pagination */
+.school-search-pagination {
+  align-items:center;
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  justify-content:center;
+  margin-top:16px;
+  padding:12px 0
+}
+.school-search-page-btn {
+  background:var(--bg-secondary, #f5f5f5);
+  border:1px solid var(--border-color, #e0e0e0);
+  border-radius:4px;
+  color:var(--text-primary, #333);
+  cursor:pointer;
+  font-size:14px;
+  min-width:36px;
+  padding:6px 12px;
+  transition:all .2s
+}
+.school-search-page-btn:hover,
+.school-search-page-btn.active {
+  background:var(--primary-color, #ff6b35);
+  border-color:var(--primary-color, #ff6b35);
+  color:white
+}
+.school-search-page-btn.active {
+  font-weight:600
+}
+.school-search-page-ellipsis {
+  color:var(--text-secondary, #666);
+  padding:0 8px
+}
+.school-search-pagination-info {
+  color:var(--text-secondary, #666);
+  font-size:12px;
+  margin-top:8px;
+  text-align:center;
+  width:100%
+}
+
+@media (max-width:768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  select {
+    font-size:16px;
+    min-height:44px
+  }
+  .btn {
+    min-height:44px;
+    min-width:44px;
+    padding:12px 20px
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    height:20px;
+    min-height:20px;
+    min-width:20px;
+    width:20px
+  }
+  .form-group {
+    margin-bottom:20px
+  }
+  .success-message .btn {
+    margin-bottom:12px;
+    width:100%
+  }
+  .verification-send-meta .send-btn-timer {
+    font-size:13px
+  }
+}
+@media (max-width:480px) {
+  .auth-card {
+    padding:24px 16px
+  }
+  .form-actions {
+    flex-direction:column;
+    gap:12px
+  }
+  .form-actions .btn {
+    width:100%
+  }
+  .phone-format-hint {
+    display:block!important;
+    margin-top:4px;
+    position:static!important
+  }
+  .school-search-page-btn {
+    font-size:12px;
+    min-width:32px;
+    padding:4px 8px
+  }
+  .verification-send-meta .send-btn-timer {
+    font-size:12px
+  }
+}
+
+#step1Form .radio-label {
+  align-items:flex-start;
+  display:flex;
+  gap:12px
+}
+#step1Form .radio-label input[type="radio"] {
+  accent-color:var(--brand, #ff6b35);
+  flex-shrink:0;
+  margin-top:6px
+}

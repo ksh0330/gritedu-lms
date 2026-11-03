@@ -1,0 +1,226 @@
+/* 필터 컴포넌트 */
+.grit-filter {
+  align-items:center;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:20px;
+  justify-content:center;
+  margin:24px 0
+}
+.grit-filter .filter-group {
+  align-items:center;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:6px;
+  justify-content:center;
+  max-width:100%
+}
+.grit-filter .filter-label {
+  color:var(--muted);
+  font-size:14px;
+  font-weight:600;
+  margin-right:4px;
+  white-space:nowrap
+}
+.grit-filter button {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  cursor:pointer;
+  font-size:14px;
+  font-weight:700;
+  min-width:fit-content;
+  padding:8px 16px;
+  transition:all .2s;
+  white-space:nowrap
+}
+.grit-filter button:hover {
+  background:var(--hover);
+  border-color:var(--accent)
+}
+.grit-filter button.on {
+  background:var(--brand);
+  border-color:var(--brand);
+  color:#fff
+}
+.grit-filter button.on:hover {
+  filter:brightness(1.08)
+}
+
+/* 스케줄 필터 (특수 스타일) */
+.grit-filter.schedule-filter,
+.schedule-filter {
+  display:flex!important;
+  flex-direction:column!important;
+  gap:32px;
+  margin:32px 0;
+  width:100%
+}
+.grit-filter.schedule-filter .filter-group,
+.schedule-filter .filter-group {
+  border:none;
+  border-radius:0;
+  display:grid!important;
+  gap:0;
+  grid-template-columns:repeat(5,1fr);
+  justify-content:center;
+  overflow:hidden;
+  width:100%
+}
+.grit-filter.schedule-filter button,
+.schedule-filter button {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:0;
+  box-shadow:none;
+  color:var(--text);
+  cursor:pointer;
+  font-size:16px;
+  font-weight:600;
+  min-height:48px;
+  min-width:0;
+  padding:12px 16px;
+  position:relative;
+  text-align:center;
+  transition:color .2s ease;
+  white-space:nowrap;
+  width:100%
+}
+.grit-filter.schedule-filter button.filter-all-btn,
+.schedule-filter button.filter-all-btn {
+  border-bottom:1px solid var(--border);
+  grid-column:1/-1
+}
+.grit-filter.schedule-filter button:nth-child(n+2):nth-child(-n+6),
+.schedule-filter button:nth-child(n+2):nth-child(-n+6) {
+  border-left:none;
+  border-top:none
+}
+.grit-filter.schedule-filter button:nth-child(n+2):nth-child(5n+2),
+.schedule-filter button:nth-child(n+2):nth-child(5n+2) {
+  border-left:1px solid var(--border)
+}
+.grit-filter.schedule-filter button:hover,
+.schedule-filter button:hover {
+  color:var(--brand)
+}
+.grit-filter.schedule-filter .filter-grade button.on,
+.schedule-filter .filter-grade button.on {
+  background:var(--brand);
+  border-color:var(--brand);
+  color:#fff
+}
+.grit-filter.schedule-filter .filter-grade button.on:hover,
+.schedule-filter .filter-grade button.on:hover {
+  color:#fff
+}
+.grit-filter.schedule-filter .filter-subject button.on,
+.schedule-filter .filter-subject button.on {
+  background:transparent;
+  border-color:var(--border);
+  box-shadow:inset 0 -2px 0 var(--brand);
+  color:var(--brand)
+}
+.grit-filter.schedule-filter .filter-subject button.on:hover,
+.schedule-filter .filter-subject button.on:hover {
+  color:var(--brand)
+}
+
+/* 모바일 반응형 */
+@media (max-width:640px) {
+  .grit-filter {
+    gap:8px 6px;
+    margin:16px 0
+  }
+  .grit-filter .filter-group {
+    flex:1 1 100%;
+    gap:6px 4px
+  }
+  .grit-filter .filter-label {
+    flex:0 0 auto;
+    font-size:13px
+  }
+  .grit-filter button {
+    border-radius:6px;
+    flex:0 1 auto;
+    font-size:13px;
+    font-weight:700;
+    min-width:0;
+    padding:8px 12px;
+    white-space:nowrap
+  }
+}
+@media (max-width:480px) {
+  .grit-filter button {
+    font-size:12px;
+    padding:6px 10px
+  }
+}
+@media (max-width:768px) {
+  .grit-filter.schedule-filter,
+  .schedule-filter {
+    gap:24px;
+    margin:24px 0
+  }
+  .grit-filter.schedule-filter button,
+  .schedule-filter button {
+    font-size:14px;
+    min-height:44px;
+    padding:10px 12px
+  }
+}
+@media (max-width:480px) {
+  .grit-filter.schedule-filter .filter-group,
+  .schedule-filter .filter-group {
+    grid-template-columns:repeat(3,1fr);
+    grid-template-rows:repeat(2,1fr)
+  }
+  .grit-filter.schedule-filter button,
+  .schedule-filter button {
+    font-size:13px;
+    min-height:40px;
+    padding:8px 10px
+  }
+  .grit-filter.schedule-filter button.filter-all-btn,
+  .schedule-filter button.filter-all-btn {
+    grid-column:1!important;
+    grid-row:1
+  }
+  .grit-filter.schedule-filter button:nth-child(2),
+  .schedule-filter button:nth-child(2) {
+    border-left:1px solid var(--border)!important;
+    grid-column:2;
+    grid-row:1
+  }
+  .grit-filter.schedule-filter button:nth-child(3),
+  .schedule-filter button:nth-child(3) {
+    grid-column:3;
+    grid-row:1
+  }
+  .grit-filter.schedule-filter button:nth-child(4),
+  .schedule-filter button:nth-child(4) {
+    border-top:1px solid var(--border)!important;
+    grid-column:1;
+    grid-row:2
+  }
+  .grit-filter.schedule-filter button:nth-child(5),
+  .schedule-filter button:nth-child(5) {
+    border-left:1px solid var(--border)!important;
+    border-top:1px solid var(--border)!important;
+    grid-column:2;
+    grid-row:2
+  }
+  .grit-filter.schedule-filter button:nth-child(6),
+  .schedule-filter button:nth-child(6) {
+    border-top:1px solid var(--border);
+    grid-column:3;
+    grid-row:2
+  }
+  .grit-filter.schedule-filter button:first-child,
+  .schedule-filter button:first-child {
+    border-bottom:none
+  }
+}

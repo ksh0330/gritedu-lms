@@ -1,0 +1,92 @@
+/* ------------------------------------------------------------------
+   Moved from members/login.html — scoped to .auth-wrap:has(#loginForm)
+   (login-only; avoids affecting signup’s main.auth-wrap)
+   ------------------------------------------------------------------ */
+
+/* 로딩 스피너 스타일 */
+.auth-wrap:has(#loginForm) .button-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.auth-wrap:has(#loginForm) .button-spinner.hidden {
+  display: none;
+}
+
+.auth-wrap:has(#loginForm) .btn.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-wrap:has(#loginForm) .btn.primary:disabled .button-text {
+  opacity: 0.7;
+}
+
+/* 회원가입 CTA (login.html 전용, public.css에서 이전) */
+.auth-wrap:has(#loginForm) .auth-card .signup-section {
+  border-top: 1px solid var(--border);
+  margin-top: 32px;
+  padding-top: 24px;
+  text-align: center;
+}
+
+.auth-wrap:has(#loginForm) .auth-card .signup-section p {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.auth-wrap:has(#loginForm) .auth-card .signup-section .btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  margin-top: 0;
+}
+
+.auth-wrap:has(#loginForm) .auth-card .signup-section .btn:hover {
+  background: var(--hover);
+  border-color: var(--brand);
+}
+
+/* 반응형 디자인 개선 - 모바일 최적화 */
+@media (max-width: 768px) {
+  /* 입력 필드 최소 높이 확보 (터치 타겟 44px 이상) */
+  #loginForm input[type="email"],
+  #loginForm input[type="password"] {
+    min-height: 44px;
+    font-size: 16px; /* iOS 줌 방지 */
+  }
+
+  /* 버튼 최소 크기 확보 */
+  .auth-wrap:has(#loginForm) .btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 20px;
+  }
+
+  /* 링크 간격 확보 */
+  .auth-wrap:has(#loginForm) .flex.justify-between.items-center a {
+    padding: 8px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-wrap:has(#loginForm) .auth-card {
+    padding: 24px 16px;
+  }
+
+  .auth-wrap:has(#loginForm) .signup-section {
+    margin-top: 24px;
+  }
+
+  .auth-wrap:has(#loginForm) .signup-section .btn {
+    width: 100%;
+  }
+}

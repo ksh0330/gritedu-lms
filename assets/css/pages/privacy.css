@@ -1,0 +1,70 @@
+/* ------------------------------------------------------------------
+   Moved from privacy.html (embedded <style>) — static policy layout
+   ------------------------------------------------------------------ */
+
+.policy-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 16px;
+}
+
+.policy-content-inner {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 40px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.policy-content-inner h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 32px 0 16px 0;
+  color: var(--text);
+}
+
+.policy-content-inner h2:first-child {
+  margin-top: 0;
+}
+
+.policy-content-inner h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 24px 0 12px 0;
+  color: var(--text);
+}
+
+.policy-content-inner p {
+  margin: 12px 0;
+  color: var(--text);
+}
+
+.policy-content-inner ol,
+.policy-content-inner ul {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.policy-content-inner li {
+  margin: 8px 0;
+  color: var(--text);
+}
+
+.policy-meta {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .policy-container {
+    padding: 24px 16px;
+  }
+
+  .policy-content-inner {
+    padding: 24px 16px;
+  }
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>그릿에듀 | 회원 LMS</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ff7a00" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <script>
+    // 로딩 skeleton: 세션에 보관된 D-Day 표시 여부와 회원 유형으로 자리를 미리 잡는다(dashboard-skeleton.css, dday.js, member-dashboard.js).
+    try { var gritDday = JSON.parse(sessionStorage.getItem('grit:dday:v1') || 'null'); if (!gritDday || gritDday.showDashboard) document.documentElement.classList.add('dday-slot-pending'); } catch (e) { document.documentElement.classList.add('dday-slot-pending'); }
+    try { var gritPurpose = sessionStorage.getItem('grit:memberPurpose'); if (gritPurpose === 'parent' || gritPurpose === 'general') document.documentElement.setAttribute('data-member-purpose', gritPurpose); } catch (e) {}
+  </script>
+<script type="module" src="/assets/js/firebase-init.js"></script>
+  <script type="module" src="/assets/js/common.js"></script>
+  <script src="/assets/js/pwa-register.js" defer></script>
+  <script type="module" src="/assets/js/pages/member-dashboard.js"></script>
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body class="member-dashboard-page">
+  <div data-include="header"></div>
+
+  <main class="grit-page-container">
+    <section class="grit-section member-dashboard-hero">
+      <div>
+        <p class="member-dashboard-kicker dashboard-skeleton" id="memberPurposeBadge">회원</p>
+        <!-- 학생 내 강의실 제목과 같은 형식(왼쪽 정렬, 아이콘 포함) -->
+        <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+          </svg>
+          회원 LMS
+        </h1>
+        <p class="home-subdesc" id="memberDashboardStatus">로그인 상태를 확인하는 중입니다.</p>
+        <div id="memberDashboardDday" class="dashboard-dday-slot" hidden></div>
+      </div>
+      <div class="member-dashboard-actions">
+        <!-- 학생 내 강의실 '기본 정보 수정'과 같은 버튼(문구·크기·아이콘). 기존 내 정보 모달을 연다. -->
+        <button type="button" class="btn" id="openMemberInfoBtn" style="display:flex;align-items:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          기본 정보 수정
+        </button>
+      </div>
+    </section>
+
+    <section class="grit-section member-parent-section" id="memberParentSection" hidden>
+      <div class="section-header member-section-header">
+        <div>
+          <h2 class="section-title">자녀 학습 요약</h2>
+        </div>
+      </div>
+      <div class="member-parent-grid">
+      <div class="member-child-link-card" id="memberChildLinkPlaceholder" hidden>
+        <h2 class="section-title">자녀 연동</h2>
+        <form id="memberChildLinkForm" class="member-child-link-form">
+          <label>
+            <span>학생 이름</span>
+            <input type="text" id="childStudentName" maxlength="50" name="studentName" autocomplete="off" required>
+          </label>
+          <label>
+            <span>자녀 학교</span>
+            <div class="member-school-search">
+              <input type="text" id="childSchool" maxlength="100" name="school" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="childSchoolOptions" required>
+              <div id="childSchoolOptions" class="member-school-options" role="listbox" hidden></div>
+            </div>
+          </label>
+          <label>
+            <span>학년</span>
+            <select id="childGrade" name="grade" required>
+              <option value="">선택</option>
+              <option value="1">중1</option>
+              <option value="2">중2</option>
+              <option value="3">중3</option>
+              <option value="4">고1</option>
+              <option value="5">고2</option>
+              <option value="6">고3</option>
+              <option value="7">졸업/N수</option>
+            </select>
+          </label>
+          <label>
+            <span>학생 휴대전화번호</span>
+            <input type="tel" id="childStudentPhone" maxlength="30" name="studentPhone" inputmode="tel" autocomplete="off" required>
+          </label>
+          <label>
+            <span>관계</span>
+            <select id="childRelationLabel" name="relationLabel" required>
+              <option value="father">부</option>
+              <option value="mother">모</option>
+              <option value="guardian">보호자</option>
+            </select>
+          </label>
+          <button type="submit" class="btn primary sm" id="memberChildLinkSubmit">자녀 연동하기</button>
+        </form>
+        <p id="memberChildLinkMessage" class="member-child-link-message" role="status" aria-live="polite"></p>
+      </div>
+      <div class="member-linked-children-card">
+        <div class="member-linked-children">
+          <h3>연동된 자녀</h3>
+          <div id="memberLinkedChildrenList" class="member-linked-children-list" aria-live="polite">
+            <div class="dashboard-skeleton dashboard-skeleton--child-card" aria-hidden="true"></div>
+            <div class="dashboard-skeleton dashboard-skeleton--child-card" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <section class="grit-section" id="memberCoursesSection">
+      <div class="section-header">
+        <h2 class="section-title">내 온라인 강좌</h2>
+      </div>
+      <div id="memberCoursesGrid" class="student-courses-grid" aria-live="polite">
+        <div class="dashboard-skeleton dashboard-skeleton--card" aria-hidden="true"></div>
+        <div class="dashboard-skeleton dashboard-skeleton--card" aria-hidden="true"></div>
+        <div class="dashboard-skeleton dashboard-skeleton--card" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="dashboard-settings-link" aria-label="계정 설정">
+      <button type="button" class="btn sm" id="openMemberMarketingConsentBtn">
+        광고성 정보 수신 설정
+      </button>
+      <button type="button" class="btn sm account-deletion-trigger" id="openMemberAccountDeletionBtn">
+        계정 삭제 안내
+      </button>
+    </section>
+  </main>
+
+  <div id="memberInfoModal" class="dashboard-modal-overlay" hidden>
+    <div class="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="memberInfoTitle">
+      <div class="dashboard-modal__header">
+        <h2 class="dashboard-modal__title" id="memberInfoTitle">회원 정보 수정</h2>
+        <button type="button" id="closeMemberInfoModal" class="dashboard-modal__close" aria-label="닫기">×</button>
+      </div>
+      <dl class="dashboard-modal__readonly-grid">
+        <div>
+          <dt>이메일</dt>
+          <dd id="memberEmailCell">-</dd>
+        </div>
+        <div>
+          <dt>회원 유형</dt>
+          <dd id="memberPurposeCell">-</dd>
+        </div>
+      </dl>
+      <form id="memberProfileForm" class="dashboard-modal__form">
+        <label class="dashboard-modal__field" for="memberNameInput">
+          <span>이름 <span class="required">*</span></span>
+          <input type="text" id="memberNameInput" maxlength="100" name="name" required>
+        </label>
+        <label class="dashboard-modal__field" for="memberPhoneInput">
+          <span>연락처 <span class="required">*</span></span>
+          <input type="tel" id="memberPhoneInput" maxlength="30" name="phone" required>
+        </label>
+        <p class="dashboard-modal__note">이메일과 회원 유형은 변경할 수 없습니다.</p>
+        <div class="dashboard-modal__actions">
+          <button type="submit" class="btn primary sm" id="memberProfileSaveBtn">저장</button>
+          <button type="button" class="btn sm" id="cancelMemberProfileBtn">취소</button>
+        </div>
+        <p id="memberProfileMessage" class="dashboard-modal__message" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="memberMarketingConsentModal" class="dashboard-modal-overlay" hidden>
+    <div class="dashboard-modal dashboard-modal--sm" role="dialog" aria-modal="true" aria-labelledby="memberMarketingConsentTitle">
+      <div class="dashboard-modal__header">
+        <h2 class="dashboard-modal__title" id="memberMarketingConsentTitle">광고성 정보 수신 설정</h2>
+        <button type="button" id="closeMemberMarketingConsentModal" class="dashboard-modal__close" aria-label="닫기">×</button>
+      </div>
+      <form id="memberMarketingConsentForm" class="dashboard-modal__form">
+        <label class="dashboard-consent-row">
+          <input type="checkbox" id="memberMarketingConsentInput" name="marketingConsent">
+          <span class="dashboard-consent-row__text">
+            <strong>문자·이메일 수신</strong>
+            <small>학원 소식, 신규 강좌, 설명회와 이벤트 안내를 받습니다.</small>
+            <em>문자와 이메일이 함께 변경됩니다. (하루 최대 3회)</em>
+          </span>
+        </label>
+        <div class="dashboard-modal__actions">
+          <button type="submit" class="btn primary sm" id="memberMarketingConsentSaveBtn">저장</button>
+          <button type="button" class="btn sm" id="cancelMemberMarketingConsentBtn">취소</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="memberAccountDeletionModal" class="dashboard-modal-overlay" hidden>
+    <div class="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="memberAccountDeletionTitle">
+      <div class="dashboard-modal__header">
+        <h2 class="dashboard-modal__title account-deletion-title" id="memberAccountDeletionTitle">계정 삭제 안내</h2>
+        <button type="button" id="closeMemberAccountDeletionModal" class="dashboard-modal__close" aria-label="닫기">×</button>
+      </div>
+      <div class="account-deletion-content">
+        <p>계정 삭제는 아래 이메일로 문의해 주세요.</p>
+        <ul>
+          <li>삭제 후에는 로그인하거나 계정을 복구할 수 없습니다.</li>
+          <li>일반 회원의 신청·수강 정보는 함께 삭제되며, 학부모 회원은 자녀와의 연결만 해제됩니다.</li>
+          <li>법령 또는 운영상 보관이 필요한 정보는 정해진 기간 동안 별도로 보관될 수 있습니다.</li>
+        </ul>
+        <p class="account-deletion-address"><span>문의 이메일</span><strong>griteducto@gmail.com</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <div data-include="footer"></div>
+</body>
+</html>
