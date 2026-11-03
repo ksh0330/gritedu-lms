@@ -172,7 +172,7 @@ flowchart LR
 ## 프로젝트 구조
 
 ```text
-gritedu-lms-portfolio/
+gritedu-lms/
 ├─ assets/
 │  ├─ css/                 # 공통·컴포넌트·페이지 스타일
 │  ├─ js/                  # 공통 모듈, 기능별·페이지별 스크립트
@@ -213,8 +213,8 @@ gritedu-lms-portfolio/
 ### 1. 저장소 복제
 
 ```bash
-git clone https://github.com/ksh0330/gritedu-lms-portfolio.git
-cd gritedu-lms-portfolio
+git clone https://github.com/ksh0330/gritedu-lms.git
+cd gritedu-lms
 ```
 
 ### 2. 의존성 설치
